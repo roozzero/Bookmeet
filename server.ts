@@ -214,6 +214,148 @@ async function startServer() {
     }
   });
 
+  app.get('/api/panel', async (req, res) => {
+    try {
+      const phone = req.query.phone ? String(req.query.phone) : undefined;
+      const panelData = await mysqlDb.getMemberPanelData(phone);
+      res.json(panelData);
+    } catch (error) {
+      console.error('Failed to load member panel data:', error);
+      res.status(500).json({ error: 'خطا در دریافت اطلاعات پنل کاربری از دیتابیس' });
+    }
+  });
+
+  app.put('/api/panel/profile', async (req, res) => {
+    try {
+      const {
+        phone,
+        first_name,
+        last_name,
+        education,
+        favorite_genre,
+        email,
+        city,
+        bio,
+      } = req.body || {};
+      if (!first_name || !last_name || !phone) {
+        res.status(400).json({ error: 'نام، نام خانوادگی و شماره تلفن الزامی است.' });
+        return;
+      }
+      const member = await mysqlDb.updateMemberProfile({
+        phone: String(phone).trim(),
+        first_name: String(first_name).trim(),
+        last_name: String(last_name).trim(),
+        education: String(education || 'کارشناسی ارشد').trim(),
+        favorite_genre: String(favorite_genre || 'ادبیات داستانی و رمان کلاسیک').trim(),
+        email: String(email || '').trim(),
+        city: String(city || 'تهران').trim(),
+        bio: String(bio || '').trim(),
+      });
+      res.json({ success: true, member });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در بروزرسانی پروفایل';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/panel/sessions/note', async (req, res) => {
+    try {
+      const { sessionId, member_note } = req.body || {};
+      const updated = await mysqlDb.updateMemberSessionNote({
+        sessionId: Number(sessionId),
+        member_note: String(member_note || '').trim(),
+      });
+      res.json({ success: true, session: updated });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ثبت یادداشت جلسه';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.patch('/api/panel/library', async (req, res) => {
+    try {
+      const { bookId, progress_percent, reading_status, personal_note } = req.body || {};
+      const updated = await mysqlDb.updateMemberLibraryItem({
+        bookId: Number(bookId),
+        progress_percent: Number(progress_percent),
+        reading_status: reading_status || 'در حال مطالعه',
+        personal_note: String(personal_note || '').trim(),
+      });
+      res.json({ success: true, book: updated });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در بروزرسانی کتاب';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/panel/library', async (req, res) => {
+    try {
+      const {
+        book_title,
+        author,
+        translator,
+        reading_status,
+        pages_count,
+        personal_note,
+      } = req.body || {};
+      if (!book_title || !author) {
+        res.status(400).json({ error: 'عنوان کتاب و نام نویسنده الزامی است.' });
+        return;
+      }
+      const created = await mysqlDb.addMemberLibraryBook({
+        book_title: String(book_title).trim(),
+        author: String(author).trim(),
+        translator: String(translator || '—').trim(),
+        reading_status: reading_status || 'در نوبت مطالعه',
+        pages_count: Number(pages_count || 320),
+        personal_note: String(personal_note || '').trim(),
+      });
+      res.status(201).json({ success: true, book: created });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در افزودن کتاب به کتابخانه من';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/panel/tickets', async (req, res) => {
+    try {
+      const { member_phone, subject, department, priority, message } = req.body || {};
+      if (!subject || !message) {
+        res.status(400).json({ error: 'عنوان تیکت و متن پیام الزامی است.' });
+        return;
+      }
+      const created = await mysqlDb.createMemberTicket({
+        member_phone: String(member_phone || 'all').trim(),
+        subject: String(subject).trim(),
+        department: String(department || 'دبیرخانه باشگاه').trim(),
+        priority: priority || 'عادی',
+        message: String(message).trim(),
+      });
+      res.status(201).json({ success: true, ticket: created });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ثبت تیکت پشتیبانی';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/panel/calendar/reserve', async (req, res) => {
+    try {
+      const { eventId } = req.body || {};
+      const updated = await mysqlDb.toggleCalendarReservation(Number(eventId));
+      res.json({ success: true, event: updated });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در تغییر وضعیت رزرو رویداد';
+      res.status(400).json({ error: message });
+    }
+  });
+
+
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

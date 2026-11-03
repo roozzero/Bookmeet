@@ -11,7 +11,13 @@ import { createBlogPostPageComponent } from './components/BlogPostPage.ts';
 import { createContactSectionComponent } from './components/ContactSection.ts';
 import { createScrollToTopButtonComponent } from './components/ScrollToTopButton.ts';
 import { createClubAuthModalComponent } from './components/ClubAuthModal.ts';
-import type { BlogPost, BootstrapPayload, ClubMember } from './types/models.ts';
+import { createMemberPanelPageComponent } from './components/MemberPanelPage.ts';
+import type {
+  BlogPost,
+  BootstrapPayload,
+  ClubMember,
+  MemberPanelPayload,
+} from './types/models.ts';
 
 const FALLBACK_BOOTSTRAP: BootstrapPayload = {
   navigationLinks: [
@@ -303,9 +309,86 @@ function mountApplication(payload: BootstrapPayload): void {
 
   function getNavbarCtaLabel(): string {
     if (currentMember) {
-      return `${currentMember.first_name} ${currentMember.last_name}`;
+      return `پنل کاربری · ${currentMember.first_name} ${currentMember.last_name}`;
     }
     return payload.heroSettings.nav_cta_text || 'ورود به باشگاه';
+  }
+
+  function openMemberPanel(phone?: string): void {
+    ApiService.fetchMemberPanelData(phone || currentMember?.phone)
+      .then((panelData: MemberPanelPayload) => {
+        currentMember = panelData.member;
+        renderMemberPanelView(panelData);
+      })
+      .catch(() => {
+        // Fallback if offline
+        const fallbackMember: ClubMember = currentMember || {
+          id: 1,
+          first_name: 'پرنیا',
+          last_name: 'فرهمند',
+          phone: '۰۹۱۲۳۴۵۶۷۸۹',
+          education: 'کارشناسی ارشد',
+          favorite_genre: 'ادبیات داستانی و رمان کلاسیک',
+          email: 'parnia.farahmand@bookmeet.ir',
+          city: 'تهران',
+          bio: 'علاقه‌مند به ادبیات کلاسیک جهان و شرکت در حلقه‌های مطالعاتی هفتگی باشگاه بوک‌میت.',
+          membership_code: 'BM-۱۴۰۵-۱۰۸',
+          joined_date: '۱۲ مهر ۱۴۰۴',
+          created_at: new Date().toISOString(),
+        };
+        renderMemberPanelView({
+          member: fallbackMember,
+          sessions: [],
+          library: [],
+          tickets: [],
+          calendarEvents: [],
+        });
+      });
+  }
+
+  function renderMemberPanelView(panelData: MemberPanelPayload): void {
+    $app.empty();
+
+    const $shell = $(
+      '<div dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
+    );
+
+    const $navbar = createNavbarComponent({
+      navigationLinks: payload.navigationLinks,
+      ctaText: getNavbarCtaLabel(),
+      onNavigate: (href) => {
+        renderMainHomeView(href);
+      },
+      onLoginClick: () => {
+        openMemberPanel(currentMember?.phone);
+      },
+    });
+
+    const $panelPage = createMemberPanelPageComponent({
+      initialData: panelData,
+      onBackToSite: () => {
+        renderMainHomeView();
+      },
+      onLogout: () => {
+        currentMember = null;
+        renderMainHomeView();
+      },
+      onMemberUpdated: (updatedMember) => {
+        currentMember = updatedMember;
+        $('.js-club-login-btn').text(getNavbarCtaLabel());
+      },
+    });
+
+    const $contact = createContactSectionComponent({
+      contactInfo: payload.contactInfo || FALLBACK_BOOTSTRAP.contactInfo,
+    });
+
+    const $scrollToTopBtn = createScrollToTopButtonComponent();
+
+    $shell.append($navbar, $panelPage, $contact, $scrollToTopBtn);
+    $app.append($shell);
+
+    window.scrollTo(0, 0);
   }
 
   function renderMainHomeView(scrollToSelector?: string): void {
@@ -318,7 +401,7 @@ function mountApplication(payload: BootstrapPayload): void {
     const $loginModal = createClubAuthModalComponent({
       onAuthSuccess: (member) => {
         currentMember = member;
-        $('.js-club-login-btn').text(getNavbarCtaLabel());
+        openMemberPanel(member.phone);
       },
     });
 
@@ -329,7 +412,11 @@ function mountApplication(payload: BootstrapPayload): void {
         scrollToSection(href);
       },
       onLoginClick: () => {
-        $loginModal.removeClass('hidden');
+        if (currentMember) {
+          openMemberPanel(currentMember.phone);
+        } else {
+          $loginModal.removeClass('hidden');
+        }
       },
     });
 
@@ -395,7 +482,7 @@ function mountApplication(payload: BootstrapPayload): void {
     const $loginModal = createClubAuthModalComponent({
       onAuthSuccess: (member) => {
         currentMember = member;
-        $('.js-club-login-btn').text(getNavbarCtaLabel());
+        openMemberPanel(member.phone);
       },
     });
 
@@ -407,7 +494,11 @@ function mountApplication(payload: BootstrapPayload): void {
         renderMainHomeView(href);
       },
       onLoginClick: () => {
-        $loginModal.removeClass('hidden');
+        if (currentMember) {
+          openMemberPanel(currentMember.phone);
+        } else {
+          $loginModal.removeClass('hidden');
+        }
       },
     });
 

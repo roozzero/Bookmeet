@@ -110,7 +110,78 @@ export interface ClubMember {
   phone: string;
   education: string;
   favorite_genre: string;
+  email?: string;
+  city?: string;
+  bio?: string;
+  membership_code?: string;
+  joined_date?: string;
   created_at: string;
+}
+
+export interface MemberSession {
+  id: number;
+  member_phone: string;
+  title: string;
+  book_title: string;
+  mentor_name: string;
+  session_date: string;
+  session_time: string;
+  location_type: string;
+  meeting_link_or_room: string;
+  status: 'ثبت‌نام‌شده' | 'برگزارشده' | 'ظرفیت باز';
+  member_note: string;
+  sort_order: number;
+}
+
+export interface MemberLibraryItem {
+  id: number;
+  member_phone: string;
+  book_title: string;
+  author: string;
+  translator: string;
+  cover_url: string;
+  reading_status: 'در حال مطالعه' | 'خوانده‌شده' | 'در نوبت مطالعه';
+  progress_percent: number;
+  pages_count: number;
+  personal_note: string;
+  updated_at: string;
+}
+
+export interface MemberTicket {
+  id: number;
+  member_phone: string;
+  ticket_code: string;
+  subject: string;
+  department: string;
+  priority: 'عادی' | 'مهم' | 'فوری';
+  status: 'پاسخ داده‌شده' | 'در انتظار بررسی' | 'بسته‌شده';
+  message: string;
+  admin_reply: string;
+  created_at: string;
+}
+
+export interface ClubCalendarEvent {
+  id: number;
+  title: string;
+  event_type: string;
+  day_of_month: string;
+  month_name: string;
+  weekday_name: string;
+  time_range: string;
+  host_name: string;
+  location_label: string;
+  capacity_info: string;
+  description: string;
+  is_reserved: number;
+  sort_order: number;
+}
+
+export interface MemberPanelPayload {
+  member: ClubMember;
+  sessions: MemberSession[];
+  library: MemberLibraryItem[];
+  tickets: MemberTicket[];
+  calendarEvents: ClubCalendarEvent[];
 }
 
 export interface ClubRegisterInput {
@@ -142,5 +213,6 @@ export interface BootstrapPayload {
   blogPosts: BlogPost[];
   contactInfo: ContactInfoData;
 }
+
 
 

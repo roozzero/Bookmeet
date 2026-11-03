@@ -123,8 +123,73 @@ CREATE TABLE IF NOT EXISTS club_members (
   last_name VARCHAR(100) NOT NULL,
   phone VARCHAR(40) NOT NULL UNIQUE,
   education VARCHAR(120) NOT NULL,
-  favorite_genre VARCHAR(120) NOT NULL,
+  favorite_genre VARCHAR(120) NOT NULL DEFAULT 'ادبیات داستانی و رمان کلاسیک',
+  email VARCHAR(150) NOT NULL DEFAULT '',
+  city VARCHAR(100) NOT NULL DEFAULT 'تهران',
+  bio TEXT NOT NULL,
+  membership_code VARCHAR(40) NOT NULL DEFAULT 'BM-۱۴۰۵-۱۰۸',
+  joined_date VARCHAR(60) NOT NULL DEFAULT 'مهر ۱۴۰۵',
   password_hash VARCHAR(255) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS member_sessions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  member_phone VARCHAR(40) NOT NULL DEFAULT 'all',
+  title VARCHAR(220) NOT NULL,
+  book_title VARCHAR(180) NOT NULL,
+  mentor_name VARCHAR(150) NOT NULL,
+  session_date VARCHAR(80) NOT NULL,
+  session_time VARCHAR(80) NOT NULL,
+  location_type VARCHAR(60) NOT NULL,
+  meeting_link_or_room VARCHAR(220) NOT NULL,
+  status VARCHAR(60) NOT NULL,
+  member_note TEXT NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS member_library (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  member_phone VARCHAR(40) NOT NULL DEFAULT 'all',
+  book_title VARCHAR(180) NOT NULL,
+  author VARCHAR(150) NOT NULL,
+  translator VARCHAR(150) NOT NULL,
+  cover_url VARCHAR(255) NOT NULL,
+  reading_status VARCHAR(60) NOT NULL,
+  progress_percent INT NOT NULL DEFAULT 0,
+  pages_count INT NOT NULL DEFAULT 300,
+  personal_note TEXT NOT NULL,
+  updated_at VARCHAR(80) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS member_tickets (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  member_phone VARCHAR(40) NOT NULL DEFAULT 'all',
+  ticket_code VARCHAR(40) NOT NULL,
+  subject VARCHAR(220) NOT NULL,
+  department VARCHAR(100) NOT NULL,
+  priority VARCHAR(40) NOT NULL,
+  status VARCHAR(60) NOT NULL,
+  message TEXT NOT NULL,
+  admin_reply TEXT NOT NULL,
+  created_at VARCHAR(80) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS club_calendar_events (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(220) NOT NULL,
+  event_type VARCHAR(100) NOT NULL,
+  day_of_month VARCHAR(20) NOT NULL,
+  month_name VARCHAR(60) NOT NULL,
+  weekday_name VARCHAR(60) NOT NULL,
+  time_range VARCHAR(80) NOT NULL,
+  host_name VARCHAR(150) NOT NULL,
+  location_label VARCHAR(180) NOT NULL,
+  capacity_info VARCHAR(100) NOT NULL,
+  description TEXT NOT NULL,
+  is_reserved TINYINT(1) NOT NULL DEFAULT 0,
+  sort_order INT NOT NULL DEFAULT 0
+);
+
 

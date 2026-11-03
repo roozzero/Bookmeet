@@ -447,13 +447,12 @@ export function createClubAuthModalComponent(
           .text(welcomeMsg)
           .removeClass('hidden');
 
-        if (options.onAuthSuccess) {
-          options.onAuthSuccess(res.member);
-        }
-
         window.setTimeout(() => {
           closeModal();
-        }, 1200);
+          if (options.onAuthSuccess) {
+            options.onAuthSuccess(res.member);
+          }
+        }, 450);
       })
       .catch((err: Error) => {
         $loginForm
@@ -517,16 +516,12 @@ export function createClubAuthModalComponent(
     })
       .then((res) => {
         const successMsg = toPersianDigits(
-          `${res.member.first_name} ${res.member.last_name} عزیز، عضویت شما در باشگاه بوک‌میت با موفقیت ثبت شد. خوش آمدید!`
+          `${res.member.first_name} ${res.member.last_name} عزیز، عضویت شما در باشگاه بوک‌میت با موفقیت ثبت شد. در حال ورود به پنل کاربری...`
         );
         $registerForm
           .find('.js-register-feedback')
           .text(successMsg)
           .removeClass('hidden');
-
-        if (options.onAuthSuccess) {
-          options.onAuthSuccess(res.member);
-        }
 
         window.setTimeout(() => {
           ($registerForm[0] as HTMLFormElement).reset();
@@ -537,7 +532,10 @@ export function createClubAuthModalComponent(
             .removeClass('text-[#2c1f14] font-medium');
           $eduDropdown.find('.js-education-check').addClass('opacity-0');
           closeModal();
-        }, 1400);
+          if (options.onAuthSuccess) {
+            options.onAuthSuccess(res.member);
+          }
+        }, 550);
       })
       .catch((err: Error) => {
         $registerForm

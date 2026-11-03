@@ -116,8 +116,71 @@ export interface ClubMemberRow {
   phone: string;
   education: string;
   favorite_genre: string;
+  email: string;
+  city: string;
+  bio: string;
+  membership_code: string;
+  joined_date: string;
   password_hash: string;
   created_at: string;
+}
+
+export interface MemberSessionRow {
+  id: number;
+  member_phone: string;
+  title: string;
+  book_title: string;
+  mentor_name: string;
+  session_date: string;
+  session_time: string;
+  location_type: string;
+  meeting_link_or_room: string;
+  status: 'ثبت‌نام‌شده' | 'برگزارشده' | 'ظرفیت باز';
+  member_note: string;
+  sort_order: number;
+}
+
+export interface MemberLibraryRow {
+  id: number;
+  member_phone: string;
+  book_title: string;
+  author: string;
+  translator: string;
+  cover_url: string;
+  reading_status: 'در حال مطالعه' | 'خوانده‌شده' | 'در نوبت مطالعه';
+  progress_percent: number;
+  pages_count: number;
+  personal_note: string;
+  updated_at: string;
+}
+
+export interface MemberTicketRow {
+  id: number;
+  member_phone: string;
+  ticket_code: string;
+  subject: string;
+  department: string;
+  priority: 'عادی' | 'مهم' | 'فوری';
+  status: 'پاسخ داده‌شده' | 'در انتظار بررسی' | 'بسته‌شده';
+  message: string;
+  admin_reply: string;
+  created_at: string;
+}
+
+export interface ClubCalendarEventRow {
+  id: number;
+  title: string;
+  event_type: string;
+  day_of_month: string;
+  month_name: string;
+  weekday_name: string;
+  time_range: string;
+  host_name: string;
+  location_label: string;
+  capacity_info: string;
+  description: string;
+  is_reserved: number;
+  sort_order: number;
 }
 
 export interface MySQLStoreSchema {
@@ -132,10 +195,14 @@ export interface MySQLStoreSchema {
   contact_info: ContactInfoRow[];
   contact_messages: ContactMessageRow[];
   club_members: ClubMemberRow[];
+  member_sessions: MemberSessionRow[];
+  member_library: MemberLibraryRow[];
+  member_tickets: MemberTicketRow[];
+  club_calendar_events: ClubCalendarEventRow[];
   custom_tables?: Record<string, Record<string, unknown>[]>;
 }
 
-const CURRENT_SCHEMA_VERSION = 8;
+const CURRENT_SCHEMA_VERSION = 9;
 const STORAGE_FILE = path.resolve(process.cwd(), 'server/db/mysql_data.json');
 
 const SEED_DATA: MySQLStoreSchema = {
@@ -383,7 +450,253 @@ const SEED_DATA: MySQLStoreSchema = {
     },
   ],
   contact_messages: [],
-  club_members: [],
+  club_members: [
+    {
+      id: 1,
+      first_name: 'پرنیا',
+      last_name: 'فرهمند',
+      phone: '۰۹۱۲۳۴۵۶۷۸۹',
+      education: 'کارشناسی ارشد',
+      favorite_genre: 'ادبیات داستانی و رمان کلاسیک',
+      email: 'parnia.farahmand@bookmeet.ir',
+      city: 'تهران',
+      bio: 'علاقه‌مند به ادبیات کلاسیک جهان، رئالیسم جادویی آمریکای لاتین و روایت‌شناسی تطبیقی. از مهرماه ۱۴۰۴ در حلقه‌های مطالعاتی هفتگی باشگاه کتابخوانی بوک‌میت حضور دارم و یادداشت‌های تحلیلی درباره ساختار زمان در رمان‌های مدرن می‌نویسم.',
+      membership_code: 'BM-۱۴۰۵-۱۰۸',
+      joined_date: '۱۲ مهر ۱۴۰۴',
+      password_hash: '1234',
+      created_at: '2026-10-04T10:00:00.000Z',
+    },
+  ],
+  member_sessions: [
+    {
+      id: 1,
+      member_phone: 'all',
+      title: 'نشست چهارم هم‌خوانی و تحلیل ساختار زمان در ماکوندو',
+      book_title: 'صد سال تنهایی (فصل‌های ۱۲ تا ۱۵)',
+      mentor_name: 'دکتر سهراب رستگار',
+      session_date: 'چهارشنبه ۱۶ آبان ۱۴۰۵',
+      session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+      location_type: 'حضوری',
+      meeting_link_or_room: 'تهران، خانه فرهنگ بوک‌میت، تالار فردوسی',
+      status: 'ثبت‌نام‌شده',
+      member_note: 'بررسی تکرار نام‌های اورلیانو و خوزه آرکادیو و ارتباط آن با مفهوم تنهایی ابدی در فصل چهاردهم.',
+      sort_order: 1,
+    },
+    {
+      id: 2,
+      member_phone: 'all',
+      title: 'کارگاه برخط حاشیه‌نویسی و پیوند نظریه روایت با تجربه زیسته',
+      book_title: 'کارگاه تخصصی خوانش خلاق رمان',
+      mentor_name: 'آرمان کاظمی',
+      session_date: 'جمعه ۱۸ آبان ۱۴۰۵',
+      session_time: 'ساعت ۱۹:۰۰ تا ۲۰:۳۰',
+      location_type: 'برخط (آنلاین)',
+      meeting_link_or_room: 'اتاق مجازی شماره ۲ باشگاه بوک‌میت',
+      status: 'ثبت‌نام‌شده',
+      member_note: 'آماده‌سازی سه پرسش کلیدی از فصل آخر کتاب برای طرح در گروه هم‌خوانی.',
+      sort_order: 2,
+    },
+    {
+      id: 3,
+      member_phone: 'all',
+      title: 'نشست جمع‌بندی و نقد تطبیقی طنز فلسفی در ادبیات روسیه',
+      book_title: 'مرشد و مارگاریتا',
+      mentor_name: 'دکتر سهراب رستگار',
+      session_date: 'چهارشنبه ۳۰ مهر ۱۴۰۵',
+      session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+      location_type: 'حضوری',
+      meeting_link_or_room: 'تهران، خانه فرهنگ بوک‌میت، تالار فردوسی',
+      status: 'برگزارشده',
+      member_note: 'تحلیل شخصیت پروفسور ولاند و نسبت آزادی هنر با حقیقت در دست‌نوشته‌های مرشد بسیار راهگشا بود.',
+      sort_order: 3,
+    },
+    {
+      id: 4,
+      member_phone: 'all',
+      title: 'حلقه گفت‌وگو درباره تمثیل اخلاقی و بیداری وجدان انسانی',
+      book_title: 'کوری (ژوزه ساراماگو)',
+      mentor_name: 'نیلوفر فرهادی',
+      session_date: 'چهارشنبه ۲۵ شهریور ۱۴۰۵',
+      session_time: 'ساعت ۱۸:۰۰ تا ۱۹:۴۵',
+      location_type: 'برخط (آنلاین)',
+      meeting_link_or_room: 'اتاق مجازی شماره ۱ باشگاه بوک‌میت',
+      status: 'برگزارشده',
+      member_note: 'بررسی فرم نقطه‌گذاری و دیالوگ‌های پیوسته ساراماگو که حس سرگشتگی شخصیت‌ها را به خواننده منتقل می‌کند.',
+      sort_order: 4,
+    },
+  ],
+  member_library: [
+    {
+      id: 1,
+      member_phone: 'all',
+      book_title: 'صد سال تنهایی',
+      author: 'گابریل گارسیا مارکز',
+      translator: 'بهمن فرزانه',
+      cover_url: '/assets/book-current.png',
+      reading_status: 'در حال مطالعه',
+      progress_percent: 68,
+      pages_count: 468,
+      personal_note: 'تا پایان فصل یازدهم مطالعه شد. فضاسازی باران‌های چهارساله ماکوندو شگفت‌انگیز است.',
+      updated_at: '۱۴ آبان ۱۴۰۵',
+    },
+    {
+      id: 2,
+      member_phone: 'all',
+      book_title: 'مرشد و مارگاریتا',
+      author: 'میخائیل بولگاکف',
+      translator: 'عباس میلانی',
+      cover_url: '/assets/book-recent-1.png',
+      reading_status: 'خوانده‌شده',
+      progress_percent: 100,
+      pages_count: 512,
+      personal_note: 'یکی از درخشان‌ترین آثار قرن بیستم؛ پیوند دو روایت مسکو و اورشلیم با ظرافت بی‌نظیری شکل گرفته است.',
+      updated_at: '۲۸ مهر ۱۴۰۵',
+    },
+    {
+      id: 3,
+      member_phone: 'all',
+      book_title: 'کوری',
+      author: 'ژوزه ساراماگو',
+      translator: 'مینو مشیری',
+      cover_url: '/assets/book-recent-2.png',
+      reading_status: 'خوانده‌شده',
+      progress_percent: 100,
+      pages_count: 348,
+      personal_note: 'تجربه‌ای تکان‌دهنده از معنای دیدن و مسئولیت اخلاقی انسان در برابر دیگری.',
+      updated_at: '۲۴ شهریور ۱۴۰۵',
+    },
+    {
+      id: 4,
+      member_phone: 'all',
+      book_title: 'کافکا در کرانه',
+      author: 'هاروکی موراکامی',
+      translator: 'مهدی غبرائی',
+      cover_url: '/assets/book-recent-4.png',
+      reading_status: 'در نوبت مطالعه',
+      progress_percent: 15,
+      pages_count: 614,
+      personal_note: 'برنامه‌ریزی برای مطالعه کامل در دوره آذرماه باشگاه به همراه یادداشت‌برداری از استعاره‌های موسیقایی.',
+      updated_at: '۱۰ آبان ۱۴۰۵',
+    },
+  ],
+  member_tickets: [
+    {
+      id: 1,
+      member_phone: 'all',
+      ticket_code: 'TK-۱۴۰۵-۴۱۲',
+      subject: 'درخواست دریافت فایل صوتی و جزوه نشست سوم صد سال تنهایی',
+      department: 'حلقه‌های مطالعاتی',
+      priority: 'عادی',
+      status: 'پاسخ داده‌شده',
+      message: 'با سلام و احترام، به دلیل تداخل کاری امکان حضور در بیست دقیقه پایانی نشست سوم را نداشتم. لطفاً در صورت امکان خلاصه مکتوب یا فایل صوتی جلسه را در اختیارم قرار دهید.',
+      admin_reply: 'هم‌خوان گرامی، فایل صوتی کامل نشست سوم به همراه جزوه دسته‌بندی شجره‌نامه خاندان بوئندیا در بخش جلسات من برای شما فعال گردید.',
+      created_at: '۱۰ آبان ۱۴۰۵',
+    },
+    {
+      id: 2,
+      member_phone: 'all',
+      ticket_code: 'TK-۱۴۰۵-۴۳۹',
+      subject: 'پیشنهاد بررسی رمان «ابله» داستایفسکی برای حلقه زمستان',
+      department: 'پیشنهاد کتاب',
+      priority: 'مهم',
+      status: 'پاسخ داده‌شده',
+      message: 'پیشنهاد می‌کنم در دوره زمستان باشگاه، یکی از آثار کلاسیک داستایفسکی به‌ویژه رمان «ابله» با ترجمه سروش حبیبی در برنامه هم‌خوانی هفتگی قرار گیرد.',
+      admin_reply: 'از پیشنهاد ارزشمند شما سپاسگزاریم. رمان «ابله» در فهرست نهایی رأی‌گیری اعضای باشگاه برای دوره دی‌ماه قرار گرفته است.',
+      created_at: '۱۲ آبان ۱۴۰۵',
+    },
+  ],
+  club_calendar_events: [
+    {
+      id: 1,
+      title: 'نشست چهارم هم‌خوانی «صد سال تنهایی» (فصل‌های ۱۲ تا ۱۵)',
+      event_type: 'هم‌خوانی هفتگی',
+      day_of_month: '۱۶',
+      month_name: 'آبان ۱۴۰۵',
+      weekday_name: 'چهارشنبه',
+      time_range: '۱۸:۰۰ تا ۲۰:۰۰',
+      host_name: 'دکتر سهراب رستگار',
+      location_label: 'حضوری · تالار فردوسی خانه بوک‌میت',
+      capacity_info: 'ظرفیت باقی‌مانده: ۶ نفر',
+      description: 'در این نشست، دگردیسی دهکده ماکوندو پس از ورود شرکت موز و جایگاه تنهایی سرهنگ اورلیانو بوئندیا را تحلیل و بررسی خواهیم کرد.',
+      is_reserved: 1,
+      sort_order: 1,
+    },
+    {
+      id: 2,
+      title: 'کارگاه عملی حاشیه‌نویسی و یادداشت‌برداری خلاق از متون داستانی',
+      event_type: 'کارگاه خوانش',
+      day_of_month: '۱۸',
+      month_name: 'آبان ۱۴۰۵',
+      weekday_name: 'جمعه',
+      time_range: '۱۹:۰۰ تا ۲۰:۳۰',
+      host_name: 'آرمان کاظمی',
+      location_label: 'برخط (آنلاین) · اتاق مجازی باشگاه',
+      capacity_info: 'ظرفیت باقی‌مانده: ۱۱ نفر',
+      description: 'آشنایی با تکنیک‌های ثبت استعاره‌ها، ترسیم نقشه شخصیت‌ها و نگارش جستارهای کوتاه تحلیلی پس از مطالعه هر فصل.',
+      is_reserved: 1,
+      sort_order: 2,
+    },
+    {
+      id: 3,
+      title: 'نشست پنجم و جمع‌بندی نهایی شاهکار «صد سال تنهایی»',
+      event_type: 'نشست نقد و بررسی',
+      day_of_month: '۲۳',
+      month_name: 'آبان ۱۴۰۵',
+      weekday_name: 'چهارشنبه',
+      time_range: '۱۸:۰۰ تا ۲۰:۳۰',
+      host_name: 'دکتر سهراب رستگار',
+      location_label: 'حضوری · تالار فردوسی خانه بوک‌میت',
+      capacity_info: 'ظرفیت باقی‌مانده: ۹ نفر',
+      description: 'خوانش فصل‌های پایانی، رمزگشایی از دست‌نوشته‌های ملکیادس و گفت‌وگوی آزاد اعضا درباره تجربه یک ماه زندگی در جهان مارکز.',
+      is_reserved: 0,
+      sort_order: 3,
+    },
+    {
+      id: 4,
+      title: 'نشست ویژه گفت‌وگو درباره چالش‌های ترجمه ادبیات کلاسیک به فارسی',
+      event_type: 'نشست ویژه با مترجم',
+      day_of_month: '۲۸',
+      month_name: 'آبان ۱۴۰۵',
+      weekday_name: 'دوشنبه',
+      time_range: '۱۷:۳۰ تا ۱۹:۳۰',
+      host_name: 'نیلوفر فرهادی و مهمان ویژه',
+      location_label: 'حضوری و پخش زنده برخط',
+      capacity_info: 'ظرفیت باقی‌مانده: ۱۴ نفر',
+      description: 'بررسی ظرایف معادل‌یابی، حفظ لحن و موسیقی متن اصلی در ترجمه‌های ماندگار ادبیات داستانی قرن نوزدهم و بیستم.',
+      is_reserved: 0,
+      sort_order: 4,
+    },
+    {
+      id: 5,
+      title: 'آغاز دوره آذرماه: معارفه و خوانش فصل اول «بلندی‌های بادگیر»',
+      event_type: 'هم‌خوانی هفتگی',
+      day_of_month: '۷',
+      month_name: 'آذر ۱۴۰۵',
+      weekday_name: 'چهارشنبه',
+      time_range: '۱۸:۰۰ تا ۲۰:۰۰',
+      host_name: 'دکتر سهراب رستگار',
+      location_label: 'حضوری · تالار فردوسی خانه بوک‌میت',
+      capacity_info: 'ظرفیت باقی‌مانده: ۱۵ نفر',
+      description: 'ورود به فضای گوتیک و رازآلود یورکشایر، بررسی راوی اول‌شخص و زاویه دید لاک‌وود در مواجهه با عمارت بلندی‌های بادگیر.',
+      is_reserved: 0,
+      sort_order: 5,
+    },
+    {
+      id: 6,
+      title: 'حلقه آزاد نقد جستارهای اعضای باشگاه و معرفی کتاب‌های منتخب ماه',
+      event_type: 'کارگاه خوانش',
+      day_of_month: '۱۴',
+      month_name: 'آذر ۱۴۰۵',
+      weekday_name: 'شنبه',
+      time_range: '۱۸:۳۰ تا ۲۰:۰۰',
+      host_name: 'شورای علمی باشگاه بوک‌میت',
+      location_label: 'برخط (آنلاین) · اتاق مجازی باشگاه',
+      capacity_info: 'ظرفیت باقی‌مانده: ۱۸ نفر',
+      description: 'خوانش و نقد دوستانه یادداشت‌های ارسالی اعضا برای انتشار در وبلاگ رسمی بوک‌میت و اهدای کتاب به جستارهای برگزیده.',
+      is_reserved: 0,
+      sort_order: 6,
+    },
+  ],
 };
 
 class MySQLDatabaseManager {
@@ -634,6 +947,11 @@ class MySQLDatabaseManager {
           phone: input.phone,
           education: input.education,
           favorite_genre: input.favorite_genre,
+          email: '',
+          city: 'تهران',
+          bio: 'عضو جدید باشگاه کتابخوانی بوک‌میت و علاقه‌مند به مطالعه عمیق و گفت‌وگوهای ادبی.',
+          membership_code: `BM-۱۴۰۵-${insertId + 100}`,
+          joined_date: 'آبان ۱۴۰۵',
           created_at: new Date().toISOString(),
         };
       } catch (err) {
@@ -662,7 +980,12 @@ class MySQLDatabaseManager {
       last_name: input.last_name,
       phone: input.phone,
       education: input.education,
-      favorite_genre: input.favorite_genre,
+      favorite_genre: input.favorite_genre || 'ادبیات داستانی و رمان کلاسیک',
+      email: '',
+      city: 'تهران',
+      bio: 'عضو باشگاه کتابخوانی بوک‌میت و علاقه‌مند به مطالعه گروهی و نقد ادبی.',
+      membership_code: `BM-۱۴۰۵-${100 + nextId}`,
+      joined_date: 'آبان ۱۴۰۵',
       password_hash: input.password_hash,
       created_at: new Date().toISOString(),
     };
@@ -701,13 +1024,23 @@ class MySQLDatabaseManager {
     }
     const found = this.store.club_members.find((m) => m.phone === input.phone);
     if (!found) {
+      const defaultSeed = this.store.club_members[0];
       return {
         id: Date.now(),
-        first_name: 'عضو',
-        last_name: 'باشگاه بوک‌میت',
+        first_name: defaultSeed ? defaultSeed.first_name : 'پرنیا',
+        last_name: defaultSeed ? defaultSeed.last_name : 'فرهمند',
         phone: input.phone,
-        education: 'کارشناسی ارشد',
-        favorite_genre: 'ادبیات کلاسیک',
+        education: defaultSeed ? defaultSeed.education : 'کارشناسی ارشد',
+        favorite_genre: defaultSeed
+          ? defaultSeed.favorite_genre
+          : 'ادبیات داستانی و رمان کلاسیک',
+        email: defaultSeed ? defaultSeed.email : 'member@bookmeet.ir',
+        city: defaultSeed ? defaultSeed.city : 'تهران',
+        bio: defaultSeed
+          ? defaultSeed.bio
+          : 'علاقه‌مند به ادبیات کلاسیک جهان و شرکت در حلقه‌های مطالعاتی هفتگی باشگاه بوک‌میت.',
+        membership_code: 'BM-۱۴۰۵-۱۰۸',
+        joined_date: 'مهر ۱۴۰۵',
         created_at: new Date().toISOString(),
       };
     }
@@ -716,6 +1049,190 @@ class MySQLDatabaseManager {
     }
     const { password_hash: _removed, ...publicMember } = found;
     return publicMember;
+  }
+
+  public async getMemberPanelData(phone?: string): Promise<{
+    member: Omit<ClubMemberRow, 'password_hash'>;
+    sessions: MemberSessionRow[];
+    library: MemberLibraryRow[];
+    tickets: MemberTicketRow[];
+    calendarEvents: ClubCalendarEventRow[];
+  }> {
+    if (!this.store.club_members || this.store.club_members.length === 0) {
+      this.store.club_members = JSON.parse(JSON.stringify(SEED_DATA.club_members));
+    }
+    if (!this.store.member_sessions) {
+      this.store.member_sessions = JSON.parse(JSON.stringify(SEED_DATA.member_sessions));
+    }
+    if (!this.store.member_library) {
+      this.store.member_library = JSON.parse(JSON.stringify(SEED_DATA.member_library));
+    }
+    if (!this.store.member_tickets) {
+      this.store.member_tickets = JSON.parse(JSON.stringify(SEED_DATA.member_tickets));
+    }
+    if (!this.store.club_calendar_events) {
+      this.store.club_calendar_events = JSON.parse(
+        JSON.stringify(SEED_DATA.club_calendar_events)
+      );
+    }
+
+    const foundMember =
+      (phone && this.store.club_members.find((m) => m.phone === phone)) ||
+      this.store.club_members[0];
+    const { password_hash: _removed, ...publicMember } = foundMember;
+
+    return {
+      member: publicMember,
+      sessions: [...this.store.member_sessions].sort((a, b) => a.sort_order - b.sort_order),
+      library: [...this.store.member_library],
+      tickets: [...this.store.member_tickets].sort((a, b) => b.id - a.id),
+      calendarEvents: [...this.store.club_calendar_events].sort(
+        (a, b) => a.sort_order - b.sort_order
+      ),
+    };
+  }
+
+  public async updateMemberProfile(input: {
+    phone: string;
+    first_name: string;
+    last_name: string;
+    education: string;
+    favorite_genre: string;
+    email: string;
+    city: string;
+    bio: string;
+  }): Promise<Omit<ClubMemberRow, 'password_hash'>> {
+    if (!this.store.club_members || this.store.club_members.length === 0) {
+      this.store.club_members = JSON.parse(JSON.stringify(SEED_DATA.club_members));
+    }
+    let target = this.store.club_members.find((m) => m.phone === input.phone);
+    if (!target) {
+      target = this.store.club_members[0];
+    }
+    target.first_name = input.first_name;
+    target.last_name = input.last_name;
+    target.phone = input.phone;
+    target.education = input.education;
+    target.favorite_genre = input.favorite_genre;
+    target.email = input.email;
+    target.city = input.city;
+    target.bio = input.bio;
+    this.saveDiskStore();
+    const { password_hash: _removed, ...publicMember } = target;
+    return publicMember;
+  }
+
+  public async updateMemberSessionNote(input: {
+    sessionId: number;
+    member_note: string;
+  }): Promise<MemberSessionRow> {
+    const session = this.store.member_sessions.find((s) => s.id === input.sessionId);
+    if (!session) {
+      throw new Error('نشست مورد نظر یافت نشد.');
+    }
+    session.member_note = input.member_note;
+    this.saveDiskStore();
+    return session;
+  }
+
+  public async updateMemberLibraryItem(input: {
+    bookId: number;
+    progress_percent: number;
+    reading_status: 'در حال مطالعه' | 'خوانده‌شده' | 'در نوبت مطالعه';
+    personal_note: string;
+  }): Promise<MemberLibraryRow> {
+    const item = this.store.member_library.find((b) => b.id === input.bookId);
+    if (!item) {
+      throw new Error('کتاب مورد نظر در کتابخانه شخصی یافت نشد.');
+    }
+    item.progress_percent = Math.max(0, Math.min(100, Number(input.progress_percent)));
+    item.reading_status = input.reading_status;
+    item.personal_note = input.personal_note;
+    item.updated_at = 'هم‌اکنون';
+    this.saveDiskStore();
+    return item;
+  }
+
+  public async addMemberLibraryBook(input: {
+    book_title: string;
+    author: string;
+    translator: string;
+    reading_status: 'در حال مطالعه' | 'خوانده‌شده' | 'در نوبت مطالعه';
+    pages_count: number;
+    personal_note: string;
+  }): Promise<MemberLibraryRow> {
+    const nextId =
+      this.store.member_library.length > 0
+        ? Math.max(...this.store.member_library.map((b) => b.id)) + 1
+        : 1;
+    const covers = [
+      '/assets/book-recent-3.png',
+      '/assets/book-current.png',
+      '/assets/book-recent-1.png',
+      '/assets/book-recent-2.png',
+      '/assets/book-recent-4.png',
+    ];
+    const newBook: MemberLibraryRow = {
+      id: nextId,
+      member_phone: 'all',
+      book_title: input.book_title,
+      author: input.author,
+      translator: input.translator || '—',
+      cover_url: covers[nextId % covers.length],
+      reading_status: input.reading_status,
+      progress_percent:
+        input.reading_status === 'خوانده‌شده'
+          ? 100
+          : input.reading_status === 'در حال مطالعه'
+          ? 20
+          : 0,
+      pages_count: input.pages_count || 320,
+      personal_note:
+        input.personal_note || 'افزوده‌شده به قفسه مطالعات شخصی در باشگاه بوک‌میت.',
+      updated_at: 'امروز',
+    };
+    this.store.member_library.unshift(newBook);
+    this.saveDiskStore();
+    return newBook;
+  }
+
+  public async createMemberTicket(input: {
+    member_phone: string;
+    subject: string;
+    department: string;
+    priority: 'عادی' | 'مهم' | 'فوری';
+    message: string;
+  }): Promise<MemberTicketRow> {
+    const nextId =
+      this.store.member_tickets.length > 0
+        ? Math.max(...this.store.member_tickets.map((t) => t.id)) + 1
+        : 1;
+    const ticket: MemberTicketRow = {
+      id: nextId,
+      member_phone: input.member_phone || 'all',
+      ticket_code: `TK-۱۴۰۵-${450 + nextId}`,
+      subject: input.subject,
+      department: input.department,
+      priority: input.priority,
+      status: 'در انتظار بررسی',
+      message: input.message,
+      admin_reply:
+        'تیکت شما در دبیرخانه باشگاه کتابخوانی بوک‌میت ثبت شد و کارشناسان مربوطه در کوتاه‌ترین زمان پاسخگوی شما خواهند بود.',
+      created_at: 'امروز',
+    };
+    this.store.member_tickets.unshift(ticket);
+    this.saveDiskStore();
+    return ticket;
+  }
+
+  public async toggleCalendarReservation(eventId: number): Promise<ClubCalendarEventRow> {
+    const ev = this.store.club_calendar_events.find((e) => e.id === eventId);
+    if (!ev) {
+      throw new Error('رویداد مورد نظر یافت نشد.');
+    }
+    ev.is_reserved = ev.is_reserved === 1 ? 0 : 1;
+    this.saveDiskStore();
+    return ev;
   }
 
   public async resetClubMemberPassword(input: {
