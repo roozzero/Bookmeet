@@ -259,23 +259,28 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
   },
 };
 
+function forceCleanRootUrl(): void {
+  try {
+    if (window.location.hash || window.location.pathname !== '/') {
+      window.history.replaceState(null, document.title, '/');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+  } catch {
+    // Ignore history API restrictions
+  }
+}
+
+forceCleanRootUrl();
+$(window).on('load hashchange popstate', () => {
+  forceCleanRootUrl();
+});
+
 function mountApplication(payload: BootstrapPayload): void {
   const $app = $('#app');
   const allPosts = payload.blogPosts || FALLBACK_BOOTSTRAP.blogPosts;
   let currentMember: ClubMember | null = null;
 
-  // Always clear any lingering URL hash on initial page load/refresh so refresh always opens the Home Page
-  if (window.location.hash) {
-    try {
-      history.replaceState(
-        null,
-        document.title,
-        window.location.pathname + window.location.search
-      );
-    } catch {
-      window.location.hash = '';
-    }
-  }
+  forceCleanRootUrl();
 
   function scrollToSection(href: string): void {
     if (href === '#home') {

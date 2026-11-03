@@ -18,9 +18,9 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
       class="js-floating-navbar sticky top-0 z-40 w-full px-6 sm:px-10 py-3 flex items-center justify-between gap-6 transition-all duration-200 bg-[#ede8d6]/92 backdrop-blur-md border-b border-transparent"
     >
       <!-- Zone 1 (Right in RTL): Bookmate Persian Logo with Colorful Books -->
-      <a
-        href="#home"
-        class="js-brand-logo inline-flex items-center shrink-0 hover:opacity-90 transition-opacity"
+      <button
+        type="button"
+        class="js-brand-logo inline-flex items-center shrink-0 hover:opacity-90 transition-opacity bg-transparent border-0 p-0 cursor-pointer"
         aria-label="باشگاه کتابخوانی بوک میت"
       >
         <img
@@ -28,7 +28,7 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
           alt="لوگوی باشگاه کتابخوانی بوک میت"
           class="h-11 sm:h-13 w-auto object-contain select-none"
         />
-      </a>
+      </button>
 
       <!-- Zone 2 (Center): 6 Persian Navigation Links -->
       <nav
@@ -55,16 +55,16 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
       : idx === 0;
 
     const $link = $(`
-      <a
-        href="${link.href}"
+      <button
+        type="button"
         data-href="${link.href}"
         data-label="${link.label}"
-        class="js-nav-link whitespace-nowrap shrink-0 transition-colors py-1 border-b-2 ${
+        class="js-nav-link bg-transparent whitespace-nowrap shrink-0 transition-colors py-1 border-b-2 cursor-pointer ${
           isInitialActive
             ? 'text-[#23180f] font-semibold border-[#3b2a1e]'
             : 'text-[#4a392b] hover:text-[#23180f] border-transparent'
         }"
-      >${link.label}</a>
+      >${link.label}</button>
     `);
 
     $link.on('click', (e) => {

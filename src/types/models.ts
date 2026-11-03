@@ -130,8 +130,6 @@ export interface ClubLoginInput {
 
 export interface ClubForgotPasswordInput {
   phone: string;
-  new_password: string;
-  confirm_new_password: string;
 }
 
 export interface BootstrapPayload {

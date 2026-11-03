@@ -3,6 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        if (window.location.hash || window.location.pathname !== '/') {
+          try {
+            window.history.replaceState(null, '', '/');
+          } catch (e) {}
+          if (window.location.hash) {
+            window.location.replace('/');
+          }
+        }
+      })();
+    </script>
     <title>Bookmeet</title>
     <meta name="description" content="Executive meeting scheduling, room reservation, and calendar booking workspace." />
     <meta property="og:title" content="Bookmeet" />
@@ -19,3 +31,4 @@
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
+

@@ -197,28 +197,19 @@ async function startServer() {
 
   app.post('/api/auth/forgot-password', async (req, res) => {
     try {
-      const { phone, new_password, confirm_new_password } = req.body || {};
-      if (!phone || !new_password || !confirm_new_password) {
-        res.status(400).json({ error: 'لطفاً شماره تلفن و رمز عبور جدید را وارد نمایید.' });
+      const { phone } = req.body || {};
+      if (!phone) {
+        res.status(400).json({ error: 'لطفاً شماره تلفن همراه خود را وارد نمایید.' });
         return;
       }
-      if (String(new_password) !== String(confirm_new_password)) {
-        res.status(400).json({ error: 'رمز عبور جدید و تایید آن یکسان نیستند.' });
-        return;
-      }
-
-      await mysqlDb.resetClubMemberPassword({
-        phone: String(phone).trim(),
-        new_password_hash: String(new_password),
-      });
 
       res.json({
         success: true,
-        message: 'رمز عبور حساب شما با موفقیت بازنشانی شد. اکنون می‌توانید وارد شوید.',
+        message: 'لینک تغییر رمز برای شما پیامک خواهد شد.',
       });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'بازنشانی رمز عبور انجام نشد.';
+        error instanceof Error ? error.message : 'ارسال پیامک بازیابی رمز عبور انجام نشد.';
       res.status(400).json({ error: message });
     }
   });
