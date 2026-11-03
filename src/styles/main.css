@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --ink-primary: #3d2c1e;
+    --ink-secondary: #5c4b3c;
+    --parchment-bg: #ede8d6;
+    --espresso-dark: #2c1f14;
+    --espresso-mid: #4d3b2c;
+  }
+
+  html {
+    direction: rtl;
+    text-align: right;
+  }
+
+  body {
+    font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink-primary);
+    background-color: var(--parchment-bg);
+    overflow-x: hidden;
+    margin: 0;
+  }
+
+  p {
+    text-align: justify;
+    text-justify: inter-word;
+  }
+}
+
+.text-justify-fa {
+  text-align: justify;
+  text-justify: inter-word;
+}
+
+/* Warm plaster/parchment wall background matching the uploaded asset */
+.parchment-canvas {
+  background-color: #ede8d6;
+  background-image:
+    radial-gradient(ellipse 80% 68% at 50% 45%, rgba(242, 237, 221, 0.92) 0%, rgba(237, 232, 214, 0.95) 62%, rgba(226, 218, 198, 0.98) 100%);
+}
+
+/* Hero display headline styling for Persian typography */
+.hero-headline {
+  font-family: 'Vazirmatn', sans-serif;
+  color: #3e2d1f;
+  line-height: 1.32;
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+/* Minimal bordered button used for "ورود به باشگاه" in the navbar */
+.club-login-btn {
+  background-color: var(--parchment-bg);
+  color: var(--ink-primary);
+  border: 1px solid rgba(61, 44, 30, 0.45);
+  border-radius: 9px;
+  box-shadow: none;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.club-login-btn:hover {
+  border-color: #23180f;
+  background-color: rgba(61, 44, 30, 0.05);
+  color: #23180f;
+}
+
+.club-login-btn:active {
+  background-color: rgba(61, 44, 30, 0.09);
+}
+
+/* Hero bookshelf asset container */
+.hero-asset-stage {
+  position: relative;
+  width: 860px;
+  max-width: 100%;
+  margin: 0 auto;
+  user-select: none;
+}
+
+.hero-asset-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+/* Entrance rotation animation on page load for floating thought-bubble badges */
+@keyframes bubbleRotateIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-22deg) translateY(10px);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.05) rotate(3deg) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg) translateY(0);
+  }
+}
+
+/* Click motion animation when user clicks a thought-bubble badge */
+@keyframes bubbleClickMotion {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.12) rotate(-7deg) translateY(-4px);
+  }
+  55% {
+    transform: scale(1.08) rotate(6deg) translateY(-2px);
+  }
+  80% {
+    transform: scale(0.97) rotate(-2deg) translateY(1px);
+  }
+  100% {
+    transform: scale(1) rotate(0deg) translateY(0);
+  }
+}
+
+/* Floating thought-bubble badge (No border on hover) */
+.book-thought-bubble {
+  position: absolute;
+  z-index: 25;
+  background-color: #f6f4ec;
+  color: #38291d;
+  padding: 8px 16px;
+  border-radius: 11px;
+  border: none !important;
+  outline: none !important;
+  font-family: 'Vazirmatn', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow:
+    0 6px 16px rgba(45, 32, 20, 0.15),
+    0 1px 3px rgba(45, 32, 20, 0.08);
+  cursor: pointer;
+  opacity: 0;
+  transform-origin: center center;
+}
+
+.book-thought-bubble.is-entered {
+  animation: bubbleRotateIn 680ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.book-thought-bubble.is-visible {
+  opacity: 1;
+}
+
+.book-thought-bubble.is-clicked {
+  animation: bubbleClickMotion 520ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Small circular white thought-bubble trailing dots */
+.thought-dot {
+  position: absolute;
+  background-color: #f6f4ec;
+  border-radius: 9999px;
+  box-shadow: 0 2px 5px rgba(45, 32, 20, 0.18);
+  pointer-events: none;
+}

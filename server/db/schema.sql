@@ -1,0 +1,64 @@
+-- Bookmeet MySQL Schema (Persian RTL Edition)
+CREATE DATABASE IF NOT EXISTS bookmeet_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE bookmeet_db;
+
+CREATE TABLE IF NOT EXISTS navigation_links (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  label VARCHAR(100) NOT NULL,
+  href VARCHAR(255) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hero_settings (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  headline VARCHAR(255) NOT NULL,
+  subtitle_line_1 VARCHAR(255) NOT NULL,
+  subtitle_line_2 VARCHAR(255) NOT NULL,
+  nav_cta_text VARCHAR(100) NOT NULL,
+  nav_cta_target VARCHAR(255) NOT NULL,
+  hero_image_url VARCHAR(255) NOT NULL,
+  audio_progress_percent INT NOT NULL DEFAULT 100,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS featured_books (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(150) NOT NULL,
+  persian_title VARCHAR(150) NOT NULL,
+  author VARCHAR(150) NOT NULL,
+  publication_year INT NOT NULL,
+  synopsis TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS about_club (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  section_kicker VARCHAR(120) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  paragraph_1 TEXT NOT NULL,
+  paragraph_2 TEXT NOT NULL,
+  image_url VARCHAR(255) NOT NULL,
+  image_caption VARCHAR(255) NOT NULL,
+  stat_1_value VARCHAR(50) NOT NULL,
+  stat_1_label VARCHAR(120) NOT NULL,
+  stat_2_value VARCHAR(50) NOT NULL,
+  stat_2_label VARCHAR(120) NOT NULL,
+  stat_3_value VARCHAR(50) NOT NULL,
+  stat_3_label VARCHAR(120) NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS about_manager (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  section_kicker VARCHAR(120) NOT NULL,
+  full_name VARCHAR(150) NOT NULL,
+  role_title VARCHAR(200) NOT NULL,
+  bio_paragraph_1 TEXT NOT NULL,
+  bio_paragraph_2 TEXT NOT NULL,
+  quote_text TEXT NOT NULL,
+  image_url VARCHAR(255) NOT NULL,
+  credentials_line VARCHAR(255) NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);

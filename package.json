@@ -1,0 +1,28 @@
+{
+  "name": "bookmeet",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx server.ts",
+    "build": "vite build",
+    "start": "tsx server.ts",
+    "lint": "tsc --noEmit",
+    "preview": "vite preview --port=3000 --host=0.0.0.0"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "jquery": "^4.0.0",
+    "mysql2": "^3.24.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/express": "^5.0.6",
+    "@types/jquery": "^4.0.1",
+    "@types/node": "^22.14.0",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.23.15",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}
