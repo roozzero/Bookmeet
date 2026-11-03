@@ -95,7 +95,7 @@ export function createBookshelfComponent(props: BookshelfProps): JQuery<HTMLElem
       $bubble.addClass('is-entered');
       window.setTimeout(() => {
         $bubble.removeClass('is-entered').addClass('is-visible');
-      }, 700);
+      }, 960);
     }, config.delayMs);
 
     // Click handler: ONLY play motion animation, no text/popover appears

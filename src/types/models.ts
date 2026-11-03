@@ -71,6 +71,38 @@ export interface LibraryBook {
   sort_order: number;
 }
 
+export interface BlogPost {
+  id: number;
+  title: string;
+  category: string;
+  author: string;
+  published_date: string;
+  reading_time: string;
+  cover_url: string;
+  excerpt: string;
+  full_content: string;
+  sort_order: number;
+}
+
+export interface ContactInfoData {
+  id: number;
+  section_kicker: string;
+  title: string;
+  description: string;
+  address: string;
+  meeting_hours: string;
+  email: string;
+  phone: string;
+  telegram_handle: string;
+}
+
+export interface ContactMessageInput {
+  full_name: string;
+  email: string;
+  subject: string;
+  message: string;
+}
+
 export interface BootstrapPayload {
   navigationLinks: NavigationLink[];
   heroSettings: HeroSettings;
@@ -78,4 +110,7 @@ export interface BootstrapPayload {
   aboutClub: AboutClubData;
   aboutManager: AboutManagerData;
   libraryBooks: LibraryBook[];
+  blogPosts: BlogPost[];
+  contactInfo: ContactInfoData;
 }
+

@@ -1,5 +1,6 @@
 import $ from 'jquery';
 import type { AboutClubData } from '../types/models.ts';
+import { parseStatString, toPersianDigits } from '../utils/persianNumbers.ts';
 
 export interface AboutClubSectionProps {
   aboutClub: AboutClubData;
@@ -10,6 +11,10 @@ export function createAboutClubSectionComponent(
 ): JQuery<HTMLElement> {
   const { aboutClub } = props;
 
+  const stat1 = parseStatString(aboutClub.stat_1_value);
+  const stat2 = parseStatString(aboutClub.stat_2_value);
+  const stat3 = parseStatString(aboutClub.stat_3_value);
+
   const $section = $(`
     <section
       id="about-club"
@@ -18,56 +23,71 @@ export function createAboutClubSectionComponent(
       class="w-full max-w-[1140px] mx-auto px-6 sm:px-10 py-16 sm:py-24 border-t border-[#ddd4c0]"
     >
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-stretch">
-        <!-- Right Column in RTL: Editorial Kicker, Heading, Two-Paragraph Justified Intro & Unboxed Metrics -->
+        <!-- Right Column in RTL: Editorial Kicker, Heading, Two-Paragraph Justified Intro & Animated Metrics -->
         <div class="lg:col-span-7 flex flex-col justify-between text-right space-y-6">
           <div class="space-y-4">
             <div class="text-xs font-medium text-[#755f4b] tracking-normal">
-              ${aboutClub.section_kicker}
+              ${toPersianDigits(aboutClub.section_kicker)}
             </div>
 
             <h2
               id="about-club-heading"
               class="text-[24px] sm:text-[32px] font-bold text-[#38281b] leading-[1.38] text-balance"
             >
-              ${aboutClub.title}
+              ${toPersianDigits(aboutClub.title)}
             </h2>
 
             <div class="space-y-4 pt-2 text-[14.5px] sm:text-[15.5px] leading-[2.05] text-[#4e3e30] font-normal text-justify">
-              <p class="js-about-p1 text-justify">
-                ${aboutClub.paragraph_1}
+              <p class="js-about-p1 text-justify" style="text-align: justify; text-justify: inter-word;">
+                ${toPersianDigits(aboutClub.paragraph_1)}
               </p>
-              <p class="js-about-p2 text-justify">
-                ${aboutClub.paragraph_2}
+              <p class="js-about-p2 text-justify" style="text-align: justify; text-justify: inter-word;">
+                ${toPersianDigits(aboutClub.paragraph_2)}
               </p>
             </div>
           </div>
 
-          <!-- Clean Unboxed Editorial Metrics Row -->
-          <div class="pt-6 border-t border-[#dbd1bd] grid grid-cols-3 gap-6">
+          <!-- Clean Unboxed Editorial Metrics Row with Incremental Motion Graphics -->
+          <div class="js-about-stats pt-6 border-t border-[#dbd1bd] grid grid-cols-3 gap-6">
             <div>
-              <div class="text-xl sm:text-2xl font-bold text-[#38281b] tabular-nums">
-                ${aboutClub.stat_1_value}
+              <div
+                class="js-stat-counter text-xl sm:text-2xl font-bold text-[#38281b] tabular-nums"
+                data-prefix="${stat1.prefix}"
+                data-target="${stat1.targetValue}"
+                data-suffix="${stat1.suffix}"
+              >
+                ${stat1.prefix}۰${stat1.suffix}
               </div>
               <div class="text-xs text-[#695645] mt-1">
-                ${aboutClub.stat_1_label}
+                ${toPersianDigits(aboutClub.stat_1_label)}
               </div>
             </div>
 
             <div>
-              <div class="text-xl sm:text-2xl font-bold text-[#38281b] tabular-nums">
-                ${aboutClub.stat_2_value}
+              <div
+                class="js-stat-counter text-xl sm:text-2xl font-bold text-[#38281b] tabular-nums"
+                data-prefix="${stat2.prefix}"
+                data-target="${stat2.targetValue}"
+                data-suffix="${stat2.suffix}"
+              >
+                ${stat2.prefix}۰${stat2.suffix}
               </div>
               <div class="text-xs text-[#695645] mt-1">
-                ${aboutClub.stat_2_label}
+                ${toPersianDigits(aboutClub.stat_2_label)}
               </div>
             </div>
 
             <div>
-              <div class="text-xl sm:text-2xl font-bold text-[#38281b] tabular-nums">
-                ${aboutClub.stat_3_value}
+              <div
+                class="js-stat-counter text-xl sm:text-2xl font-bold text-[#38281b] tabular-nums"
+                data-prefix="${stat3.prefix}"
+                data-target="${stat3.targetValue}"
+                data-suffix="${stat3.suffix}"
+              >
+                ${stat3.prefix}۰${stat3.suffix}
               </div>
               <div class="text-xs text-[#695645] mt-1">
-                ${aboutClub.stat_3_label}
+                ${toPersianDigits(aboutClub.stat_3_label)}
               </div>
             </div>
           </div>
@@ -78,7 +98,7 @@ export function createAboutClubSectionComponent(
           <div class="relative w-full h-full min-h-[320px] sm:min-h-[380px] rounded-2xl overflow-hidden border border-[#d5cab6] bg-[#e4dcc8] flex flex-col justify-end group">
             <img
               src="${aboutClub.image_url}"
-              alt="${aboutClub.image_caption}"
+              alt="${toPersianDigits(aboutClub.image_caption)}"
               referrerpolicy="no-referrer"
               class="js-about-image absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
             />
@@ -86,21 +106,9 @@ export function createAboutClubSectionComponent(
             <div class="relative z-10 bg-gradient-to-t from-[#241911]/85 via-[#241911]/40 to-transparent p-5 pt-14 flex items-end justify-between gap-4">
               <div class="text-right">
                 <p class="text-xs font-medium text-[#f5efe4] leading-relaxed text-justify">
-                  ${aboutClub.image_caption}
+                  ${toPersianDigits(aboutClub.image_caption)}
                 </p>
               </div>
-
-              <label
-                class="px-3 py-1.5 text-[11.5px] font-medium text-[#f5efe4] border border-[#f5efe4]/40 hover:border-[#f5efe4] hover:bg-[#f5efe4]/10 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-                title="جایگزینی تصویر بخش درباره باشگاه"
-              >
-                <span>تغییر تصویر</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  class="js-about-file-input hidden"
-                />
-              </label>
             </div>
           </div>
         </div>
@@ -108,22 +116,50 @@ export function createAboutClubSectionComponent(
     </section>
   `);
 
-  const $fileInput = $section.find('.js-about-file-input');
-  const $img = $section.find('.js-about-image');
+  function runStatCountersAnimation() {
+    $section.find('.js-stat-counter').each(function () {
+      const $el = $(this);
+      const prefix = String($el.attr('data-prefix') || '');
+      const suffix = String($el.attr('data-suffix') || '');
+      const target = Number($el.attr('data-target') || 0);
 
-  $fileInput.on('change', function (e) {
-    const target = e.target as HTMLInputElement;
-    const file = target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const result = ev.target?.result;
-      if (typeof result === 'string') {
-        $img.attr('src', result);
-      }
-    };
-    reader.readAsDataURL(file);
-  });
+      $({ countVal: 0 }).animate(
+        { countVal: target },
+        {
+          duration: 1700,
+          easing: 'swing',
+          step(now) {
+            const current = Math.floor(now);
+            $el.text(`${prefix}${toPersianDigits(current)}${suffix}`);
+          },
+          complete() {
+            $el.text(`${prefix}${toPersianDigits(target)}${suffix}`);
+          },
+        }
+      );
+    });
+  }
+
+  // Trigger incremental counter animation when section enters viewport
+  const sectionEl = $section[0];
+  if (sectionEl && 'IntersectionObserver' in window) {
+    let hasAnimated = false;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !hasAnimated) {
+            hasAnimated = true;
+            runStatCountersAnimation();
+            observer.disconnect();
+          }
+        });
+      },
+      { threshold: 0.2 }
+    );
+    observer.observe(sectionEl);
+  } else {
+    window.setTimeout(runStatCountersAnimation, 300);
+  }
 
   return $section;
 }

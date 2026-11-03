@@ -6,7 +6,10 @@ import { createHeroSectionComponent } from './components/HeroSection.ts';
 import { createAboutClubSectionComponent } from './components/AboutClubSection.ts';
 import { createAboutManagerSectionComponent } from './components/AboutManagerSection.ts';
 import { createLibrarySectionComponent } from './components/LibrarySection.ts';
-import type { BootstrapPayload } from './types/models.ts';
+import { createBlogSectionComponent } from './components/BlogSection.ts';
+import { createBlogPostPageComponent } from './components/BlogPostPage.ts';
+import { createContactSectionComponent } from './components/ContactSection.ts';
+import type { BlogPost, BootstrapPayload } from './types/models.ts';
 
 const FALLBACK_BOOTSTRAP: BootstrapPayload = {
   navigationLinks: [
@@ -196,6 +199,62 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
       sort_order: 5,
     },
   ],
+  blogPosts: [
+    {
+      id: 1,
+      title: 'چگونه خواندنِ آهسته و گروهی درک ما از رمان‌های کلاسیک را دگرگون می‌کند؟',
+      category: 'یادداشت ادبی',
+      author: 'سهراب رستگار',
+      published_date: '۱۲ آبان ۱۴۰۵',
+      reading_time: '۶ دقیقه مطالعه',
+      cover_url: '/assets/blog-1.png',
+      excerpt:
+        'در روزگاری که سرعت مصرف اطلاعات مجال درنگ را از ما گرفته است، خوانش آهسته و گفت‌وگوی گروهی درباره متون کلاسیک به ما می‌آموزد که چگونه میان سطرهای یک رمان زندگی کنیم و جزئیات پنهان معماری روایت را دریابیم.',
+      full_content:
+        'در نشست‌های باشگاه کتابخوانی بوک‌میت بارها تجربه کرده‌ایم که یک متن واحد، در برخورد با ذهن‌های گوناگون، لایه‌هایی تازه و غیرمنتظره از معنا را آشکار می‌سازد. خواندن آهسته به ما اجازه می‌دهد از سطح پیرنگ عبور کنیم و به ضرباهنگ جمله‌ها، استعاره‌های تکرارشونده و سکوت‌های میان دیالوگ‌ها گوش بسپاریم. هنگامی که اعضای باشگاه برداشت‌های خود را از یک فصل مشترک بازگو می‌کنند، کتاب از یک شیء خاموش به میدانی زنده برای تجربه همدلی و تفکر انتقادی تبدیل می‌شود.',
+      sort_order: 1,
+    },
+    {
+      id: 2,
+      title: 'نگاهی به رئالیسم جادویی؛ از تنهایی ماکوندو تا هزارتوهای روایت معاصر',
+      category: 'نقد و بررسی',
+      author: 'نیلوفر فرهادی',
+      published_date: '۵ آبان ۱۴۰۵',
+      reading_time: '۸ دقیقه مطالعه',
+      cover_url: '/assets/blog-2.png',
+      excerpt:
+        'رئالیسم جادویی صرفاً ترفندی فانتزی برای گریز از واقعیت نیست؛ بلکه شیوه‌ای اصیل برای نگریستن به تاریخ، حافظه جمعی و شگفتی‌های نهفته در زندگی روزمره مردمانی است که اسطوره و واقعیت را هم‌زمان زیسته اند.',
+      full_content:
+        'هنگامی که گابریل گارسیا مارکز در «صد سال تنهایی» از رویدادهای خارق‌العاده با لحنی کاملاً عادی و روزمره سخن می‌گوید، مرز سنتی میان باورپذیری و خیال را جابه‌جا می‌کند. در حلقه مطالعاتی این ماه بررسی کردیم که چگونه این شگرد روایی به نویسندگان آمریکای لاتین و سپس ادبیات معاصر جهان امکان داد تا زخم‌های تاریخی، فراموشی جمعی و تنهایی انسان مدرن را در قاب تصاویری فراموش‌نشدنی ثبت کنند.',
+      sort_order: 2,
+    },
+    {
+      id: 3,
+      title: 'راهنمای نوشتن حاشیه‌نویسی و یادداشت‌برداری خلاق هنگام مطالعه رمان',
+      category: 'کارگاه خوانش',
+      author: 'آرمان کاظمی',
+      published_date: '۲۷ مهر ۱۴۰۵',
+      reading_time: '۵ دقیقه مطالعه',
+      cover_url: '/assets/blog-3.png',
+      excerpt:
+        'گفت‌وگو با کتاب از لحظه‌ای آغاز می‌شود که مداد را در دست می‌گیرید و پرسش‌ها، تردیدها و تداعی‌های شخصی خود را در حاشیه صفحه‌ها یا دفترچه یادداشت‌های روزانه ثبت می‌کنید.',
+      full_content:
+        'بسیاری از خوانندگان پس از پایان یک رمان حجیم احساس می‌کنند بخش بزرگی از ظرایف اثر از یادشان رفته است. روش پیشنهادی ما در باشگاه بوک‌میت، ثبت سه محور کلیدی در پایان هر فصل است: نخست، یک جمله یا تصویر تکان‌دهنده؛ دوم، دگرگونی انگیزه شخصیت‌ها؛ و سوم، پرسشی که متن در ذهن ما بی‌پاسخ رها کرده است. این یادداشت‌های کوتاه، بهترین توشه برای مشارکت فعال در نشست‌های هفتگی نقد و بررسی هستند.',
+      sort_order: 3,
+    },
+  ],
+  contactInfo: {
+    id: 1,
+    section_kicker: '۰۵ · ارتباط با ما و عضویت در حلقه‌های مطالعاتی',
+    title: 'صدای شما، آغازگر گفت‌وگوهای تازه در باشگاه بوک‌میت است',
+    description:
+      'اگر درباره شیوه برگزاری نشست‌های هفتگی، پیشنهاد کتاب برای دوره‌های آینده، همکاری در نگارش جستارهای وبلاگ یا عضویت در حلقه‌های مطالعاتی بوک‌میت پرسشی دارید، پیام خود را برای ما ارسال کنید. دبیرخانه باشگاه در کوتاه‌ترین زمان پاسخگوی شما خواهد بود.',
+    address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات بوک‌میت، پلاک ۴۲',
+    meeting_hours: 'نشست‌های حضوری: چهارشنبه‌ها ساعت ۱۸ تا ۲۰ · نشست‌های برخط: جمعه‌ها ساعت ۱۹',
+    email: 'hello@bookmeet.ir',
+    phone: '۰۲۱-۸۸۹۴۳۲۱۰',
+    telegram_handle: '@BookmeetClub',
+  },
 };
 
 function createClubLoginModal(): JQuery<HTMLElement> {
@@ -262,52 +321,168 @@ function createClubLoginModal(): JQuery<HTMLElement> {
 
 function mountApplication(payload: BootstrapPayload): void {
   const $app = $('#app');
-  $app.empty();
+  const allPosts = payload.blogPosts || FALLBACK_BOOTSTRAP.blogPosts;
 
-  const $shell = $(
-    '<div id="home" dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
-  );
+  function renderMainHomeView(scrollToSelector?: string): void {
+    $app.empty();
 
-  const $loginModal = createClubLoginModal();
+    const $shell = $(
+      '<div id="home" dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
+    );
 
-  const $navbar = createNavbarComponent({
-    navigationLinks: payload.navigationLinks,
-    ctaText: payload.heroSettings.nav_cta_text || 'ورود به باشگاه',
-    onNavigate: (href) => {
-      if (href.startsWith('#')) {
-        const $target = $(href);
+    const $loginModal = createClubLoginModal();
+
+    const $navbar = createNavbarComponent({
+      navigationLinks: payload.navigationLinks,
+      ctaText: payload.heroSettings.nav_cta_text || 'ورود به باشگاه',
+      onNavigate: (href) => {
+        if (href.startsWith('#')) {
+          const $target = $(href);
+          if ($target.length) {
+            $('html, body').animate(
+              { scrollTop: ($target.offset()?.top || 0) - 20 },
+              450
+            );
+          }
+        }
+      },
+      onLoginClick: () => {
+        $loginModal.removeClass('hidden');
+      },
+    });
+
+    const $hero = createHeroSectionComponent({
+      heroSettings: payload.heroSettings,
+      featuredBooks: payload.featuredBooks,
+    });
+
+    const $aboutClub = createAboutClubSectionComponent({
+      aboutClub: payload.aboutClub || FALLBACK_BOOTSTRAP.aboutClub,
+    });
+
+    const $aboutManager = createAboutManagerSectionComponent({
+      aboutManager: payload.aboutManager || FALLBACK_BOOTSTRAP.aboutManager,
+    });
+
+    const $library = createLibrarySectionComponent({
+      libraryBooks: payload.libraryBooks || FALLBACK_BOOTSTRAP.libraryBooks,
+    });
+
+    const $blog = createBlogSectionComponent({
+      blogPosts: allPosts,
+      onOpenPost: (post: BlogPost) => {
+        window.location.hash = `#/blog/${post.id}`;
+        renderBlogPostPageView(post);
+      },
+    });
+
+    const $contact = createContactSectionComponent({
+      contactInfo: payload.contactInfo || FALLBACK_BOOTSTRAP.contactInfo,
+    });
+
+    $shell.append(
+      $navbar,
+      $hero,
+      $aboutClub,
+      $aboutManager,
+      $library,
+      $blog,
+      $contact,
+      $loginModal
+    );
+    $app.append($shell);
+
+    if (scrollToSelector) {
+      window.setTimeout(() => {
+        const $target = $(scrollToSelector);
         if ($target.length) {
           $('html, body').animate(
             { scrollTop: ($target.offset()?.top || 0) - 20 },
-            450
+            400
           );
         }
+      }, 60);
+    }
+  }
+
+  function renderBlogPostPageView(post: BlogPost): void {
+    $app.empty();
+
+    const $shell = $(
+      '<div dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
+    );
+
+    const $loginModal = createClubLoginModal();
+
+    const $navbar = createNavbarComponent({
+      navigationLinks: payload.navigationLinks,
+      ctaText: payload.heroSettings.nav_cta_text || 'ورود به باشگاه',
+      activeHref: '#blog',
+      onNavigate: (href) => {
+        if (window.location.hash.startsWith('#/blog/')) {
+          history.pushState('', document.title, window.location.pathname + window.location.search);
+        }
+        renderMainHomeView(href);
+      },
+      onLoginClick: () => {
+        $loginModal.removeClass('hidden');
+      },
+    });
+
+    const $postPage = createBlogPostPageComponent({
+      post,
+      allPosts,
+      onBackToHome: () => {
+        if (window.location.hash.startsWith('#/blog/')) {
+          history.pushState('', document.title, window.location.pathname + window.location.search);
+        }
+        renderMainHomeView('#blog');
+      },
+      onSelectPost: (nextPost: BlogPost) => {
+        window.location.hash = `#/blog/${nextPost.id}`;
+        renderBlogPostPageView(nextPost);
+      },
+    });
+
+    const $contact = createContactSectionComponent({
+      contactInfo: payload.contactInfo || FALLBACK_BOOTSTRAP.contactInfo,
+    });
+
+    $shell.append($navbar, $postPage, $contact, $loginModal);
+    $app.append($shell);
+
+    $('html, body').stop(true).animate({ scrollTop: 0 }, 250);
+  }
+
+  // Handle initial route or hash navigation
+  function checkHashRoute(): boolean {
+    const hash = window.location.hash || '';
+    const match = hash.match(/^#\/blog\/(\d+)$/);
+    if (match) {
+      const postId = Number(match[1]);
+      const found = allPosts.find((p) => p.id === postId);
+      if (found) {
+        renderBlogPostPageView(found);
+        return true;
       }
-    },
-    onLoginClick: () => {
-      $loginModal.removeClass('hidden');
-    },
-  });
+    }
+    return false;
+  }
 
-  const $hero = createHeroSectionComponent({
-    heroSettings: payload.heroSettings,
-    featuredBooks: payload.featuredBooks,
-  });
+  $(window)
+    .off('hashchange.bookmeet')
+    .on('hashchange.bookmeet', () => {
+      if (!checkHashRoute() && !window.location.hash.startsWith('#/blog/')) {
+        // Already on home or returning to home via browser back button
+        if ($('#home').length === 0) {
+          renderMainHomeView('#blog');
+        }
+      }
+    });
 
-  const $aboutClub = createAboutClubSectionComponent({
-    aboutClub: payload.aboutClub || FALLBACK_BOOTSTRAP.aboutClub,
-  });
-
-  const $aboutManager = createAboutManagerSectionComponent({
-    aboutManager: payload.aboutManager || FALLBACK_BOOTSTRAP.aboutManager,
-  });
-
-  const $library = createLibrarySectionComponent({
-    libraryBooks: payload.libraryBooks || FALLBACK_BOOTSTRAP.libraryBooks,
-  });
-
-  $shell.append($navbar, $hero, $aboutClub, $aboutManager, $library, $loginModal);
-  $app.append($shell);
+  if (!checkHashRoute()) {
+    renderMainHomeView();
+  }
 }
 
 $(function () {

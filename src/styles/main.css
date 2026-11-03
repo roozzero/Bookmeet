@@ -49,6 +49,25 @@
   text-wrap: balance;
 }
 
+/* Seesaw / right-and-left up-and-down rocking motion for "ورود به باشگاه" button in navbar */
+@keyframes clubBtnRockRightLeft {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-2.5px) rotate(3.8deg);
+  }
+  50% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  75% {
+    transform: translateY(2.5px) rotate(-3.8deg);
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+}
+
 /* Minimal bordered button used for "ورود به باشگاه" in the navbar */
 .club-login-btn {
   background-color: var(--parchment-bg);
@@ -57,6 +76,14 @@
   border-radius: 9px;
   box-shadow: none;
   transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.club-login-btn--rocking {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  animation: clubBtnRockRightLeft 2.8s ease-in-out infinite;
 }
 
 .club-login-btn:hover {
@@ -85,15 +112,19 @@
   object-fit: contain;
 }
 
-/* Entrance rotation animation on page load for floating thought-bubble badges */
+/* Full spin/rotation entrance animation on page load for floating thought-bubble badges */
 @keyframes bubbleRotateIn {
   0% {
     opacity: 0;
-    transform: scale(0.3) rotate(-22deg) translateY(10px);
+    transform: scale(0.15) rotate(-360deg) translateY(16px);
   }
-  70% {
+  65% {
     opacity: 1;
-    transform: scale(1.05) rotate(3deg) translateY(-2px);
+    transform: scale(1.08) rotate(14deg) translateY(-3px);
+  }
+  85% {
+    opacity: 1;
+    transform: scale(0.97) rotate(-4deg) translateY(1px);
   }
   100% {
     opacity: 1;
@@ -107,13 +138,13 @@
     transform: scale(1) rotate(0deg);
   }
   25% {
-    transform: scale(1.12) rotate(-7deg) translateY(-4px);
+    transform: scale(1.14) rotate(-9deg) translateY(-5px);
   }
   55% {
-    transform: scale(1.08) rotate(6deg) translateY(-2px);
+    transform: scale(1.09) rotate(8deg) translateY(-2px);
   }
   80% {
-    transform: scale(0.97) rotate(-2deg) translateY(1px);
+    transform: scale(0.96) rotate(-3deg) translateY(1px);
   }
   100% {
     transform: scale(1) rotate(0deg) translateY(0);
@@ -144,7 +175,7 @@
 }
 
 .book-thought-bubble.is-entered {
-  animation: bubbleRotateIn 680ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: bubbleRotateIn 950ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .book-thought-bubble.is-visible {
@@ -152,7 +183,7 @@
 }
 
 .book-thought-bubble.is-clicked {
-  animation: bubbleClickMotion 520ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: bubbleClickMotion 540ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 /* Small circular white thought-bubble trailing dots */

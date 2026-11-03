@@ -9,7 +9,7 @@ async function startServer() {
 
   app.use(express.json());
 
-  // MySQL-backed API endpoint for Navigation + Hero + About Club + Manager + Library
+  // MySQL-backed API endpoint for Navigation + Hero + About Club + Manager + Library + Blog + Contact
   app.get('/api/bootstrap', async (_req, res) => {
     try {
       const [
@@ -19,6 +19,8 @@ async function startServer() {
         aboutClub,
         aboutManager,
         libraryBooks,
+        blogPosts,
+        contactInfo,
       ] = await Promise.all([
         mysqlDb.getNavigationLinks(),
         mysqlDb.getHeroSettings(),
@@ -26,6 +28,8 @@ async function startServer() {
         mysqlDb.getAboutClub(),
         mysqlDb.getAboutManager(),
         mysqlDb.getLibraryBooks(),
+        mysqlDb.getBlogPosts(),
+        mysqlDb.getContactInfo(),
       ]);
 
       res.json({
@@ -35,6 +39,8 @@ async function startServer() {
         aboutClub,
         aboutManager,
         libraryBooks,
+        blogPosts,
+        contactInfo,
       });
     } catch (error) {
       console.error('Database fetch error:', error);
@@ -69,6 +75,46 @@ async function startServer() {
     } catch (error) {
       console.error('Failed to fetch library_books:', error);
       res.status(500).json({ error: 'Failed to fetch library_books data' });
+    }
+  });
+
+  app.get('/api/blog', async (_req, res) => {
+    try {
+      const blogPosts = await mysqlDb.getBlogPosts();
+      res.json({ blogPosts });
+    } catch (error) {
+      console.error('Failed to fetch blog_posts:', error);
+      res.status(500).json({ error: 'Failed to fetch blog_posts data' });
+    }
+  });
+
+  app.get('/api/contact', async (_req, res) => {
+    try {
+      const contactInfo = await mysqlDb.getContactInfo();
+      res.json({ contactInfo });
+    } catch (error) {
+      console.error('Failed to fetch contact_info:', error);
+      res.status(500).json({ error: 'Failed to fetch contact_info data' });
+    }
+  });
+
+  app.post('/api/contact', async (req, res) => {
+    try {
+      const { full_name, email, subject, message } = req.body || {};
+      if (!full_name || !email || !message) {
+        res.status(400).json({ error: 'لطفا تمامی فیلدهای ضروری را تکمیل نمایید.' });
+        return;
+      }
+      const saved = await mysqlDb.createContactMessage({
+        full_name: String(full_name).trim(),
+        email: String(email).trim(),
+        subject: String(subject || 'پیام از طرف بازدیدکننده سایت').trim(),
+        message: String(message).trim(),
+      });
+      res.status(201).json({ success: true, messageRecord: saved });
+    } catch (error) {
+      console.error('Failed to store contact_message:', error);
+      res.status(500).json({ error: 'Failed to store contact message in MySQL' });
     }
   });
 

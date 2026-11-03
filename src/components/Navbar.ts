@@ -26,11 +26,11 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
       <nav class="flex items-center gap-5 sm:gap-7 md:gap-8 text-[14px] font-medium text-[#4a392b] overflow-x-auto" aria-label="منوی اصلی">
       </nav>
 
-      <!-- Zone 3 (Left in RTL): "ورود به باشگاه" Primary Action Button (Replaces Social Icons) -->
+      <!-- Zone 3 (Left in RTL): "ورود به باشگاه" Primary Action Button with Right-Left Up-Down Motion -->
       <div class="flex items-center shrink-0">
         <button
           type="button"
-          class="js-club-login-btn club-login-btn px-4 py-2 text-[13px] font-medium whitespace-nowrap shrink-0 cursor-pointer"
+          class="js-club-login-btn club-login-btn club-login-btn--rocking px-4 py-2 text-[13px] font-medium whitespace-nowrap shrink-0 cursor-pointer"
         >
           ${props.ctaText}
         </button>

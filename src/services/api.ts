@@ -1,5 +1,9 @@
 import $ from 'jquery';
-import type { BootstrapPayload, FeaturedBook } from '../types/models.ts';
+import type {
+  BootstrapPayload,
+  ContactMessageInput,
+  FeaturedBook,
+} from '../types/models.ts';
 
 export const ApiService = {
   fetchBootstrapData(): Promise<BootstrapPayload> {
@@ -27,4 +31,22 @@ export const ApiService = {
       });
     });
   },
+
+  submitContactMessage(
+    payload: ContactMessageInput
+  ): Promise<{ success: boolean }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/contact',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data: { success: boolean }) => resolve(data),
+        error: (_jqXHR, textStatus, errorThrown) =>
+          reject(new Error(errorThrown || textStatus || 'Request failed')),
+      });
+    });
+  },
 };
+

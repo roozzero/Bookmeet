@@ -75,6 +75,40 @@ export interface LibraryBookRow {
   sort_order: number;
 }
 
+export interface BlogPostRow {
+  id: number;
+  title: string;
+  category: string;
+  author: string;
+  published_date: string;
+  reading_time: string;
+  cover_url: string;
+  excerpt: string;
+  full_content: string;
+  sort_order: number;
+}
+
+export interface ContactInfoRow {
+  id: number;
+  section_kicker: string;
+  title: string;
+  description: string;
+  address: string;
+  meeting_hours: string;
+  email: string;
+  phone: string;
+  telegram_handle: string;
+}
+
+export interface ContactMessageRow {
+  id: number;
+  full_name: string;
+  email: string;
+  subject: string;
+  message: string;
+  created_at: string;
+}
+
 export interface MySQLStoreSchema {
   schema_version: number;
   navigation_links: NavigationLinkRow[];
@@ -83,10 +117,13 @@ export interface MySQLStoreSchema {
   about_club: AboutClubRow[];
   about_manager: AboutManagerRow[];
   library_books: LibraryBookRow[];
+  blog_posts: BlogPostRow[];
+  contact_info: ContactInfoRow[];
+  contact_messages: ContactMessageRow[];
   custom_tables?: Record<string, Record<string, unknown>[]>;
 }
 
-const CURRENT_SCHEMA_VERSION = 5;
+const CURRENT_SCHEMA_VERSION = 7;
 const STORAGE_FILE = path.resolve(process.cwd(), 'server/db/mysql_data.json');
 
 const SEED_DATA: MySQLStoreSchema = {
@@ -275,6 +312,65 @@ const SEED_DATA: MySQLStoreSchema = {
       sort_order: 5,
     },
   ],
+  blog_posts: [
+    {
+      id: 1,
+      title: 'چگونه خواندنِ آهسته و گروهی درک ما از رمان‌های کلاسیک را دگرگون می‌کند؟',
+      category: 'یادداشت ادبی',
+      author: 'سهراب رستگار',
+      published_date: '۱۲ آبان ۱۴۰۵',
+      reading_time: '۶ دقیقه مطالعه',
+      cover_url: '/assets/blog-1.png',
+      excerpt:
+        'در روزگاری که سرعت مصرف اطلاعات مجال درنگ را از ما گرفته است، خوانش آهسته و گفت‌وگوی گروهی درباره متون کلاسیک به ما می‌آموزد که چگونه میان سطرهای یک رمان زندگی کنیم و جزئیات پنهان معماری روایت را دریابیم.',
+      full_content:
+        'در نشست‌های باشگاه کتابخوانی بوک‌میت بارها تجربه کرده‌ایم که یک متن واحد، در برخورد با ذهن‌های گوناگون، لایه‌هایی تازه و غیرمنتظره از معنا را آشکار می‌سازد. خواندن آهسته به ما اجازه می‌دهد از سطح پیرنگ عبور کنیم و به ضرباهنگ جمله‌ها، استعاره‌های تکرارشونده و سکوت‌های میان دیالوگ‌ها گوش بسپاریم. هنگامی که اعضای باشگاه برداشت‌های خود را از یک فصل مشترک بازگو می‌کنند، کتاب از یک شیء خاموش به میدانی زنده برای تجربه همدلی و تفکر انتقادی تبدیل می‌شود.',
+      sort_order: 1,
+    },
+    {
+      id: 2,
+      title: 'نگاهی به رئالیسم جادویی؛ از تنهایی ماکوندو تا هزارتوهای روایت معاصر',
+      category: 'نقد و بررسی',
+      author: 'نیلوفر فرهادی',
+      published_date: '۵ آبان ۱۴۰۵',
+      reading_time: '۸ دقیقه مطالعه',
+      cover_url: '/assets/blog-2.png',
+      excerpt:
+        'رئالیسم جادویی صرفاً ترفندی فانتزی برای گریز از واقعیت نیست؛ بلکه شیوه‌ای اصیل برای نگریستن به تاریخ، حافظه جمعی و شگفتی‌های نهفته در زندگی روزمره مردمانی است که اسطوره و واقعیت را هم‌زمان زیسته اند.',
+      full_content:
+        'هنگامی که گابریل گارسیا مارکز در «صد سال تنهایی» از رویدادهای خارق‌العاده با لحنی کاملاً عادی و روزمره سخن می‌گوید، مرز سنتی میان باورپذیری و خیال را جابه‌جا می‌کند. در حلقه مطالعاتی این ماه بررسی کردیم که چگونه این شگرد روایی به نویسندگان آمریکای لاتین و سپس ادبیات معاصر جهان امکان داد تا زخم‌های تاریخی، فراموشی جمعی و تنهایی انسان مدرن را در قاب تصاویری فراموش‌نشدنی ثبت کنند.',
+      sort_order: 2,
+    },
+    {
+      id: 3,
+      title: 'راهنمای نوشتن حاشیه‌نویسی و یادداشت‌برداری خلاق هنگام مطالعه رمان',
+      category: 'کارگاه خوانش',
+      author: 'آرمان کاظمی',
+      published_date: '۲۷ مهر ۱۴۰۵',
+      reading_time: '۵ دقیقه مطالعه',
+      cover_url: '/assets/blog-3.png',
+      excerpt:
+        'گفت‌وگو با کتاب از لحظه‌ای آغاز می‌شود که مداد را در دست می‌گیرید و پرسش‌ها، تردیدها و تداعی‌های شخصی خود را در حاشیه صفحه‌ها یا دفترچه یادداشت‌های روزانه ثبت می‌کنید.',
+      full_content:
+        'بسیاری از خوانندگان پس از پایان یک رمان حجیم احساس می‌کنند بخش بزرگی از ظرایف اثر از یادشان رفته است. روش پیشنهادی ما در باشگاه بوک‌میت، ثبت سه محور کلیدی در پایان هر فصل است: نخست، یک جمله یا تصویر تکان‌دهنده؛ دوم، دگرگونی انگیزه شخصیت‌ها؛ و سوم، پرسشی که متن در ذهن ما بی‌پاسخ رها کرده است. این یادداشت‌های کوتاه، بهترین توشه برای مشارکت فعال در نشست‌های هفتگی نقد و بررسی هستند.',
+      sort_order: 3,
+    },
+  ],
+  contact_info: [
+    {
+      id: 1,
+      section_kicker: '۰۵ · ارتباط با ما و عضویت در حلقه‌های مطالعاتی',
+      title: 'صدای شما، آغازگر گفت‌وگوهای تازه در باشگاه بوک‌میت است',
+      description:
+        'اگر درباره شیوه برگزاری نشست‌های هفتگی، پیشنهاد کتاب برای دوره‌های آینده، همکاری در نگارش جستارهای وبلاگ یا عضویت در حلقه‌های مطالعاتی بوک‌میت پرسشی دارید، پیام خود را برای ما ارسال کنید. دبیرخانه باشگاه در کوتاه‌ترین زمان پاسخگوی شما خواهد بود.',
+      address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات بوک‌میت، پلاک ۴۲',
+      meeting_hours: 'نشست‌های حضوری: چهارشنبه‌ها ساعت ۱۸ تا ۲۰ · نشست‌های برخط: جمعه‌ها ساعت ۱۹',
+      email: 'hello@bookmeet.ir',
+      phone: '۰۲۱-۸۸۹۴۳۲۱۰',
+      telegram_handle: '@BookmeetClub',
+    },
+  ],
+  contact_messages: [],
 };
 
 class MySQLDatabaseManager {
@@ -420,6 +516,75 @@ class MySQLDatabaseManager {
     return [...this.store.library_books].sort((a, b) => a.sort_order - b.sort_order);
   }
 
+  public async getBlogPosts(): Promise<BlogPostRow[]> {
+    if (this.pool && this.isExternalMySQLConnected) {
+      try {
+        const [rows] = await this.pool.query(
+          'SELECT * FROM blog_posts ORDER BY sort_order ASC'
+        );
+        return rows as BlogPostRow[];
+      } catch {
+        this.isExternalMySQLConnected = false;
+      }
+    }
+    return [...(this.store.blog_posts || [])].sort((a, b) => a.sort_order - b.sort_order);
+  }
+
+  public async getContactInfo(): Promise<ContactInfoRow> {
+    if (this.pool && this.isExternalMySQLConnected) {
+      try {
+        const [rows] = await this.pool.query('SELECT * FROM contact_info LIMIT 1');
+        const list = rows as ContactInfoRow[];
+        if (list.length > 0) return list[0];
+      } catch {
+        this.isExternalMySQLConnected = false;
+      }
+    }
+    return this.store.contact_info[0];
+  }
+
+  public async createContactMessage(input: {
+    full_name: string;
+    email: string;
+    subject: string;
+    message: string;
+  }): Promise<ContactMessageRow> {
+    if (this.pool && this.isExternalMySQLConnected) {
+      try {
+        const [result] = await this.pool.execute(
+          'INSERT INTO contact_messages (full_name, email, subject, message) VALUES (?, ?, ?, ?)',
+          [input.full_name, input.email, input.subject, input.message]
+        );
+        const insertId = (result as { insertId?: number }).insertId || Date.now();
+        return {
+          id: insertId,
+          ...input,
+          created_at: new Date().toISOString(),
+        };
+      } catch {
+        this.isExternalMySQLConnected = false;
+      }
+    }
+    if (!this.store.contact_messages) {
+      this.store.contact_messages = [];
+    }
+    const nextId =
+      this.store.contact_messages.length > 0
+        ? Math.max(...this.store.contact_messages.map((m) => m.id)) + 1
+        : 1;
+    const row: ContactMessageRow = {
+      id: nextId,
+      full_name: input.full_name,
+      email: input.email,
+      subject: input.subject,
+      message: input.message,
+      created_at: new Date().toISOString(),
+    };
+    this.store.contact_messages.push(row);
+    this.saveDiskStore();
+    return row;
+  }
+
   public async ensureTable<T extends Record<string, unknown>>(
     tableName: string,
     initialRows: T[] = []
@@ -457,3 +622,4 @@ class MySQLDatabaseManager {
 }
 
 export const mysqlDb = new MySQLDatabaseManager();
+
