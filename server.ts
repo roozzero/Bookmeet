@@ -9,7 +9,7 @@ async function startServer() {
 
   app.use(express.json());
 
-  // MySQL-backed API endpoint for Navigation + Hero Section + About Club + About Manager
+  // MySQL-backed API endpoint for Navigation + Hero + About Club + Manager + Library
   app.get('/api/bootstrap', async (_req, res) => {
     try {
       const [
@@ -18,12 +18,14 @@ async function startServer() {
         featuredBooks,
         aboutClub,
         aboutManager,
+        libraryBooks,
       ] = await Promise.all([
         mysqlDb.getNavigationLinks(),
         mysqlDb.getHeroSettings(),
         mysqlDb.getFeaturedBooks(),
         mysqlDb.getAboutClub(),
         mysqlDb.getAboutManager(),
+        mysqlDb.getLibraryBooks(),
       ]);
 
       res.json({
@@ -32,6 +34,7 @@ async function startServer() {
         featuredBooks,
         aboutClub,
         aboutManager,
+        libraryBooks,
       });
     } catch (error) {
       console.error('Database fetch error:', error);
@@ -56,6 +59,16 @@ async function startServer() {
     } catch (error) {
       console.error('Failed to fetch about_manager:', error);
       res.status(500).json({ error: 'Failed to fetch about_manager data' });
+    }
+  });
+
+  app.get('/api/library', async (_req, res) => {
+    try {
+      const libraryBooks = await mysqlDb.getLibraryBooks();
+      res.json({ libraryBooks });
+    } catch (error) {
+      console.error('Failed to fetch library_books:', error);
+      res.status(500).json({ error: 'Failed to fetch library_books data' });
     }
   });
 

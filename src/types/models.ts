@@ -54,10 +54,28 @@ export interface AboutManagerData {
   credentials_line: string;
 }
 
+export interface LibraryBook {
+  id: number;
+  is_current: number;
+  title: string;
+  original_title: string;
+  author: string;
+  translator: string;
+  category: 'کلاسیک' | 'معاصر';
+  publication_year: number;
+  pages_count: number;
+  reading_progress_percent: number;
+  session_schedule: string;
+  cover_url: string;
+  short_description: string;
+  sort_order: number;
+}
+
 export interface BootstrapPayload {
   navigationLinks: NavigationLink[];
   heroSettings: HeroSettings;
   featuredBooks: FeaturedBook[];
   aboutClub: AboutClubData;
   aboutManager: AboutManagerData;
+  libraryBooks: LibraryBook[];
 }

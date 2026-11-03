@@ -58,6 +58,23 @@ export interface AboutManagerRow {
   credentials_line: string;
 }
 
+export interface LibraryBookRow {
+  id: number;
+  is_current: number;
+  title: string;
+  original_title: string;
+  author: string;
+  translator: string;
+  category: 'کلاسیک' | 'معاصر';
+  publication_year: number;
+  pages_count: number;
+  reading_progress_percent: number;
+  session_schedule: string;
+  cover_url: string;
+  short_description: string;
+  sort_order: number;
+}
+
 export interface MySQLStoreSchema {
   schema_version: number;
   navigation_links: NavigationLinkRow[];
@@ -65,10 +82,11 @@ export interface MySQLStoreSchema {
   featured_books: FeaturedBookRow[];
   about_club: AboutClubRow[];
   about_manager: AboutManagerRow[];
+  library_books: LibraryBookRow[];
   custom_tables?: Record<string, Record<string, unknown>[]>;
 }
 
-const CURRENT_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 5;
 const STORAGE_FILE = path.resolve(process.cwd(), 'server/db/mysql_data.json');
 
 const SEED_DATA: MySQLStoreSchema = {
@@ -168,6 +186,93 @@ const SEED_DATA: MySQLStoreSchema = {
         '«کتاب‌ها زمانی به راستی آغاز می‌شوند که آخرین صفحه‌شان را می‌بندیم و درباره آنچه در ما دگرگون کرده‌اند با یکدیگر سخن می‌گوییم.»',
       image_url: '/assets/manager-portrait.png',
       credentials_line: 'دکتری ادبیات تطبیقی · ۱۲ سال تجربه تسهیل‌گری نشست‌های کتاب · نویسنده و پژوهشگر روایت',
+    },
+  ],
+  library_books: [
+    {
+      id: 1,
+      is_current: 1,
+      title: 'صد سال تنهایی',
+      original_title: 'One Hundred Years of Solitude',
+      author: 'گابریل گارسیا مارکز',
+      translator: 'بهمن فرزانه',
+      category: 'کلاسیک',
+      publication_year: 1967,
+      pages_count: 468,
+      reading_progress_percent: 68,
+      session_schedule: 'نشست بعدی هم‌خوانی: چهارشنبه ساعت ۱۸:۰۰ (فصل‌های ۱۲ تا ۱۵)',
+      cover_url: '/assets/book-current.png',
+      short_description:
+        'حماسه پررمزوراز خاندان بوئندیا در دهکده خیالی ماکوندو؛ اثری بنیادین در سبک رئالیسم جادویی که مرز میان واقعیت، اسطوره، عشق و تنهایی ابدی انسان را با زبانی شاعرانه و تکرارناپذیر روایت می‌کند. در حلقه‌های مطالعاتی این ماه، ساختار دایره‌ای زمان و استعاره‌های تاریخی این شاهکار را فصل‌به‌فصل بررسی می‌کنیم.',
+      sort_order: 1,
+    },
+    {
+      id: 2,
+      is_current: 0,
+      title: 'مرشد و مارگاریتا',
+      original_title: 'The Master and Margarita',
+      author: 'میخائیل بولگاکف',
+      translator: 'عباس میلانی',
+      category: 'کلاسیک',
+      publication_year: 1967,
+      pages_count: 512,
+      reading_progress_percent: 100,
+      session_schedule: 'بررسی‌شده در دوره مهرماه باشگاه',
+      cover_url: '/assets/book-recent-1.png',
+      short_description:
+        'روایتی طنزآمیز، فلسفی و چندلایه از حضور ناگهانی پروفسور ولاند در مسکو دهه ۱۹۳۰ که در هم‌تنیدگی با عشق مرشد و مارگاریتا، تقابل جاودانه خیر، شر و آزادی هنر را به تصویر می‌کشد.',
+      sort_order: 2,
+    },
+    {
+      id: 3,
+      is_current: 0,
+      title: 'کوری',
+      original_title: 'Blindness',
+      author: 'ژوزه ساراماگو',
+      translator: 'مینو مشیری',
+      category: 'معاصر',
+      publication_year: 1995,
+      pages_count: 348,
+      reading_progress_percent: 100,
+      session_schedule: 'بررسی‌شده در دوره شهریورماه باشگاه',
+      cover_url: '/assets/book-recent-2.png',
+      short_description:
+        'تمثیلی تکان‌دهنده از شیوع یک نابینایی سفید در شهری بی‌نام که فروپاشی اخلاقی جامعه و درعین‌حال امید، همدلی و بیداری وجدان انسانی را در تاریک‌ترین لحظات می‌آزماید.',
+      sort_order: 3,
+    },
+    {
+      id: 4,
+      is_current: 0,
+      title: 'بلندی‌های بادگیر',
+      original_title: 'Wuthering Heights',
+      author: 'امیلی برونته',
+      translator: 'رضا رضایی',
+      category: 'کلاسیک',
+      publication_year: 1847,
+      pages_count: 420,
+      reading_progress_percent: 100,
+      session_schedule: 'بررسی‌شده در دوره مردادماه باشگاه',
+      cover_url: '/assets/book-recent-3.png',
+      short_description:
+        'داستانی پرشور و تسخیرکننده در دشت‌های مه‌آلود یورکشایر که پیوند پرتلاطم کاترین و هیت‌کلیف را در قالب ساختار روایی تو در تو و فضاسازی گوتیک واکاوی می‌کند.',
+      sort_order: 4,
+    },
+    {
+      id: 5,
+      is_current: 0,
+      title: 'کافکا در کرانه',
+      original_title: 'Kafka on the Shore',
+      author: 'هاروکی موراکامی',
+      translator: 'مهدی غبرائی',
+      category: 'معاصر',
+      publication_year: 2002,
+      pages_count: 614,
+      reading_progress_percent: 100,
+      session_schedule: 'بررسی‌شده در دوره تیرماه باشگاه',
+      cover_url: '/assets/book-recent-4.png',
+      short_description:
+        'سفری هزارتو و رؤیاگونه در پیوند دو روایت موازی از نوجوانی گریزان از خانه و پیرمردی ساده دل که مرزهای حافظه، موسیقی، تقدیر و ضمیر ناخودآگاه را درمی‌نوردد.',
+      sort_order: 5,
     },
   ],
 };
@@ -299,6 +404,20 @@ class MySQLDatabaseManager {
       }
     }
     return this.store.about_manager[0];
+  }
+
+  public async getLibraryBooks(): Promise<LibraryBookRow[]> {
+    if (this.pool && this.isExternalMySQLConnected) {
+      try {
+        const [rows] = await this.pool.query(
+          'SELECT * FROM library_books ORDER BY sort_order ASC'
+        );
+        return rows as LibraryBookRow[];
+      } catch {
+        this.isExternalMySQLConnected = false;
+      }
+    }
+    return [...this.store.library_books].sort((a, b) => a.sort_order - b.sort_order);
   }
 
   public async ensureTable<T extends Record<string, unknown>>(
