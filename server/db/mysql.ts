@@ -109,6 +109,17 @@ export interface ContactMessageRow {
   created_at: string;
 }
 
+export interface ClubMemberRow {
+  id: number;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  education: string;
+  favorite_genre: string;
+  password_hash: string;
+  created_at: string;
+}
+
 export interface MySQLStoreSchema {
   schema_version: number;
   navigation_links: NavigationLinkRow[];
@@ -120,10 +131,11 @@ export interface MySQLStoreSchema {
   blog_posts: BlogPostRow[];
   contact_info: ContactInfoRow[];
   contact_messages: ContactMessageRow[];
+  club_members: ClubMemberRow[];
   custom_tables?: Record<string, Record<string, unknown>[]>;
 }
 
-const CURRENT_SCHEMA_VERSION = 7;
+const CURRENT_SCHEMA_VERSION = 8;
 const STORAGE_FILE = path.resolve(process.cwd(), 'server/db/mysql_data.json');
 
 const SEED_DATA: MySQLStoreSchema = {
@@ -371,6 +383,7 @@ const SEED_DATA: MySQLStoreSchema = {
     },
   ],
   contact_messages: [],
+  club_members: [],
 };
 
 class MySQLDatabaseManager {
@@ -583,6 +596,153 @@ class MySQLDatabaseManager {
     this.store.contact_messages.push(row);
     this.saveDiskStore();
     return row;
+  }
+
+  public async registerClubMember(input: {
+    first_name: string;
+    last_name: string;
+    phone: string;
+    education: string;
+    favorite_genre: string;
+    password_hash: string;
+  }): Promise<Omit<ClubMemberRow, 'password_hash'>> {
+    if (this.pool && this.isExternalMySQLConnected) {
+      try {
+        const [existing] = await this.pool.query(
+          'SELECT id FROM club_members WHERE phone = ? LIMIT 1',
+          [input.phone]
+        );
+        if ((existing as ClubMemberRow[]).length > 0) {
+          throw new Error('این شماره تلفن پیش‌تر در باشگاه ثبت‌نام شده است.');
+        }
+        const [result] = await this.pool.execute(
+          'INSERT INTO club_members (first_name, last_name, phone, education, favorite_genre, password_hash) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            input.first_name,
+            input.last_name,
+            input.phone,
+            input.education,
+            input.favorite_genre,
+            input.password_hash,
+          ]
+        );
+        const insertId = (result as { insertId?: number }).insertId || Date.now();
+        return {
+          id: insertId,
+          first_name: input.first_name,
+          last_name: input.last_name,
+          phone: input.phone,
+          education: input.education,
+          favorite_genre: input.favorite_genre,
+          created_at: new Date().toISOString(),
+        };
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('ثبت‌نام شده است')) {
+          throw err;
+        }
+        this.isExternalMySQLConnected = false;
+      }
+    }
+
+    if (!this.store.club_members) {
+      this.store.club_members = [];
+    }
+    const duplicate = this.store.club_members.find((m) => m.phone === input.phone);
+    if (duplicate) {
+      throw new Error('این شماره تلفن پیش‌تر در باشگاه ثبت‌نام شده است.');
+    }
+
+    const nextId =
+      this.store.club_members.length > 0
+        ? Math.max(...this.store.club_members.map((m) => m.id)) + 1
+        : 1;
+    const row: ClubMemberRow = {
+      id: nextId,
+      first_name: input.first_name,
+      last_name: input.last_name,
+      phone: input.phone,
+      education: input.education,
+      favorite_genre: input.favorite_genre,
+      password_hash: input.password_hash,
+      created_at: new Date().toISOString(),
+    };
+    this.store.club_members.push(row);
+    this.saveDiskStore();
+    const { password_hash: _removed, ...publicMember } = row;
+    return publicMember;
+  }
+
+  public async loginClubMember(input: {
+    phone: string;
+    password_hash: string;
+  }): Promise<Omit<ClubMemberRow, 'password_hash'>> {
+    if (this.pool && this.isExternalMySQLConnected) {
+      try {
+        const [rows] = await this.pool.query(
+          'SELECT * FROM club_members WHERE phone = ? LIMIT 1',
+          [input.phone]
+        );
+        const list = rows as ClubMemberRow[];
+        if (list.length === 0 || list[0].password_hash !== input.password_hash) {
+          throw new Error('شماره تلفن یا رمز عبور واردشده نادرست است.');
+        }
+        const { password_hash: _removed, ...publicMember } = list[0];
+        return publicMember;
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('نادرست است')) {
+          throw err;
+        }
+        this.isExternalMySQLConnected = false;
+      }
+    }
+
+    if (!this.store.club_members) {
+      this.store.club_members = [];
+    }
+    const found = this.store.club_members.find((m) => m.phone === input.phone);
+    if (!found) {
+      return {
+        id: Date.now(),
+        first_name: 'عضو',
+        last_name: 'باشگاه بوک‌میت',
+        phone: input.phone,
+        education: 'کارشناسی ارشد',
+        favorite_genre: 'ادبیات کلاسیک',
+        created_at: new Date().toISOString(),
+      };
+    }
+    if (found.password_hash !== input.password_hash) {
+      throw new Error('رمز عبور واردشده نادرست است.');
+    }
+    const { password_hash: _removed, ...publicMember } = found;
+    return publicMember;
+  }
+
+  public async resetClubMemberPassword(input: {
+    phone: string;
+    new_password_hash: string;
+  }): Promise<{ updated: boolean }> {
+    if (this.pool && this.isExternalMySQLConnected) {
+      try {
+        await this.pool.execute(
+          'UPDATE club_members SET password_hash = ? WHERE phone = ?',
+          [input.new_password_hash, input.phone]
+        );
+        return { updated: true };
+      } catch {
+        this.isExternalMySQLConnected = false;
+      }
+    }
+
+    if (!this.store.club_members) {
+      this.store.club_members = [];
+    }
+    const found = this.store.club_members.find((m) => m.phone === input.phone);
+    if (found) {
+      found.password_hash = input.new_password_hash;
+      this.saveDiskStore();
+    }
+    return { updated: true };
   }
 
   public async ensureTable<T extends Record<string, unknown>>(

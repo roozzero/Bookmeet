@@ -128,6 +128,102 @@ async function startServer() {
     }
   });
 
+  app.post('/api/auth/register', async (req, res) => {
+    try {
+      const {
+        first_name,
+        last_name,
+        phone,
+        education,
+        favorite_genre,
+        password,
+        confirm_password,
+      } = req.body || {};
+
+      if (
+        !first_name ||
+        !last_name ||
+        !phone ||
+        !education ||
+        !password ||
+        !confirm_password
+      ) {
+        res.status(400).json({ error: 'لطفاً تمامی فیلدهای ثبت‌نام را تکمیل نمایید.' });
+        return;
+      }
+
+      if (String(password) !== String(confirm_password)) {
+        res.status(400).json({ error: 'رمز عبور و تکرار رمز عبور با یکدیگر مطابقت ندارند.' });
+        return;
+      }
+
+      const member = await mysqlDb.registerClubMember({
+        first_name: String(first_name).trim(),
+        last_name: String(last_name).trim(),
+        phone: String(phone).trim(),
+        education: String(education).trim(),
+        favorite_genre: String(favorite_genre || 'عمومی').trim(),
+        password_hash: String(password),
+      });
+
+      res.status(201).json({ success: true, member });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ثبت‌نام عضو جدید در باشگاه';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { phone, password } = req.body || {};
+      if (!phone || !password) {
+        res.status(400).json({ error: 'لطفاً شماره تلفن و رمز عبور خود را وارد نمایید.' });
+        return;
+      }
+
+      const member = await mysqlDb.loginClubMember({
+        phone: String(phone).trim(),
+        password_hash: String(password),
+      });
+
+      res.json({ success: true, member });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'ورود به حساب کاربری انجام نشد.';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+      const { phone, new_password, confirm_new_password } = req.body || {};
+      if (!phone || !new_password || !confirm_new_password) {
+        res.status(400).json({ error: 'لطفاً شماره تلفن و رمز عبور جدید را وارد نمایید.' });
+        return;
+      }
+      if (String(new_password) !== String(confirm_new_password)) {
+        res.status(400).json({ error: 'رمز عبور جدید و تایید آن یکسان نیستند.' });
+        return;
+      }
+
+      await mysqlDb.resetClubMemberPassword({
+        phone: String(phone).trim(),
+        new_password_hash: String(new_password),
+      });
+
+      res.json({
+        success: true,
+        message: 'رمز عبور حساب شما با موفقیت بازنشانی شد. اکنون می‌توانید وارد شوید.',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'بازنشانی رمز عبور انجام نشد.';
+      res.status(400).json({ error: message });
+    }
+  });
+
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },

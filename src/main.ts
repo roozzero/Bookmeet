@@ -9,7 +9,9 @@ import { createLibrarySectionComponent } from './components/LibrarySection.ts';
 import { createBlogSectionComponent } from './components/BlogSection.ts';
 import { createBlogPostPageComponent } from './components/BlogPostPage.ts';
 import { createContactSectionComponent } from './components/ContactSection.ts';
-import type { BlogPost, BootstrapPayload } from './types/models.ts';
+import { createScrollToTopButtonComponent } from './components/ScrollToTopButton.ts';
+import { createClubAuthModalComponent } from './components/ClubAuthModal.ts';
+import type { BlogPost, BootstrapPayload, ClubMember } from './types/models.ts';
 
 const FALLBACK_BOOTSTRAP: BootstrapPayload = {
   navigationLinks: [
@@ -257,71 +259,49 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
   },
 };
 
-function createClubLoginModal(): JQuery<HTMLElement> {
-  const $modal = $(`
-    <div dir="rtl" class="js-login-modal hidden fixed inset-0 z-50 bg-[#23180f]/45 backdrop-blur-[1px] flex items-center justify-center p-4">
-      <div class="bg-[#faf6ec] border border-[#dcd0bc] rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4 text-right">
-        <div class="flex items-center justify-between border-b border-[#e5dccb] pb-3">
-          <h2 class="text-base font-bold text-[#38281b]">ورود به باشگاه کتابخوانی بوک میت</h2>
-          <button type="button" class="js-close-login text-xs text-[#735e4c] hover:text-[#23180f] px-2 py-1 rounded cursor-pointer">
-            بستن
-          </button>
-        </div>
-        <form class="js-login-form space-y-3.5">
-          <div>
-            <label class="block text-xs font-medium text-[#4f3f31] mb-1">پست الکترونیک یا شماره همراه</label>
-            <input
-              type="text"
-              required
-              placeholder="example@bookmeet.ir"
-              class="w-full px-3.5 py-2 text-sm bg-white border border-[#d5c8b2] rounded-lg text-[#2c1f14] focus:outline-none focus:border-[#3d2c1e]"
-            />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-[#4f3f31] mb-1">کلمه عبور</label>
-            <input
-              type="password"
-              required
-              placeholder="••••••••"
-              class="w-full px-3.5 py-2 text-sm bg-white border border-[#d5c8b2] rounded-lg text-[#2c1f14] focus:outline-none focus:border-[#3d2c1e]"
-            />
-          </div>
-          <div class="js-login-feedback hidden text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-            درخواست ورود شما با موفقیت ثبت شد. خوش آمدید!
-          </div>
-          <div class="pt-2 flex items-center justify-end gap-2">
-            <button type="button" class="js-close-login px-4 py-2 text-xs font-medium text-[#5c4b3c] hover:text-[#23180f] cursor-pointer">
-              انصراف
-            </button>
-            <button type="submit" class="club-login-btn px-5 py-2 text-xs font-medium cursor-pointer">
-              ورود به حساب
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  `);
-
-  $modal.find('.js-close-login').on('click', () => {
-    $modal.addClass('hidden');
-    $modal.find('.js-login-feedback').addClass('hidden');
-  });
-
-  $modal.find('.js-login-form').on('submit', (e) => {
-    e.preventDefault();
-    $modal.find('.js-login-feedback').removeClass('hidden');
-    setTimeout(() => {
-      $modal.addClass('hidden');
-      $modal.find('.js-login-feedback').addClass('hidden');
-    }, 1100);
-  });
-
-  return $modal;
-}
-
 function mountApplication(payload: BootstrapPayload): void {
   const $app = $('#app');
   const allPosts = payload.blogPosts || FALLBACK_BOOTSTRAP.blogPosts;
+  let currentMember: ClubMember | null = null;
+
+  // Always clear any lingering URL hash on initial page load/refresh so refresh always opens the Home Page
+  if (window.location.hash) {
+    try {
+      history.replaceState(
+        null,
+        document.title,
+        window.location.pathname + window.location.search
+      );
+    } catch {
+      window.location.hash = '';
+    }
+  }
+
+  function scrollToSection(href: string): void {
+    if (href === '#home') {
+      $('html, body').stop(true).animate({ scrollTop: 0 }, 450);
+      return;
+    }
+    if (href.startsWith('#')) {
+      const $target = $(href);
+      if ($target.length) {
+        const navHeight = $('.js-floating-navbar').outerHeight() || 72;
+        $('html, body')
+          .stop(true)
+          .animate(
+            { scrollTop: Math.max(0, ($target.offset()?.top || 0) - navHeight) },
+            450
+          );
+      }
+    }
+  }
+
+  function getNavbarCtaLabel(): string {
+    if (currentMember) {
+      return `${currentMember.first_name} ${currentMember.last_name}`;
+    }
+    return payload.heroSettings.nav_cta_text || 'ورود به باشگاه';
+  }
 
   function renderMainHomeView(scrollToSelector?: string): void {
     $app.empty();
@@ -330,21 +310,18 @@ function mountApplication(payload: BootstrapPayload): void {
       '<div id="home" dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
     );
 
-    const $loginModal = createClubLoginModal();
+    const $loginModal = createClubAuthModalComponent({
+      onAuthSuccess: (member) => {
+        currentMember = member;
+        $('.js-club-login-btn').text(getNavbarCtaLabel());
+      },
+    });
 
     const $navbar = createNavbarComponent({
       navigationLinks: payload.navigationLinks,
-      ctaText: payload.heroSettings.nav_cta_text || 'ورود به باشگاه',
+      ctaText: getNavbarCtaLabel(),
       onNavigate: (href) => {
-        if (href.startsWith('#')) {
-          const $target = $(href);
-          if ($target.length) {
-            $('html, body').animate(
-              { scrollTop: ($target.offset()?.top || 0) - 20 },
-              450
-            );
-          }
-        }
+        scrollToSection(href);
       },
       onLoginClick: () => {
         $loginModal.removeClass('hidden');
@@ -371,7 +348,6 @@ function mountApplication(payload: BootstrapPayload): void {
     const $blog = createBlogSectionComponent({
       blogPosts: allPosts,
       onOpenPost: (post: BlogPost) => {
-        window.location.hash = `#/blog/${post.id}`;
         renderBlogPostPageView(post);
       },
     });
@@ -379,6 +355,8 @@ function mountApplication(payload: BootstrapPayload): void {
     const $contact = createContactSectionComponent({
       contactInfo: payload.contactInfo || FALLBACK_BOOTSTRAP.contactInfo,
     });
+
+    const $scrollToTopBtn = createScrollToTopButtonComponent();
 
     $shell.append(
       $navbar,
@@ -388,20 +366,17 @@ function mountApplication(payload: BootstrapPayload): void {
       $library,
       $blog,
       $contact,
+      $scrollToTopBtn,
       $loginModal
     );
     $app.append($shell);
 
     if (scrollToSelector) {
       window.setTimeout(() => {
-        const $target = $(scrollToSelector);
-        if ($target.length) {
-          $('html, body').animate(
-            { scrollTop: ($target.offset()?.top || 0) - 20 },
-            400
-          );
-        }
+        scrollToSection(scrollToSelector);
       }, 60);
+    } else {
+      window.scrollTo(0, 0);
     }
   }
 
@@ -412,16 +387,18 @@ function mountApplication(payload: BootstrapPayload): void {
       '<div dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
     );
 
-    const $loginModal = createClubLoginModal();
+    const $loginModal = createClubAuthModalComponent({
+      onAuthSuccess: (member) => {
+        currentMember = member;
+        $('.js-club-login-btn').text(getNavbarCtaLabel());
+      },
+    });
 
     const $navbar = createNavbarComponent({
       navigationLinks: payload.navigationLinks,
-      ctaText: payload.heroSettings.nav_cta_text || 'ورود به باشگاه',
+      ctaText: getNavbarCtaLabel(),
       activeHref: '#blog',
       onNavigate: (href) => {
-        if (window.location.hash.startsWith('#/blog/')) {
-          history.pushState('', document.title, window.location.pathname + window.location.search);
-        }
         renderMainHomeView(href);
       },
       onLoginClick: () => {
@@ -433,13 +410,9 @@ function mountApplication(payload: BootstrapPayload): void {
       post,
       allPosts,
       onBackToHome: () => {
-        if (window.location.hash.startsWith('#/blog/')) {
-          history.pushState('', document.title, window.location.pathname + window.location.search);
-        }
         renderMainHomeView('#blog');
       },
       onSelectPost: (nextPost: BlogPost) => {
-        window.location.hash = `#/blog/${nextPost.id}`;
         renderBlogPostPageView(nextPost);
       },
     });
@@ -448,41 +421,16 @@ function mountApplication(payload: BootstrapPayload): void {
       contactInfo: payload.contactInfo || FALLBACK_BOOTSTRAP.contactInfo,
     });
 
-    $shell.append($navbar, $postPage, $contact, $loginModal);
+    const $scrollToTopBtn = createScrollToTopButtonComponent();
+
+    $shell.append($navbar, $postPage, $contact, $scrollToTopBtn, $loginModal);
     $app.append($shell);
 
     $('html, body').stop(true).animate({ scrollTop: 0 }, 250);
   }
 
-  // Handle initial route or hash navigation
-  function checkHashRoute(): boolean {
-    const hash = window.location.hash || '';
-    const match = hash.match(/^#\/blog\/(\d+)$/);
-    if (match) {
-      const postId = Number(match[1]);
-      const found = allPosts.find((p) => p.id === postId);
-      if (found) {
-        renderBlogPostPageView(found);
-        return true;
-      }
-    }
-    return false;
-  }
-
-  $(window)
-    .off('hashchange.bookmeet')
-    .on('hashchange.bookmeet', () => {
-      if (!checkHashRoute() && !window.location.hash.startsWith('#/blog/')) {
-        // Already on home or returning to home via browser back button
-        if ($('#home').length === 0) {
-          renderMainHomeView('#blog');
-        }
-      }
-    });
-
-  if (!checkHashRoute()) {
-    renderMainHomeView();
-  }
+  // Always start on the Main Home Page on initial load or page refresh
+  renderMainHomeView();
 }
 
 $(function () {
@@ -494,3 +442,4 @@ $(function () {
       mountApplication(FALLBACK_BOOTSTRAP);
     });
 });
+

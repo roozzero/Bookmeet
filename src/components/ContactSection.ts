@@ -125,113 +125,113 @@ export function createContactSectionComponent(
           </div>
         </div>
 
-        <!-- Prominent Footer with Brand Headline & Organized Social Media Icons -->
-        <footer class="mt-20 pt-10 border-t-2 border-[#d4c7b0]">
-          <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 pb-8">
-            <!-- Prominent Footer Title & Emblem -->
-            <div class="space-y-2.5 max-w-xl">
-              <div class="inline-flex items-center gap-3">
-                <span class="w-10 h-10 rounded-xl bg-[#382315] text-[#f8f4ea] inline-flex items-center justify-center shrink-0 shadow-xs">
-                  <svg width="22" height="20" viewBox="0 0 28 26" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M4 4.5H11.5C12.8807 4.5 14 5.61929 14 7V21.5C14 20.3954 13.1046 19.5 12 19.5H4V4.5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
-                    <path d="M24 4.5H16.5C15.1193 4.5 14 5.61929 14 7V21.5C14 20.3954 14.8954 19.5 16 19.5H24V4.5Z" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"/>
-                    <path d="M9.5 21.5C11 22.8 13 23 14 23C15 23 17 22.8 18.5 21.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  </svg>
+        <!-- Refined Proportional Footer with Brand Headline & Organized Social Media Icons -->
+        <footer class="mt-16 pt-8 border-t border-[#d8ccb6]">
+          <div class="bg-[#f6f1e4]/75 border border-[#ded3be] rounded-2xl px-6 py-5 sm:px-7 sm:py-6">
+            <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-5 border-b border-[#e5dccb]">
+              <!-- Compact Prominent Brand Title & Subtitle -->
+              <div class="space-y-1.5 max-w-lg">
+                <div class="inline-flex items-center gap-3">
+                  <img
+                    src="/assets/Bookmate%20Persian%20Logo%20with%20Colorful%20Books.png"
+                    alt="لوگوی باشگاه کتابخوانی بوک‌میت"
+                    class="h-10 w-auto object-contain select-none shrink-0"
+                  />
+                  <h3 class="text-base sm:text-[18px] font-bold text-[#2c1b0e] tracking-tight">
+                    باشگاه کتابخوانی بوک‌میت
+                  </h3>
+                </div>
+                <p
+                  class="text-[12px] text-[#5c4a3a] leading-[1.9] text-justify"
+                  style="text-align: justify; text-justify: inter-word;"
+                >
+                  محفلی صمیمی برای خوانش آهسته، نقد ادبی و هم‌اندیشی پیرامون ماندگارترین آثار داستانی و فلسفی جهان.
+                </p>
+              </div>
+
+              <!-- Organized Social Media Icon Row -->
+              <div class="flex flex-col sm:flex-row md:flex-col items-start sm:items-center md:items-end gap-2.5 w-full md:w-auto justify-between">
+                <span class="text-[11px] font-medium text-[#6e5947]">
+                  همراه ما در شبکه‌های اجتماعی باشید
                 </span>
-                <h3 class="text-xl sm:text-2xl md:text-[26px] font-extrabold text-[#2c1b0e] tracking-tight">
-                  باشگاه کتابخوانی بوک‌میت
-                </h3>
-              </div>
-              <p
-                class="text-xs sm:text-sm text-[#564434] leading-[1.95] text-justify"
-                style="text-align: justify; text-justify: inter-word;"
-              >
-                محفلی صمیمی برای خوانش آهسته، نقد ادبی و هم‌اندیشی پیرامون ماندگارترین آثار داستانی و فلسفی جهان.
-              </p>
-            </div>
+                <div class="flex items-center gap-2" role="list" aria-label="شبکه‌های اجتماعی باشگاه بوک‌میت">
+                  <!-- Instagram -->
+                  <a
+                    href="#instagram"
+                    aria-label="اینستاگرام بوک‌میت"
+                    title="اینستاگرام"
+                    class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                    </svg>
+                  </a>
 
-            <!-- Organized Social Media Icon Row -->
-            <div class="flex flex-col items-start md:items-end gap-3">
-              <span class="text-xs font-semibold text-[#5e4a3a]">
-                بوک‌میت را در شبکه‌های اجتماعی دنبال کنید
-              </span>
-              <div class="flex items-center gap-3" role="list" aria-label="شبکه‌های اجتماعی باشگاه بوک‌میت">
-                <!-- Instagram -->
-                <a
-                  href="#instagram"
-                  aria-label="اینستاگرام بوک‌میت"
-                  title="اینستاگرام"
-                  class="js-social-icon w-10 h-10 rounded-xl bg-[#f7f2e6] border border-[#cbbca4] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200 shadow-2xs"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-                  </svg>
-                </a>
+                  <!-- Telegram -->
+                  <a
+                    href="#telegram"
+                    aria-label="تلگرام بوک‌میت"
+                    title="تلگرام"
+                    class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21.5 3.5L2.5 11l7 2.8 2.8 7 3.5-4.2 4.2 3.2 1.5-16.3z"></path>
+                      <path d="M9.5 13.8L21.5 3.5"></path>
+                    </svg>
+                  </a>
 
-                <!-- Telegram -->
-                <a
-                  href="#telegram"
-                  aria-label="تلگرام بوک‌میت"
-                  title="تلگرام"
-                  class="js-social-icon w-10 h-10 rounded-xl bg-[#f7f2e6] border border-[#cbbca4] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200 shadow-2xs"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21.5 3.5L2.5 11l7 2.8 2.8 7 3.5-4.2 4.2 3.2 1.5-16.3z"></path>
-                    <path d="M9.5 13.8L21.5 3.5"></path>
-                  </svg>
-                </a>
+                  <!-- X / Twitter -->
+                  <a
+                    href="#x"
+                    aria-label="ایکس (توییتر) بوک‌میت"
+                    title="ایکس (توییتر)"
+                    class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M4 4l11.733 16h4.267l-11.733 -16z"></path>
+                      <path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772"></path>
+                    </svg>
+                  </a>
 
-                <!-- X / Twitter -->
-                <a
-                  href="#x"
-                  aria-label="ایکس (توییتر) بوک‌میت"
-                  title="ایکس (توییتر)"
-                  class="js-social-icon w-10 h-10 rounded-xl bg-[#f7f2e6] border border-[#cbbca4] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200 shadow-2xs"
-                >
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 4l11.733 16h4.267l-11.733 -16z"></path>
-                    <path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772"></path>
-                  </svg>
-                </a>
+                  <!-- YouTube -->
+                  <a
+                    href="#youtube"
+                    aria-label="یوتیوب بوک‌میت"
+                    title="یوتیوب"
+                    class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"></path>
+                      <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>
+                    </svg>
+                  </a>
 
-                <!-- YouTube -->
-                <a
-                  href="#youtube"
-                  aria-label="یوتیوب بوک‌میت"
-                  title="یوتیوب"
-                  class="js-social-icon w-10 h-10 rounded-xl bg-[#f7f2e6] border border-[#cbbca4] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200 shadow-2xs"
-                >
-                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"></path>
-                    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>
-                  </svg>
-                </a>
-
-                <!-- LinkedIn -->
-                <a
-                  href="#linkedin"
-                  aria-label="لینکدین بوک‌میت"
-                  title="لینکدین"
-                  class="js-social-icon w-10 h-10 rounded-xl bg-[#f7f2e6] border border-[#cbbca4] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200 shadow-2xs"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
-                    <rect x="2" y="9" width="4" height="12"></rect>
-                    <circle cx="4" cy="4" r="2"></circle>
-                  </svg>
-                </a>
+                  <!-- LinkedIn -->
+                  <a
+                    href="#linkedin"
+                    aria-label="لینکدین بوک‌میت"
+                    title="لینکدین"
+                    class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+                      <rect x="2" y="9" width="4" height="12"></rect>
+                      <circle cx="4" cy="4" r="2"></circle>
+                    </svg>
+                  </a>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="pt-5 border-t border-[#e0d5c1] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6f5a48]">
-            <div>
-              تمامی حقوق مادی و معنوی برای <strong class="font-bold text-[#382315]">باشگاه کتابخوانی بوک‌میت</strong> محفوظ است · ۱۴۰۵
-            </div>
-            <div>
-              طراحی و اجرا با الهام از نسخه‌های خطی و چاپی ماندگار
+            <div class="pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-[#75604d]">
+              <div>
+                تمامی حقوق مادی و معنوی برای <strong class="font-semibold text-[#382315]">باشگاه کتابخوانی بوک‌میت</strong> محفوظ است · ۱۴۰۵
+              </div>
+              <div>
+                حلقه‌های مطالعاتی و نقد ادبیات داستانی
+              </div>
             </div>
           </div>
         </footer>

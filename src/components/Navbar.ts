@@ -10,21 +10,31 @@ export interface NavbarProps {
 }
 
 export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
+  const logoSrc = '/assets/Bookmate%20Persian%20Logo%20with%20Colorful%20Books.png';
+
   const $header = $(`
-    <header dir="rtl" class="w-full px-6 sm:px-10 pt-5 pb-3 flex items-center justify-between gap-8 relative z-30">
-      <!-- Zone 1 (Right in RTL): Minimalist Open-Book Brand Mark -->
-      <a href="#home" class="js-brand-logo inline-flex items-center gap-2.5 text-[#3b2a1e] hover:opacity-80 transition-opacity shrink-0 whitespace-nowrap" aria-label="باشگاه کتابخوانی بوک میت">
-        <svg width="26" height="24" viewBox="0 0 28 26" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M4 4.5H11.5C12.8807 4.5 14 5.61929 14 7V21.5C14 20.3954 13.1046 19.5 12 19.5H4V4.5Z" stroke="#3b2a1e" stroke-width="2.1" stroke-linejoin="round"/>
-          <path d="M24 4.5H16.5C15.1193 4.5 14 5.61929 14 7V21.5C14 20.3954 14.8954 19.5 16 19.5H24V4.5Z" stroke="#3b2a1e" stroke-width="2.1" stroke-linejoin="round"/>
-          <path d="M11 4.5V11.5L14 9.5L17 11.5V4.5" fill="#ede8d6" stroke="#3b2a1e" stroke-width="1.9" stroke-linejoin="round"/>
-          <path d="M9.5 21.5C11 22.8 13 23 14 23C15 23 17 22.8 18.5 21.5" stroke="#3b2a1e" stroke-width="2" stroke-linecap="round"/>
-        </svg>
+    <header
+      dir="rtl"
+      class="js-floating-navbar sticky top-0 z-40 w-full px-6 sm:px-10 py-3 flex items-center justify-between gap-6 transition-all duration-200 bg-[#ede8d6]/92 backdrop-blur-md border-b border-transparent"
+    >
+      <!-- Zone 1 (Right in RTL): Bookmate Persian Logo with Colorful Books -->
+      <a
+        href="#home"
+        class="js-brand-logo inline-flex items-center shrink-0 hover:opacity-90 transition-opacity"
+        aria-label="باشگاه کتابخوانی بوک میت"
+      >
+        <img
+          src="${logoSrc}"
+          alt="لوگوی باشگاه کتابخوانی بوک میت"
+          class="h-11 sm:h-13 w-auto object-contain select-none"
+        />
       </a>
 
       <!-- Zone 2 (Center): 6 Persian Navigation Links -->
-      <nav class="flex items-center gap-5 sm:gap-7 md:gap-8 text-[14px] font-medium text-[#4a392b] overflow-x-auto" aria-label="منوی اصلی">
-      </nav>
+      <nav
+        class="flex items-center gap-5 sm:gap-7 md:gap-8 text-[14px] font-medium text-[#4a392b] overflow-x-auto"
+        aria-label="منوی اصلی"
+      ></nav>
 
       <!-- Zone 3 (Left in RTL): "ورود به باشگاه" Primary Action Button with Right-Left Up-Down Motion -->
       <div class="flex items-center shrink-0">
@@ -74,6 +84,29 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
 
     $nav.append($link);
   });
+
+  // Add subtle border & shadow when scrolling down so the floating navbar stands out cleanly
+  function syncNavbarScrollState(): void {
+    const scrollTop = $(window).scrollTop() || 0;
+    if (scrollTop > 14) {
+      $header
+        .removeClass('border-transparent')
+        .addClass(
+          'border-[#dbd0bc] shadow-[0_10px_28px_-14px_rgba(45,29,16,0.16)]'
+        );
+    } else {
+      $header
+        .removeClass(
+          'border-[#dbd0bc] shadow-[0_10px_28px_-14px_rgba(45,29,16,0.16)]'
+        )
+        .addClass('border-transparent');
+    }
+  }
+
+  $(window)
+    .off('scroll.floatingNavbar')
+    .on('scroll.floatingNavbar', syncNavbarScrollState);
+  window.setTimeout(syncNavbarScrollState, 20);
 
   $header.find('.js-brand-logo').on('click', (e) => {
     e.preventDefault();

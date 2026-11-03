@@ -103,6 +103,37 @@ export interface ContactMessageInput {
   message: string;
 }
 
+export interface ClubMember {
+  id: number;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  education: string;
+  favorite_genre: string;
+  created_at: string;
+}
+
+export interface ClubRegisterInput {
+  first_name: string;
+  last_name: string;
+  phone: string;
+  education: string;
+  favorite_genre?: string;
+  password: string;
+  confirm_password: string;
+}
+
+export interface ClubLoginInput {
+  phone: string;
+  password: string;
+}
+
+export interface ClubForgotPasswordInput {
+  phone: string;
+  new_password: string;
+  confirm_new_password: string;
+}
+
 export interface BootstrapPayload {
   navigationLinks: NavigationLink[];
   heroSettings: HeroSettings;
@@ -113,4 +144,5 @@ export interface BootstrapPayload {
   blogPosts: BlogPost[];
   contactInfo: ContactInfoData;
 }
+
 

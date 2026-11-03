@@ -140,25 +140,41 @@ export function createBlogPostPageComponent(
   const $relatedGrid = $page.find('.js-related-posts');
   relatedPosts.forEach((rel) => {
     const $relCard = $(`
-      <article class="bg-[#f8f4ea] border border-[#ded3be] hover:border-[#9e7d5d] rounded-2xl p-5 flex flex-col justify-between gap-4 transition-all cursor-pointer">
-        <div class="space-y-2.5">
-          <div class="flex items-center justify-between text-[11px] text-[#7a6451]">
-            <span class="font-semibold text-[#6b4c32]">${toPersianDigits(rel.category)}</span>
-            <span>${toPersianDigits(rel.published_date)} · ${toPersianDigits(rel.reading_time)}</span>
+      <article class="group bg-[#f8f4ea] border border-[#ded3be] hover:border-[#9e7d5d] rounded-2xl overflow-hidden flex flex-col justify-between transition-all duration-300 shadow-[0_12px_28px_-16px_rgba(48,31,17,0.14)] hover:shadow-[0_18px_36px_-16px_rgba(48,31,17,0.22)] cursor-pointer">
+        <div>
+          <!-- Suggested Article Cover Image -->
+          <div class="relative aspect-[16/9.5] w-full overflow-hidden bg-[#e5dcc8] border-b border-[#e4dac7]">
+            <img
+              src="${rel.cover_url}"
+              alt="${toPersianDigits(rel.title)}"
+              class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+              loading="lazy"
+            />
+            <div class="absolute top-3 right-3 bg-[#2d1c10]/85 backdrop-blur-xs text-[#f6f1e5] text-[10.5px] font-medium px-2.5 py-1 rounded-md">
+              ${toPersianDigits(rel.category)}
+            </div>
           </div>
-          <h3 class="text-base font-bold text-[#382315] leading-snug">
-            ${toPersianDigits(rel.title)}
-          </h3>
-          <p
-            class="text-xs text-[#4e3d2f] leading-[1.95] text-justify"
-            style="text-align: justify; text-justify: inter-word;"
-          >
-            ${toPersianDigits(rel.excerpt)}
-          </p>
+
+          <div class="p-5 space-y-2.5">
+            <div class="flex items-center justify-between text-[11px] text-[#7a6451]">
+              <span>نویسنده: <strong class="font-semibold text-[#473425]">${toPersianDigits(rel.author)}</strong></span>
+              <span>${toPersianDigits(rel.published_date)} · ${toPersianDigits(rel.reading_time)}</span>
+            </div>
+            <h3 class="text-sm sm:text-base font-bold text-[#382315] group-hover:text-[#7a5230] transition-colors leading-snug">
+              ${toPersianDigits(rel.title)}
+            </h3>
+            <p
+              class="text-xs text-[#4e3d2f] leading-[1.95] text-justify"
+              style="text-align: justify; text-justify: inter-word;"
+            >
+              ${toPersianDigits(rel.excerpt)}
+            </p>
+          </div>
         </div>
-        <div class="pt-2 border-t border-[#e8dfd0] flex items-center justify-between text-xs font-semibold text-[#6b4c32]">
-          <span>مطالعه این یادداشت</span>
-          <span>←</span>
+
+        <div class="px-5 pb-4 pt-2 border-t border-[#e8dfd0] flex items-center justify-between text-xs font-semibold text-[#6b4c32] group-hover:text-[#382315]">
+          <span>مطالعه کامل این یادداشت</span>
+          <span class="transition-transform duration-200 group-hover:-translate-x-1">←</span>
         </div>
       </article>
     `);
