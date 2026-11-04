@@ -11,8 +11,16 @@ import { createBlogPostPageComponent } from './components/BlogPostPage.ts';
 import { createContactSectionComponent } from './components/ContactSection.ts';
 import { createScrollToTopButtonComponent } from './components/ScrollToTopButton.ts';
 import { createClubAuthModalComponent } from './components/ClubAuthModal.ts';
-import { createMemberPanelPageComponent } from './components/MemberPanelPage.ts';
+import {
+  createMemberPanelPageComponent,
+  type PanelTabKey,
+} from './components/MemberPanelPage.ts';
+import {
+  createAdminPanelPageComponent,
+  type AdminTabKey,
+} from './components/AdminPanelPage.ts';
 import type {
+  AdminPanelPayload,
   BlogPost,
   BootstrapPayload,
   ClubMember,
@@ -265,30 +273,40 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
   },
 };
 
-function forceCleanRootUrl(): void {
+function pushRoute(path: string, replace = false): void {
   try {
-    if (window.location.hash || window.location.pathname !== '/') {
-      window.history.replaceState(null, document.title, '/');
-      window.dispatchEvent(new PopStateEvent('popstate'));
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    if (window.location.pathname !== cleanPath) {
+      if (replace) {
+        window.history.replaceState({ path: cleanPath }, document.title, cleanPath);
+      } else {
+        window.history.pushState({ path: cleanPath }, document.title, cleanPath);
+      }
     }
   } catch {
-    // Ignore history API restrictions
+    // Ignore history API restrictions in sandboxed environments
   }
 }
 
-forceCleanRootUrl();
-$(window).on('load hashchange popstate', () => {
-  forceCleanRootUrl();
-});
-
 function mountApplication(payload: BootstrapPayload): void {
   const $app = $('#app');
-  const allPosts = payload.blogPosts || FALLBACK_BOOTSTRAP.blogPosts;
+  let allPosts = payload.blogPosts || FALLBACK_BOOTSTRAP.blogPosts;
   let currentMember: ClubMember | null = null;
-
-  forceCleanRootUrl();
+  let cachedAdminData: AdminPanelPayload | null = null;
+  let cachedMemberData: MemberPanelPayload | null = null;
 
   function scrollToSection(href: string): void {
+    const sectionMap: Record<string, string> = {
+      '#home': '/',
+      '#about-club': '/about-club',
+      '#about-me': '/about-me',
+      '#library': '/library',
+      '#blog': '/blog',
+      '#contact': '/contact',
+    };
+    if (sectionMap[href]) {
+      pushRoute(sectionMap[href]);
+    }
     if (href === '#home') {
       $('html, body').stop(true).animate({ scrollTop: 0 }, 450);
       return;
@@ -309,45 +327,83 @@ function mountApplication(payload: BootstrapPayload): void {
 
   function getNavbarCtaLabel(): string {
     if (currentMember) {
+      if (currentMember.role === 'admin' || currentMember.phone === 'admin') {
+        return `پنل مدیریت · ${currentMember.first_name} ${currentMember.last_name}`;
+      }
       return `پنل کاربری · ${currentMember.first_name} ${currentMember.last_name}`;
     }
     return payload.heroSettings.nav_cta_text || 'ورود به باشگاه';
   }
 
-  function openMemberPanel(phone?: string): void {
-    ApiService.fetchMemberPanelData(phone || currentMember?.phone)
-      .then((panelData: MemberPanelPayload) => {
-        currentMember = panelData.member;
-        renderMemberPanelView(panelData);
+  function openAppropriatePanel(member?: ClubMember | null): void {
+    const target = member || currentMember;
+    if (target && (target.role === 'admin' || target.phone === 'admin')) {
+      openAdminPanel('dashboard');
+    } else {
+      openMemberPanel(target?.phone, 'dashboard');
+    }
+  }
+
+  function openAdminPanel(
+    initialTab: AdminTabKey = 'dashboard',
+    initialSubPath?: string,
+    skipPush = false
+  ): void {
+    if (!skipPush) {
+      const targetUrl = initialSubPath
+        ? `/admin/${initialTab}/${initialSubPath}`
+        : `/admin/${initialTab}`;
+      pushRoute(targetUrl);
+    }
+
+    ApiService.fetchAdminPanelData()
+      .then((adminData: AdminPanelPayload) => {
+        cachedAdminData = adminData;
+        currentMember = adminData.admin;
+        renderAdminPanelView(adminData, initialTab, initialSubPath);
       })
       .catch(() => {
-        // Fallback if offline
-        const fallbackMember: ClubMember = currentMember || {
-          id: 1,
-          first_name: 'پرنیا',
-          last_name: 'فرهمند',
-          phone: '۰۹۱۲۳۴۵۶۷۸۹',
-          education: 'کارشناسی ارشد',
-          favorite_genre: 'ادبیات داستانی و رمان کلاسیک',
-          email: 'parnia.farahmand@bookmeet.ir',
+        const fallbackAdmin: ClubMember = currentMember || {
+          id: 2,
+          first_name: 'سهراب',
+          last_name: 'رستگار',
+          phone: 'admin',
+          role: 'admin',
+          education: 'دکتری',
+          favorite_genre: 'ادبیات تطبیقی و نقد ادبی',
+          email: 'admin@bookmeet.ir',
           city: 'تهران',
-          bio: 'علاقه‌مند به ادبیات کلاسیک جهان و شرکت در حلقه‌های مطالعاتی هفتگی باشگاه بوک‌میت.',
-          membership_code: 'BM-۱۴۰۵-۱۰۸',
-          joined_date: '۱۲ مهر ۱۴۰۴',
+          avatar_url: '/assets/manager-portrait.png',
+          bio: 'پژوهشگر ادبیات تطبیقی، منتقد ادبی و مدیر باشگاه کتابخوانی بوک‌میت.',
+          membership_code: 'BM-ADMIN-۰۰۱',
+          joined_date: '۱ فروردین ۱۴۰۲',
           created_at: new Date().toISOString(),
         };
-        renderMemberPanelView({
-          member: fallbackMember,
+        const fallbackPayload: AdminPanelPayload = cachedAdminData || {
+          admin: fallbackAdmin,
           sessions: [],
           classes: [],
-          library: [],
+          users: [],
           tickets: [],
-          calendarEvents: [],
-        });
+          announcements: [],
+          blogPosts: allPosts,
+          comments: [],
+          gallery: [],
+          heroSettings: payload.heroSettings || FALLBACK_BOOTSTRAP.heroSettings,
+          aboutClub: payload.aboutClub || FALLBACK_BOOTSTRAP.aboutClub,
+          aboutManager: payload.aboutManager || FALLBACK_BOOTSTRAP.aboutManager,
+          contactInfo: payload.contactInfo || FALLBACK_BOOTSTRAP.contactInfo,
+          libraryBooks: payload.libraryBooks || FALLBACK_BOOTSTRAP.libraryBooks,
+        };
+        renderAdminPanelView(fallbackPayload, initialTab, initialSubPath);
       });
   }
 
-  function renderMemberPanelView(panelData: MemberPanelPayload): void {
+  function renderAdminPanelView(
+    adminData: AdminPanelPayload,
+    initialTab: AdminTabKey = 'dashboard',
+    initialSubPath?: string
+  ): void {
     $app.empty();
 
     const $shell = $(
@@ -362,17 +418,134 @@ function mountApplication(payload: BootstrapPayload): void {
         renderMainHomeView(href);
       },
       onLoginClick: () => {
-        openMemberPanel(currentMember?.phone);
+        openAdminPanel('dashboard');
+      },
+    });
+
+    const $adminPage = createAdminPanelPageComponent({
+      initialData: adminData,
+      initialTab,
+      initialSubPath,
+      onRouteChange: (newPath) => {
+        pushRoute(newPath);
+      },
+      onBackToSite: () => {
+        pushRoute('/');
+        renderMainHomeView();
+      },
+      onLogout: () => {
+        currentMember = null;
+        pushRoute('/');
+        renderMainHomeView();
+      },
+      onAdminUpdated: (updatedAdmin) => {
+        currentMember = updatedAdmin;
+        $('.js-club-login-btn').text(getNavbarCtaLabel());
+      },
+      onSiteDataUpdated: (updated) => {
+        if (updated.heroSettings) payload.heroSettings = updated.heroSettings;
+        if (updated.aboutClub) payload.aboutClub = updated.aboutClub;
+        if (updated.aboutManager) payload.aboutManager = updated.aboutManager;
+        if (updated.contactInfo) payload.contactInfo = updated.contactInfo;
+        if (updated.blogPosts) {
+          payload.blogPosts = updated.blogPosts;
+          allPosts = updated.blogPosts;
+        }
+      },
+    });
+
+    const $scrollToTopBtn = createScrollToTopButtonComponent();
+
+    $shell.append($navbar, $adminPage, $scrollToTopBtn);
+    $app.append($shell);
+
+    window.scrollTo(0, 0);
+  }
+
+  function openMemberPanel(
+    phone?: string,
+    initialTab: PanelTabKey = 'dashboard',
+    initialSubPath?: string,
+    skipPush = false
+  ): void {
+    if (!skipPush) {
+      const targetUrl = initialSubPath
+        ? `/panel/${initialTab}/${initialSubPath}`
+        : `/panel/${initialTab}`;
+      pushRoute(targetUrl);
+    }
+
+    ApiService.fetchMemberPanelData(phone || currentMember?.phone)
+      .then((panelData: MemberPanelPayload) => {
+        cachedMemberData = panelData;
+        currentMember = panelData.member;
+        renderMemberPanelView(panelData, initialTab, initialSubPath);
+      })
+      .catch(() => {
+        const fallbackMember: ClubMember = currentMember || {
+          id: 1,
+          first_name: 'پرنیا',
+          last_name: 'فرهمند',
+          phone: '۰۹۱۲۳۴۵۶۷۸۹',
+          education: 'کارشناسی ارشد',
+          favorite_genre: 'ادبیات داستانی و رمان کلاسیک',
+          email: 'parnia.farahmand@bookmeet.ir',
+          city: 'تهران',
+          bio: 'علاقه‌مند به ادبیات کلاسیک جهان و شرکت در حلقه‌های مطالعاتی هفتگی باشگاه بوک‌میت.',
+          membership_code: 'BM-۱۴۰۵-۱۰۸',
+          joined_date: '۱۲ مهر ۱۴۰۴',
+          created_at: new Date().toISOString(),
+        };
+        const fallbackPanel: MemberPanelPayload = cachedMemberData || {
+          member: fallbackMember,
+          sessions: [],
+          classes: [],
+          library: [],
+          tickets: [],
+          calendarEvents: [],
+          announcements: [],
+        };
+        renderMemberPanelView(fallbackPanel, initialTab, initialSubPath);
+      });
+  }
+
+  function renderMemberPanelView(
+    panelData: MemberPanelPayload,
+    initialTab: PanelTabKey = 'dashboard',
+    initialSubPath?: string
+  ): void {
+    $app.empty();
+
+    const $shell = $(
+      '<div dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
+    );
+
+    const $navbar = createNavbarComponent({
+      navigationLinks: payload.navigationLinks,
+      ctaText: getNavbarCtaLabel(),
+      isStationaryCta: true,
+      onNavigate: (href) => {
+        renderMainHomeView(href);
+      },
+      onLoginClick: () => {
+        openAppropriatePanel(currentMember);
       },
     });
 
     const $panelPage = createMemberPanelPageComponent({
       initialData: panelData,
+      initialTab,
+      initialSubPath,
+      onRouteChange: (newPath) => {
+        pushRoute(newPath);
+      },
       onBackToSite: () => {
+        pushRoute('/');
         renderMainHomeView();
       },
       onLogout: () => {
         currentMember = null;
+        pushRoute('/');
         renderMainHomeView();
       },
       onMemberUpdated: (updatedMember) => {
@@ -381,19 +554,18 @@ function mountApplication(payload: BootstrapPayload): void {
       },
     });
 
-    const $contact = createContactSectionComponent({
-      contactInfo: payload.contactInfo || FALLBACK_BOOTSTRAP.contactInfo,
-    });
-
     const $scrollToTopBtn = createScrollToTopButtonComponent();
 
-    $shell.append($navbar, $panelPage, $contact, $scrollToTopBtn);
+    $shell.append($navbar, $panelPage, $scrollToTopBtn);
     $app.append($shell);
 
     window.scrollTo(0, 0);
   }
 
-  function renderMainHomeView(scrollToSelector?: string): void {
+  function renderMainHomeView(scrollToSelector?: string, skipPush = false): void {
+    if (!skipPush && !scrollToSelector) {
+      pushRoute('/');
+    }
     $app.empty();
 
     const $shell = $(
@@ -403,7 +575,7 @@ function mountApplication(payload: BootstrapPayload): void {
     const $loginModal = createClubAuthModalComponent({
       onAuthSuccess: (member) => {
         currentMember = member;
-        openMemberPanel(member.phone);
+        openAppropriatePanel(member);
       },
     });
 
@@ -416,7 +588,7 @@ function mountApplication(payload: BootstrapPayload): void {
       },
       onLoginClick: () => {
         if (currentMember) {
-          openMemberPanel(currentMember.phone);
+          openAppropriatePanel(currentMember);
         } else {
           $loginModal.removeClass('hidden');
         }
@@ -443,7 +615,8 @@ function mountApplication(payload: BootstrapPayload): void {
     const $blog = createBlogSectionComponent({
       blogPosts: allPosts,
       onOpenPost: (post: BlogPost) => {
-        renderBlogPostPageView(post);
+        pushRoute(`/blog/${post.id}`);
+        renderBlogPostPageView(post, true);
       },
     });
 
@@ -475,7 +648,10 @@ function mountApplication(payload: BootstrapPayload): void {
     }
   }
 
-  function renderBlogPostPageView(post: BlogPost): void {
+  function renderBlogPostPageView(post: BlogPost, skipPush = false): void {
+    if (!skipPush) {
+      pushRoute(`/blog/${post.id}`);
+    }
     $app.empty();
 
     const $shell = $(
@@ -485,7 +661,7 @@ function mountApplication(payload: BootstrapPayload): void {
     const $loginModal = createClubAuthModalComponent({
       onAuthSuccess: (member) => {
         currentMember = member;
-        openMemberPanel(member.phone);
+        openAppropriatePanel(member);
       },
     });
 
@@ -499,7 +675,7 @@ function mountApplication(payload: BootstrapPayload): void {
       },
       onLoginClick: () => {
         if (currentMember) {
-          openMemberPanel(currentMember.phone);
+          openAppropriatePanel(currentMember);
         } else {
           $loginModal.removeClass('hidden');
         }
@@ -510,10 +686,12 @@ function mountApplication(payload: BootstrapPayload): void {
       post,
       allPosts,
       onBackToHome: () => {
-        renderMainHomeView('#blog');
+        pushRoute('/blog');
+        renderMainHomeView('#blog', true);
       },
       onSelectPost: (nextPost: BlogPost) => {
-        renderBlogPostPageView(nextPost);
+        pushRoute(`/blog/${nextPost.id}`);
+        renderBlogPostPageView(nextPost, true);
       },
     });
 
@@ -529,18 +707,82 @@ function mountApplication(payload: BootstrapPayload): void {
     $('html, body').stop(true).animate({ scrollTop: 0 }, 250);
   }
 
-  // Always start on the Main Home Page on initial load or page refresh
-  renderMainHomeView();
+  // Client-side URL Router handler (for popstate / direct path navigation)
+  function handleLocationRoute(): void {
+    const pathname = window.location.pathname || '/';
+    const segments = pathname.split('/').filter(Boolean);
+
+    if (segments.length === 0) {
+      renderMainHomeView(undefined, true);
+      return;
+    }
+
+    const first = segments[0];
+
+    // Section routes on home page
+    const sectionRoutes: Record<string, string> = {
+      'about-club': '#about-club',
+      'about-me': '#about-me',
+      library: '#library',
+      contact: '#contact',
+    };
+    if (sectionRoutes[first]) {
+      renderMainHomeView(sectionRoutes[first], true);
+      return;
+    }
+
+    // Blog routes: /blog or /blog/:id
+    if (first === 'blog') {
+      if (segments[1]) {
+        const postId = Number(segments[1]);
+        const targetPost = allPosts.find((p) => p.id === postId);
+        if (targetPost) {
+          renderBlogPostPageView(targetPost, true);
+          return;
+        }
+      }
+      renderMainHomeView('#blog', true);
+      return;
+    }
+
+    // Admin Panel routes: /admin/:tab/...
+    if (first === 'admin') {
+      const tab = (segments[1] as AdminTabKey) || 'dashboard';
+      const subPath = segments.slice(2).join('/');
+      openAdminPanel(tab, subPath || undefined, true);
+      return;
+    }
+
+    // Member Panel routes: /panel/:tab/...
+    if (first === 'panel') {
+      const tab = (segments[1] as PanelTabKey) || 'dashboard';
+      const subPath = segments.slice(2).join('/');
+      openMemberPanel(currentMember?.phone, tab, subPath || undefined, true);
+      return;
+    }
+
+    renderMainHomeView(undefined, true);
+  }
+
+  $(window)
+    .off('popstate.bookmeetRouter')
+    .on('popstate.bookmeetRouter', () => {
+      handleLocationRoute();
+    });
+
+  handleLocationRoute();
 }
 
 $(function () {
-  // Mount immediately so the Hero section and preloaded image appear with zero network delay
   mountApplication(FALLBACK_BOOTSTRAP);
 
   ApiService.fetchBootstrapData()
     .then((data) => {
-      // Only refresh if user has not opened a modal or navigated away from home
-      if ($('#home').length && $('.js-auth-modal-backdrop:not(.hidden)').length === 0 && ($(window).scrollTop() || 0) < 40) {
+      if (
+        $('#home').length &&
+        $('.js-auth-modal-backdrop:not(.hidden)').length === 0 &&
+        ($(window).scrollTop() || 0) < 40
+      ) {
         mountApplication(data);
       }
     })
@@ -548,4 +790,3 @@ $(function () {
       // Already mounted with FALLBACK_BOOTSTRAP
     });
 });
-

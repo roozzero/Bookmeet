@@ -46,13 +46,13 @@ export function createClubAuthModalComponent(
         <form class="js-login-form space-y-3" autocomplete="on">
           <div>
             <label class="block text-xs font-semibold text-[#4f3f31] mb-1">
-              شماره تلفن همراه
+              شماره تلفن همراه یا نام کاربری
             </label>
             <input
-              type="tel"
+              type="text"
               name="login_phone"
               required
-              placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+              placeholder="۰۹۱۲۳۴۵۶۷۸۹ یا admin"
               class="js-persian-digit-input w-full px-3 py-2 text-xs sm:text-sm bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d] transition-colors"
             />
           </div>
@@ -439,9 +439,14 @@ export function createClubAuthModalComponent(
 
     ApiService.loginClubMember({ phone, password })
       .then((res) => {
-        const welcomeMsg = toPersianDigits(
-          `${res.member.first_name} ${res.member.last_name} عزیز، ورود شما به باشگاه کتابخوانی بوک‌میت با موفقیت انجام شد.`
-        );
+        const welcomeMsg =
+          res.member.role === 'admin'
+            ? toPersianDigits(
+                `${res.member.first_name} ${res.member.last_name} عزیز، ورود شما به پنل مدیریت باشگاه با موفقیت انجام شد.`
+              )
+            : toPersianDigits(
+                `${res.member.first_name} ${res.member.last_name} عزیز، ورود شما به باشگاه کتابخوانی بوک‌میت با موفقیت انجام شد.`
+              );
         $loginForm
           .find('.js-login-feedback')
           .text(welcomeMsg)

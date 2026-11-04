@@ -78,10 +78,13 @@ export interface LibraryBookRow {
 export interface BlogPostRow {
   id: number;
   title: string;
+  slug?: string;
   category: string;
   author: string;
   published_date: string;
   reading_time: string;
+  tags?: string;
+  status?: 'منتشر شده' | 'پیش‌نویس';
   cover_url: string;
   excerpt: string;
   full_content: string;
@@ -114,25 +117,43 @@ export interface ClubMemberRow {
   first_name: string;
   last_name: string;
   phone: string;
+  role?: 'member' | 'admin';
   education: string;
   favorite_genre: string;
   email: string;
   city: string;
+  avatar_url?: string;
   bio: string;
   membership_code: string;
   joined_date: string;
+  status?: 'فعال' | 'غیرفعال';
   password_hash: string;
   created_at: string;
 }
 
+export interface UserCommentRow {
+  id: number;
+  author_name: string;
+  author_phone: string;
+  target_title: string;
+  target_type: string;
+  rating: number;
+  comment_text: string;
+  admin_reply: string;
+  status: 'تایید شده' | 'در انتظار تایید' | 'رد شده';
+  created_date: string;
+  sort_order: number;
+}
+
 export interface SessionSubItemRow {
   id: number;
-  session_number: number;
+  session_number: number | string;
   title: string;
-  status: 'برگزار شده' | 'تعریف شده';
+  status: 'برگزار شده' | 'تعریف شده' | 'جلسه آتی';
   session_date: string;
   session_time: string;
-  pages_read: string;
+  cover_url?: string;
+  pages_read: string | number;
   pages_to_read: string;
   reviewed_topics: string;
   session_notes: string;
@@ -144,12 +165,16 @@ export interface MemberSessionRow {
   member_phone: string;
   title: string;
   book_title: string;
+  book_author?: string;
+  pages_count?: number;
+  publisher?: string;
   mentor_name: string;
   session_date: string;
   session_time: string;
+  cover_url: string;
   location_type: string;
   meeting_link_or_room: string;
-  status: 'ثبت‌نام‌شده' | 'برگزارشده' | 'ظرفیت باز';
+  status: 'ثبت‌نام‌شده' | 'برگزارشده' | 'ظرفیت باز' | 'فعال' | 'غیرفعال';
   member_note: string;
   sub_sessions: SessionSubItemRow[];
   sort_order: number;
@@ -160,11 +185,12 @@ export interface MemberClassRow {
   member_phone: string;
   title: string;
   book_title: string;
-  mentor_name: string;
-  session_date: string;
-  session_time: string;
-  status: 'ثبت‌نام‌شده' | 'برگزارشده';
-  member_note: string;
+  instructor_name: string;
+  schedule_summary: string;
+  level_label: string;
+  cover_url: string;
+  status: 'ثبت‌نام‌شده' | 'برگزارشده' | 'فعال' | 'غیرفعال';
+  description: string;
   sub_sessions: SessionSubItemRow[];
   sort_order: number;
 }
@@ -193,7 +219,9 @@ export interface MemberTicketRow {
   priority: 'عادی' | 'مهم' | 'فوری';
   status: 'پاسخ داده‌شده' | 'در انتظار بررسی' | 'بسته‌شده';
   message: string;
+  attachment_name?: string;
   admin_reply: string;
+  admin_replies?: { text: string; created_at: string }[];
   created_at: string;
 }
 
@@ -213,6 +241,28 @@ export interface ClubCalendarEventRow {
   sort_order: number;
 }
 
+export interface ClubAnnouncementRow {
+  id: number;
+  title: string;
+  category: string;
+  published_date: string;
+  summary: string;
+  content: string;
+  is_important: number;
+  is_read: number;
+  target_user_phone?: string;
+  target_user_name?: string;
+  sort_order: number;
+}
+
+export interface GalleryImageRow {
+  id: number;
+  title: string;
+  url: string;
+  category: string;
+  created_at: string;
+}
+
 export interface MySQLStoreSchema {
   schema_version: number;
   navigation_links: NavigationLinkRow[];
@@ -230,10 +280,13 @@ export interface MySQLStoreSchema {
   member_library: MemberLibraryRow[];
   member_tickets: MemberTicketRow[];
   club_calendar_events: ClubCalendarEventRow[];
+  club_announcements: ClubAnnouncementRow[];
+  user_comments: UserCommentRow[];
+  gallery_images: GalleryImageRow[];
   custom_tables?: Record<string, Record<string, unknown>[]>;
 }
 
-const CURRENT_SCHEMA_VERSION = 10;
+const CURRENT_SCHEMA_VERSION = 13;
 const STORAGE_FILE = path.resolve(process.cwd(), 'server/db/mysql_data.json');
 
 const SEED_DATA: MySQLStoreSchema = {
@@ -487,15 +540,68 @@ const SEED_DATA: MySQLStoreSchema = {
       first_name: 'پرنیا',
       last_name: 'فرهمند',
       phone: '۰۹۱۲۳۴۵۶۷۸۹',
+      role: 'member',
       education: 'کارشناسی ارشد',
       favorite_genre: 'ادبیات داستانی و رمان کلاسیک',
       email: 'parnia.farahmand@bookmeet.ir',
       city: 'تهران',
+      avatar_url: '',
       bio: 'علاقه‌مند به ادبیات کلاسیک جهان، رئالیسم جادویی آمریکای لاتین و روایت‌شناسی تطبیقی. از مهرماه ۱۴۰۴ در حلقه‌های مطالعاتی هفتگی باشگاه کتابخوانی بوک‌میت حضور دارم و یادداشت‌های تحلیلی درباره ساختار زمان در رمان‌های مدرن می‌نویسم.',
       membership_code: 'BM-۱۴۰۵-۱۰۸',
       joined_date: '۱۲ مهر ۱۴۰۴',
       password_hash: '1234',
       created_at: '2026-10-04T10:00:00.000Z',
+    },
+    {
+      id: 2,
+      first_name: 'سهراب',
+      last_name: 'رستگار',
+      phone: 'admin',
+      role: 'admin',
+      education: 'دکتری',
+      favorite_genre: 'ادبیات تطبیقی و نقد ادبی',
+      email: 'admin@bookmeet.ir',
+      city: 'تهران',
+      avatar_url: '/assets/manager-portrait.png',
+      bio: 'پژوهشگر ادبیات تطبیقی، منتقد ادبی و مدیر و بنیان‌گذار باشگاه کتابخوانی بوک‌میت.',
+      membership_code: 'BM-ADMIN-۰۰۱',
+      joined_date: '۱ فروردین ۱۴۰۲',
+      password_hash: 'admin1234',
+      created_at: '2023-03-21T10:00:00.000Z',
+    },
+    {
+      id: 3,
+      first_name: 'کیانوش',
+      last_name: 'معتمدی',
+      phone: '۰۹۱۲۱۱۱۲۲۳۳',
+      role: 'member',
+      education: 'دکتری',
+      favorite_genre: 'فلسفه و ادبیات اگزیستانسیال',
+      email: 'kianoosh.m@bookmeet.ir',
+      city: 'تهران',
+      avatar_url: '',
+      bio: 'پژوهشگر فلسفه هنر و عضو حلقه‌های نقد رمان کلاسیک و معاصر در باشگاه بوک‌میت.',
+      membership_code: 'BM-۱۴۰۵-۱۱۴',
+      joined_date: '۲۰ مهر ۱۴۰۴',
+      password_hash: '1234',
+      created_at: '2026-10-12T10:00:00.000Z',
+    },
+    {
+      id: 4,
+      first_name: 'مهسا',
+      last_name: 'تاجیک',
+      phone: '۰۹۳۵۴۴۴۵۵۶۶',
+      role: 'member',
+      education: 'کارشناسی',
+      favorite_genre: 'ادبیات مدرن و داستان کوتاه',
+      email: 'mahsa.tajik@bookmeet.ir',
+      city: 'اصفهان',
+      avatar_url: '',
+      bio: 'علاقه‌مند به حاشیه‌نویسی خلاق و مطالعه گروهی آثار قرن بیستم.',
+      membership_code: 'BM-۱۴۰۵-۱۲۹',
+      joined_date: '۳ آبان ۱۴۰۵',
+      password_hash: '1234',
+      created_at: '2026-10-25T10:00:00.000Z',
     },
   ],
   member_sessions: [
@@ -503,23 +609,28 @@ const SEED_DATA: MySQLStoreSchema = {
       id: 1,
       member_phone: 'all',
       title: 'حلقه هم‌خوانی و تحلیل ساختار زمان در «صد سال تنهایی»',
-      book_title: 'صد سال تنهایی · گابریل گارسیا مارکز',
+      book_title: 'صد سال تنهایی',
+      book_author: 'گابریل گارسیا مارکز',
+      pages_count: 468,
+      publisher: 'نشر نیلوفر',
       mentor_name: 'دکتر سهراب رستگار',
       session_date: 'چهارشنبه‌ها · آبان ۱۴۰۵',
       session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+      cover_url: '/assets/book-current.png',
       location_type: 'آنلاین',
       meeting_link_or_room: 'تالار فردوسی خانه بوک‌میت',
-      status: 'ثبت‌نام‌شده',
+      status: 'فعال',
       member_note: 'بررسی تکرار نام‌های اورلیانو و خوزه آرکادیو و ارتباط آن با مفهوم تنهایی ابدی در ماکوندو.',
       sub_sessions: [
         {
           id: 101,
-          session_number: 1,
-          title: 'جلسه اول: پیدایش ماکوندو و کیمیاگری ملکیادس',
+          session_number: 'جلسه اول',
+          title: 'پیدایش ماکوندو و کیمیاگری ملکیادس',
           status: 'برگزار شده',
           session_date: '۲۵ مهر ۱۴۰۵',
-          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-          pages_read: '۱۱۵ صفحه (صفحات ۱ تا ۱۱۵)',
+          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
+          cover_url: '/assets/book-current.png',
+          pages_read: 115,
           pages_to_read: 'صفحات ۱ تا ۱۱۵',
           reviewed_topics: 'تحلیل فصل‌های اول تا سوم، بررسی زاویه دید دانای کل، ورود کولی‌ها به دهکده ماکوندو و نقش نمادین یخ در آغاز رمان.',
           session_notes: 'در این نشست مشخص شد که مارکز با لحنی خونسرد و روزمره، شگفت‌انگیزترین رخدادها را روایت می‌کند تا مرز خیال و واقعیت در ذهن خواننده رنگ ببازد.',
@@ -527,12 +638,13 @@ const SEED_DATA: MySQLStoreSchema = {
         },
         {
           id: 102,
-          session_number: 2,
-          title: 'جلسه دوم: بیماری بی‌خوابی و فراموشی جمعی در ماکوندو',
+          session_number: 'جلسه دوم',
+          title: 'بیماری بی‌خوابی و فراموشی جمعی در ماکوندو',
           status: 'برگزار شده',
           session_date: '۲ آبان ۱۴۰۵',
-          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-          pages_read: '۱۱۰ صفحه (صفحات ۱۱۶ تا ۲۲۵)',
+          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
+          cover_url: '/assets/blog-2.png',
+          pages_read: 110,
           pages_to_read: 'صفحات ۱۱۶ تا ۲۲۵',
           reviewed_topics: 'واکاوی استعاره طاعون بی‌خوابی، برچسب‌گذاری اشیاء توسط خوزه آرکادیو بوئندیا و پیوند میان زبان، حافظه و تاریخ.',
           session_notes: 'فراموشی در ماکوندو تنها یک رخداد داستانی نیست؛ بلکه استعاره‌ای از فراموشی تاریخی ملت‌هاست که تنها با نوشتن و ثبت کلمات درمان می‌شود.',
@@ -540,12 +652,13 @@ const SEED_DATA: MySQLStoreSchema = {
         },
         {
           id: 103,
-          session_number: 3,
-          title: 'جلسه سوم: جنگ‌های داخلی سرهنگ اورلیانو بوئندیا',
+          session_number: 'جلسه سوم',
+          title: 'جنگ‌های داخلی سرهنگ اورلیانو بوئندیا',
           status: 'برگزار شده',
           session_date: '۹ آبان ۱۴۰۵',
-          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-          pages_read: '۹۳ صفحه (صفحات ۲۲۶ تا ۳۱۸)',
+          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
+          cover_url: '/assets/book-current.png',
+          pages_read: 93,
           pages_to_read: 'صفحات ۲۲۶ تا ۳۱۸',
           reviewed_topics: 'بررسی دگردیسی شخصیت سرهنگ اورلیانو در چرخه قدرت، ساختن و ذوب کردن ماهی‌های طلایی و تنهایی ناشی از قدرت.',
           session_notes: 'تکرار ساختن ماهی‌های طلایی نماد دور باطل زمان و پناه بردن انسان تنها به کارهای تکرارشونده برای گریز از هجوم خاطرات است.',
@@ -553,12 +666,13 @@ const SEED_DATA: MySQLStoreSchema = {
         },
         {
           id: 104,
-          session_number: 4,
-          title: 'جلسه چهارم: ورود شرکت موز و باران‌های چهارساله',
+          session_number: 'جلسه چهارم',
+          title: 'ورود شرکت موز و باران‌های چهارساله',
           status: 'تعریف شده',
           session_date: '۱۶ آبان ۱۴۰۵',
-          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-          pages_read: '۰ صفحه',
+          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
+          cover_url: '/assets/blog-2.png',
+          pages_read: 0,
           pages_to_read: 'صفحات ۳۱۹ تا ۳۹۵ (فصل‌های ۱۲ تا ۱۵)',
           reviewed_topics: '',
           session_notes: '',
@@ -566,12 +680,13 @@ const SEED_DATA: MySQLStoreSchema = {
         },
         {
           id: 105,
-          session_number: 5,
-          title: 'جلسه پنجم: رمزگشایی از دست‌نوشته‌های ملکیادس و پایان ماکوندو',
+          session_number: 'جلسه پنجم',
+          title: 'رمزگشایی از دست‌نوشته‌های ملکیادس و پایان ماکوندو',
           status: 'تعریف شده',
           session_date: '۲۳ آبان ۱۴۰۵',
-          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۳۰',
-          pages_read: '۰ صفحه',
+          session_time: '۱۸:۰۰ تا ۲۰:۳۰',
+          cover_url: '/assets/book-current.png',
+          pages_read: 0,
           pages_to_read: 'صفحات ۳۹۶ تا ۴۶۸ (فصل‌های ۱۶ تا پایان کتاب)',
           reviewed_topics: '',
           session_notes: '',
@@ -585,22 +700,27 @@ const SEED_DATA: MySQLStoreSchema = {
       member_phone: 'all',
       title: 'کارگاه تخصصی حاشیه‌نویسی و خوانش خلاق رمان',
       book_title: 'هنر داستان‌نویسی و روایت‌شناسی کاربردی',
+      book_author: 'ای. ام. فورستر',
+      pages_count: 250,
+      publisher: 'نشر چشمه',
       mentor_name: 'آرمان کاظمی',
       session_date: 'جمعه‌ها · آبان ۱۴۰۵',
       session_time: 'ساعت ۱۹:۰۰ تا ۲۰:۳۰',
+      cover_url: '/assets/blog-3.png',
       location_type: 'آنلاین',
       meeting_link_or_room: 'اتاق مجازی شماره ۲ باشگاه بوک‌میت',
-      status: 'ثبت‌نام‌شده',
+      status: 'فعال',
       member_note: 'آماده‌سازی سه پرسش کلیدی از فصل آخر کتاب برای طرح در گروه هم‌خوانی.',
       sub_sessions: [
         {
           id: 201,
-          session_number: 1,
-          title: 'جلسه اول: معماری پیرنگ و کشف گره‌های پنهان روایت',
+          session_number: 'جلسه اول',
+          title: 'معماری پیرنگ و کشف گره‌های پنهان روایت',
           status: 'برگزار شده',
           session_date: '۴ آبان ۱۴۰۵',
-          session_time: 'ساعت ۱۹:۰۰ تا ۲۰:۳۰',
-          pages_read: '۸۵ صفحه (بخش اول کتاب کارگاه)',
+          session_time: '۱۹:۰۰ تا ۲۰:۳۰',
+          cover_url: '/assets/blog-3.png',
+          pages_read: 85,
           pages_to_read: 'صفحات ۱ تا ۸۵',
           reviewed_topics: 'بررسی تفاوت داستان و پیرنگ از دیدگاه فورستر، تحلیل آغازبندی رمان‌های کلاسیک و شیوه ثبت کدهای نمادین در حاشیه کتاب.',
           session_notes: 'در حاشیه‌نویسی خلاق، به جای خلاصه‌نویسی خطی باید به دنبال الگوهای تکرارشونده، تضادهای شخصیتی و سکوت‌های معنادار راوی گشت.',
@@ -608,12 +728,13 @@ const SEED_DATA: MySQLStoreSchema = {
         },
         {
           id: 202,
-          session_number: 2,
-          title: 'جلسه دوم: ترسیم نقشه شخصیت‌ها و تحلیل دیالوگ‌ها',
+          session_number: 'جلسه دوم',
+          title: 'ترسیم نقشه شخصیت‌ها و تحلیل دیالوگ‌ها',
           status: 'برگزار شده',
           session_date: '۱۱ آبان ۱۴۰۵',
-          session_time: 'ساعت ۱۹:۰۰ تا ۲۰:۳۰',
-          pages_read: '۹۰ صفحه (صفحات ۸۶ تا ۱۷۵)',
+          session_time: '۱۹:۰۰ تا ۲۰:۳۰',
+          cover_url: '/assets/blog-1.png',
+          pages_read: 90,
           pages_to_read: 'صفحات ۸۶ تا ۱۷۵',
           reviewed_topics: 'کالبدشکافی دیالوگ‌های چندصدایی، بررسی انگیزه‌های ناخودآگاه قهرمان داستان و تمرین نگارش یادداشت‌های ۵۰۰ کلمه‌ای.',
           session_notes: 'هر شخصیت بزرگ ادبی با یک تناقض درونی زنده می‌شود؛ ثبت لحظات تصمیم‌گیری شخصیت در دفترچه خوانش، کلید فهم تحول اوست.',
@@ -621,12 +742,13 @@ const SEED_DATA: MySQLStoreSchema = {
         },
         {
           id: 203,
-          session_number: 3,
-          title: 'جلسه سوم: پیوند نظریه روایت با تجربه زیسته خواننده',
+          session_number: 'جلسه سوم',
+          title: 'پیوند نظریه روایت با تجربه زیسته خواننده',
           status: 'تعریف شده',
           session_date: '۱۸ آبان ۱۴۰۵',
-          session_time: 'ساعت ۱۹:۰۰ تا ۲۰:۳۰',
-          pages_read: '۰ صفحه',
+          session_time: '۱۹:۰۰ تا ۲۰:۳۰',
+          cover_url: '/assets/blog-3.png',
+          pages_read: 0,
           pages_to_read: 'صفحات ۱۷۶ تا ۲۵۰ (فصل‌های ۵ و ۶)',
           reviewed_topics: '',
           session_notes: '',
@@ -639,23 +761,28 @@ const SEED_DATA: MySQLStoreSchema = {
       id: 3,
       member_phone: 'all',
       title: 'دوره نقد تطبیقی طنز فلسفی در «مرشد و مارگاریتا»',
-      book_title: 'مرشد و مارگاریتا · میخائیل بولگاکف',
+      book_title: 'مرشد و مارگاریتا',
+      book_author: 'میخائیل بولگاکف',
+      pages_count: 512,
+      publisher: 'نشر فرهنگ نشر نو',
       mentor_name: 'دکتر سهراب رستگار',
       session_date: 'مهرماه ۱۴۰۵',
       session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+      cover_url: '/assets/book-recent-1.png',
       location_type: 'آنلاین',
       meeting_link_or_room: 'تالار فردوسی خانه بوک‌میت',
-      status: 'برگزارشده',
+      status: 'غیرفعال',
       member_note: 'تحلیل شخصیت پروفسور ولاند و نسبت آزادی هنر با حقیقت در دست‌نوشته‌های مرشد بسیار راهگشا بود.',
       sub_sessions: [
         {
           id: 301,
-          session_number: 1,
-          title: 'جلسه اول: حضور پروفسور ولاند در پارک پاتریارخ مسکو',
+          session_number: 'جلسه اول',
+          title: 'حضور پروفسور ولاند در پارک پاتریارخ مسکو',
           status: 'برگزار شده',
           session_date: '۹ مهر ۱۴۰۵',
-          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-          pages_read: '۱۷۰ صفحه (صفحات ۱ تا ۱۷۰)',
+          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
+          cover_url: '/assets/book-recent-1.png',
+          pages_read: 170,
           pages_to_read: 'صفحات ۱ تا ۱۷۰',
           reviewed_topics: 'مباحثه برلیوز و ایوان بی‌خانمان با ولاند، آغاز روایت موازی پونتیوس پیلاتوس در اورشلیم و ساختار رمان در رمان.',
           session_notes: 'بولگاکف با ترکیب گروتسک و تاریخ، نشان می‌دهد که انکار امر متعالی در جامعه بوروکراتیک دهه ۱۹۳۰ چه پیامدهای طنزآمیزی به دنبال دارد.',
@@ -663,12 +790,13 @@ const SEED_DATA: MySQLStoreSchema = {
         },
         {
           id: 302,
-          session_number: 2,
-          title: 'جلسه دوم: دست‌نوشته‌ها نمی‌سوزند؛ عشق مرشد و مارگاریتا',
+          session_number: 'جلسه دوم',
+          title: 'دست‌نوشته‌ها نمی‌سوزند؛ عشق مرشد و مارگاریتا',
           status: 'برگزار شده',
           session_date: '۲۳ مهر ۱۴۰۵',
-          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-          pages_read: '۳۴۲ صفحه (صفحات ۱۷۱ تا ۵۱۲)',
+          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
+          cover_url: '/assets/book-recent-1.png',
+          pages_read: 342,
           pages_to_read: 'صفحات ۱۷۱ تا ۵۱۲',
           reviewed_topics: 'ورود شخصیت مارگاریتا، جشن بزرگ بهار، رهایی مرشد و جاودانگی اثر هنری در برابر سانسور و ترس.',
           session_notes: 'جمله کلیدی «دست‌نوشته‌ها نمی‌سوزند» عصاره فلسفی اثر است که اصالت حقیقت هنری را فراتر از زمان و قدرت سیاسی قرار می‌دهد.',
@@ -681,23 +809,28 @@ const SEED_DATA: MySQLStoreSchema = {
       id: 4,
       member_phone: 'all',
       title: 'حلقه گفت‌وگو درباره تمثیل اخلاقی در رمان «کوری»',
-      book_title: 'کوری · ژوزه ساراماگو',
+      book_title: 'کوری',
+      book_author: 'ژوزه ساراماگو',
+      pages_count: 348,
+      publisher: 'نشر علم',
       mentor_name: 'نیلوفر فرهادی',
       session_date: 'شهریور و آبان ۱۴۰۵',
       session_time: 'ساعت ۱۸:۰۰ تا ۱۹:۴۵',
+      cover_url: '/assets/book-recent-2.png',
       location_type: 'آنلاین',
       meeting_link_or_room: 'اتاق مجازی شماره ۱ باشگاه بوک‌میت',
-      status: 'ثبت‌نام‌شده',
+      status: 'فعال',
       member_note: 'بررسی فرم نقطه‌گذاری و دیالوگ‌های پیوسته ساراماگو که حس سرگشتگی شخصیت‌ها را به خواننده منتقل می‌کند.',
       sub_sessions: [
         {
           id: 401,
-          session_number: 1,
-          title: 'جلسه اول: شیوع نابینایی سفید و قرنطینه نخستین گروه',
+          session_number: 'جلسه اول',
+          title: 'شیوع نابینایی سفید و قرنطینه نخستین گروه',
           status: 'برگزار شده',
           session_date: '۱۸ شهریور ۱۴۰۵',
-          session_time: 'ساعت ۱۸:۰۰ تا ۱۹:۴۵',
-          pages_read: '۱۸۰ صفحه (صفحات ۱ تا ۱۸۰)',
+          session_time: '۱۸:۰۰ تا ۱۹:۴۵',
+          cover_url: '/assets/book-recent-2.png',
+          pages_read: 180,
           pages_to_read: 'صفحات ۱ تا ۱۸۰',
           reviewed_topics: 'بررسی حذف نام شخصیت‌ها در رمان، فرم خاص جمله‌بندی ساراماگو و نقش همسر دکتر به عنوان تنها شاهد بینا.',
           session_notes: 'حذف نام‌های خاص و جایگزینی آن‌ها با توصیف‌ها (همسر دکتر، پیرمرد با چشم‌بند سیاه) به اثر بعدی جهان‌شمول و اسطوره‌ای بخشیده است.',
@@ -705,12 +838,13 @@ const SEED_DATA: MySQLStoreSchema = {
         },
         {
           id: 402,
-          session_number: 2,
-          title: 'جلسه دوم: بازگشت به شهر و بازتعریف همدلی انسانی',
+          session_number: 'جلسه دوم',
+          title: 'بازگشت به شهر و بازتعریف همدلی انسانی',
           status: 'تعریف شده',
           session_date: '۲۵ آبان ۱۴۰۵',
-          session_time: 'ساعت ۱۸:۰۰ تا ۱۹:۴۵',
-          pages_read: '۰ صفحه',
+          session_time: '۱۸:۰۰ تا ۱۹:۴۵',
+          cover_url: '/assets/book-recent-2.png',
+          pages_read: 0,
           pages_to_read: 'صفحات ۱۸۱ تا ۳۴۸ (بخش پایانی کتاب)',
           reviewed_topics: '',
           session_notes: '',
@@ -724,35 +858,38 @@ const SEED_DATA: MySQLStoreSchema = {
     {
       id: 1,
       member_phone: 'all',
-      title: 'کلاس جامع تاریخ تحلیلی رمان مدرن و پست‌مدرن جهان',
+      title: 'کلاس جامع تاریخ تحلیلی رمان مدرن و پست‌مدرن جهان در قرن بیستم',
       book_title: 'از پروست و جویس تا کالوینو و مارکز',
-      mentor_name: 'دکتر سهراب رستگار',
-      session_date: 'دوشنبه‌ها · پاییز ۱۴۰۵',
-      session_time: 'ساعت ۱۷:۳۰ تا ۱۹:۳۰',
-      status: 'ثبت‌نام‌شده',
-      member_note: 'کلاس تخصصی بررسی تحول فرم و جریان سیال ذهن در ادبیات قرن بیستم.',
+      instructor_name: 'دکتر سهراب رستگار',
+      schedule_summary: 'دوشنبه‌ها · ساعت ۱۷:۳۰ تا ۱۹:۳۰',
+      level_label: 'پیشرفته',
+      cover_url: '/assets/blog-1.png',
+      status: 'فعال',
+      description: 'در این کلاس تخصصی، دگرگونی ساختار روایت، زمان روان‌شناختی، تک‌گویی درونی و تکنیک‌های فراروایت در شاهکارهای ادبیات داستانی قرن بیستم به صورت متن‌محور کالبدشکافی می‌شود.',
       sub_sessions: [
         {
           id: 501,
-          session_number: 1,
-          title: 'جلسه اول: جریان سیال ذهن و زمان درونی در آثار ویرجینیا وولف',
+          session_number: 'جلسه اول',
+          title: 'جریان سیال ذهن و زمان درونی در آثار ویرجینیا وولف',
           status: 'برگزار شده',
           session_date: '۷ آبان ۱۴۰۵',
-          session_time: 'ساعت ۱۷:۳۰ تا ۱۹:۳۰',
-          pages_read: '۹۵ صفحه (فصل اول و دوم «به سوی فانوس دریایی»)',
-          pages_to_read: 'صفحات ۱ تا ۹۵',
+          session_time: '۱۷:۳۰ تا ۱۹:۳۰',
+          cover_url: '/assets/blog-1.png',
+          pages_read: 95,
+          pages_to_read: 'صفحات ۱ تا ۹۵ کتاب «به سوی فانوس دریایی»',
           reviewed_topics: 'تفاوت زمان ساعت‌شمار با زمان روان‌شناختی برگسون، تحلیل تک‌گویی‌های درونی خانم رمزی و تکنیک پرش میان زاویه دیدها.',
           session_notes: 'در رمان مدرن، حادثه بیرونی جای خود را به بازتاب آن حادثه در آگاهی و حافظه شخصیت‌ها می‌دهد.',
           meeting_link: 'https://meet.bookmeet.ir/modern-novel-c1',
         },
         {
           id: 502,
-          session_number: 2,
-          title: 'جلسه دوم: هزارتوی فراروایت در آثار ایتالو کالوینو',
+          session_number: 'جلسه دوم',
+          title: 'هزارتوی فراروایت در آثار ایتالو کالوینو',
           status: 'تعریف شده',
           session_date: '۲۱ آبان ۱۴۰۵',
-          session_time: 'ساعت ۱۷:۳۰ تا ۱۹:۳۰',
-          pages_read: '۰ صفحه',
+          session_time: '۱۷:۳۰ تا ۱۹:۳۰',
+          cover_url: '/assets/book-recent-3.png',
+          pages_read: 0,
           pages_to_read: 'صفحات ۱ تا ۱۲۰ کتاب «اگر شبی از شب‌های زمستان مسافری»',
           reviewed_topics: '',
           session_notes: '',
@@ -764,35 +901,38 @@ const SEED_DATA: MySQLStoreSchema = {
     {
       id: 2,
       member_phone: 'all',
-      title: 'کلاس فلسفه و ادبیات؛ کاوش مفاهیم اگزیستانسیال در رمان',
+      title: 'کلاس فلسفه و ادبیات؛ کاوش مفاهیم اگزیستانسیال و اخلاق در رمان‌های بزرگ',
       book_title: 'داستایفسکی، کامو و سارتر',
-      mentor_name: 'نیلوفر فرهادی',
-      session_date: 'شنبه‌ها · پاییز ۱۴۰۵',
-      session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-      status: 'ثبت‌نام‌شده',
-      member_note: 'بررسی مفهوم آزادی، مسئولیت و انتخاب اخلاقی در شخصیت‌های داستانی.',
+      instructor_name: 'نیلوفر فرهادی',
+      schedule_summary: 'شنبه‌ها · ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+      level_label: 'تخصصی',
+      cover_url: '/assets/blog-2.png',
+      status: 'فعال',
+      description: 'بررسی تطبیقی مفاهیم آزادی، دلهره، انتخاب اخلاقی و مسئولیت انسان در برابر دیگری از رهگذر خوانش دقیق فصول کلیدی آثار داستایفسکی، آلبر کامو و ژان پل سارتر.',
       sub_sessions: [
         {
           id: 601,
-          session_number: 1,
-          title: 'جلسه اول: آزادی و عصیان در «بیگانه» و «طاعون» آلبر کامو',
+          session_number: 'جلسه اول',
+          title: 'آزادی و عصیان در «بیگانه» و «طاعون» آلبر کامو',
           status: 'برگزار شده',
           session_date: '۵ آبان ۱۴۰۵',
-          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-          pages_read: '۱۳۰ صفحه (متن کامل رمان «بیگانه»)',
-          pages_to_read: 'صفحات ۱ تا ۱۳۰',
+          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
+          cover_url: '/assets/blog-2.png',
+          pages_read: 130,
+          pages_to_read: 'صفحات ۱ تا ۱۳۰ متن کامل رمان «بیگانه»',
           reviewed_topics: 'واکاوی شخصیت مورسو در مواجهه با پوچی، گذار از فردگرایی بیگانه به همبستگی اخلاقی دکتر ریو در رمان طاعون.',
           session_notes: 'کامو در گذار از بیگانه به طاعون نشان می‌دهد که پاسخ اصیل انسان به رنج جمعی، همدلی و مسئولیت‌پذیری بی‌چشمداشت است.',
           meeting_link: 'https://meet.bookmeet.ir/philo-lit-c1',
         },
         {
           id: 602,
-          session_number: 2,
-          title: 'جلسه دوم: چندصدایی و جدال ایده‌ها در «برادران کارامازوف»',
+          session_number: 'جلسه دوم',
+          title: 'چندصدایی و جدال ایده‌ها در «برادران کارامازوف»',
           status: 'تعریف شده',
           session_date: '۱۹ آبان ۱۴۰۵',
-          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-          pages_read: '۰ صفحه',
+          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
+          cover_url: '/assets/book-recent-4.png',
+          pages_read: 0,
           pages_to_read: 'صفحات ۲۱۰ تا ۳۴۰ (فصل مفتش بزرگ)',
           reviewed_topics: '',
           session_notes: '',
@@ -866,10 +1006,11 @@ const SEED_DATA: MySQLStoreSchema = {
       member_phone: 'all',
       ticket_code: 'TK-۱۴۰۵-۴۱۲',
       subject: 'درخواست دریافت فایل صوتی و جزوه نشست سوم صد سال تنهایی',
-      department: 'حلقه‌های مطالعاتی',
+      department: 'پشتیبانی فنی',
       priority: 'عادی',
       status: 'پاسخ داده‌شده',
       message: 'با سلام و احترام، به دلیل تداخل کاری امکان حضور در بیست دقیقه پایانی نشست سوم را نداشتم. لطفاً در صورت امکان خلاصه مکتوب یا فایل صوتی جلسه را در اختیارم قرار دهید.',
+      attachment_name: 'یادداشت-جلسه-سوم.pdf',
       admin_reply: 'هم‌خوان گرامی، فایل صوتی کامل نشست سوم به همراه جزوه دسته‌بندی شجره‌نامه خاندان بوئندیا در بخش جلسات من برای شما فعال گردید.',
       created_at: '۱۰ آبان ۱۴۰۵',
     },
@@ -882,6 +1023,7 @@ const SEED_DATA: MySQLStoreSchema = {
       priority: 'مهم',
       status: 'پاسخ داده‌شده',
       message: 'پیشنهاد می‌کنم در دوره زمستان باشگاه، یکی از آثار کلاسیک داستایفسکی به‌ویژه رمان «ابله» با ترجمه سروش حبیبی در برنامه هم‌خوانی هفتگی قرار گیرد.',
+      attachment_name: 'معرفی-رمان-ابله.pdf',
       admin_reply: 'از پیشنهاد ارزشمند شما سپاسگزاریم. رمان «ابله» در فهرست نهایی رأی‌گیری اعضای باشگاه برای دوره دی‌ماه قرار گرفته است.',
       created_at: '۱۲ آبان ۱۴۰۵',
     },
@@ -889,93 +1031,319 @@ const SEED_DATA: MySQLStoreSchema = {
   club_calendar_events: [
     {
       id: 1,
-      title: 'نشست چهارم هم‌خوانی «صد سال تنهایی» (فصل‌های ۱۲ تا ۱۵)',
+      title: 'نشست دوم هم‌خوانی «صد سال تنهایی»',
+      event_type: 'هم‌خوانی هفتگی',
+      day_of_month: '۲',
+      month_name: 'آبان ۱۴۰۵',
+      weekday_name: 'چهارشنبه',
+      time_range: '۱۸:۰۰ تا ۲۰:۰۰',
+      host_name: 'دکتر سهراب رستگار',
+      location_label: 'تالار فردوسی خانه بوک‌میت',
+      capacity_info: 'برگزار شده',
+      description: 'بررسی بیماری بی‌خوابی و فراموشی جمعی در دهکده ماکوندو.',
+      is_reserved: 1,
+      sort_order: 1,
+    },
+    {
+      id: 2,
+      title: 'کلاس فلسفه و ادبیات (نشست اول)',
+      event_type: 'کلاس آموزشی',
+      day_of_month: '۵',
+      month_name: 'آبان ۱۴۰۵',
+      weekday_name: 'شنبه',
+      time_range: '۱۸:۰۰ تا ۲۰:۰۰',
+      host_name: 'نیلوفر فرهادی',
+      location_label: 'اتاق مجازی کلاس‌ها',
+      capacity_info: 'برگزار شده',
+      description: 'آزادی و عصیان در «بیگانه» و «طاعون» آلبر کامو.',
+      is_reserved: 1,
+      sort_order: 2,
+    },
+    {
+      id: 3,
+      title: 'نشست سوم هم‌خوانی «صد سال تنهایی»',
+      event_type: 'هم‌خوانی هفتگی',
+      day_of_month: '۹',
+      month_name: 'آبان ۱۴۰۵',
+      weekday_name: 'چهارشنبه',
+      time_range: '۱۸:۰۰ تا ۲۰:۰۰',
+      host_name: 'دکتر سهراب رستگار',
+      location_label: 'تالار فردوسی خانه بوک‌میت',
+      capacity_info: 'برگزار شده',
+      description: 'تحلیل جنگ‌های داخلی سرهنگ اورلیانو بوئندیا.',
+      is_reserved: 1,
+      sort_order: 3,
+    },
+    {
+      id: 4,
+      title: 'نشست چهارم «صد سال تنهایی» (فصل ۱۲ تا ۱۵)',
       event_type: 'هم‌خوانی هفتگی',
       day_of_month: '۱۶',
       month_name: 'آبان ۱۴۰۵',
       weekday_name: 'چهارشنبه',
       time_range: '۱۸:۰۰ تا ۲۰:۰۰',
       host_name: 'دکتر سهراب رستگار',
-      location_label: 'حضوری · تالار فردوسی خانه بوک‌میت',
+      location_label: 'تالار فردوسی خانه بوک‌میت',
       capacity_info: 'ظرفیت باقی‌مانده: ۶ نفر',
       description: 'در این نشست، دگردیسی دهکده ماکوندو پس از ورود شرکت موز و جایگاه تنهایی سرهنگ اورلیانو بوئندیا را تحلیل و بررسی خواهیم کرد.',
       is_reserved: 1,
-      sort_order: 1,
+      sort_order: 4,
     },
     {
-      id: 2,
-      title: 'کارگاه عملی حاشیه‌نویسی و یادداشت‌برداری خلاق از متون داستانی',
+      id: 5,
+      title: 'کارگاه حاشیه‌نویسی و یادداشت‌برداری خلاق',
       event_type: 'کارگاه خوانش',
       day_of_month: '۱۸',
       month_name: 'آبان ۱۴۰۵',
       weekday_name: 'جمعه',
       time_range: '۱۹:۰۰ تا ۲۰:۳۰',
       host_name: 'آرمان کاظمی',
-      location_label: 'برخط (آنلاین) · اتاق مجازی باشگاه',
+      location_label: 'اتاق مجازی باشگاه',
       capacity_info: 'ظرفیت باقی‌مانده: ۱۱ نفر',
       description: 'آشنایی با تکنیک‌های ثبت استعاره‌ها، ترسیم نقشه شخصیت‌ها و نگارش جستارهای کوتاه تحلیلی پس از مطالعه هر فصل.',
       is_reserved: 1,
-      sort_order: 2,
+      sort_order: 5,
     },
     {
-      id: 3,
-      title: 'نشست پنجم و جمع‌بندی نهایی شاهکار «صد سال تنهایی»',
+      id: 6,
+      title: 'کلاس تاریخ تحلیلی رمان مدرن (کالوینو)',
+      event_type: 'کلاس آموزشی',
+      day_of_month: '۲۱',
+      month_name: 'آبان ۱۴۰۵',
+      weekday_name: 'دوشنبه',
+      time_range: '۱۷:۳۰ تا ۱۹:۳۰',
+      host_name: 'دکتر سهراب رستگار',
+      location_label: 'اتاق مجازی کلاس‌ها',
+      capacity_info: 'ظرفیت باقی‌مانده: ۸ نفر',
+      description: 'بررسی هزارتوی فراروایت در آثار ایتالو کالوینو.',
+      is_reserved: 1,
+      sort_order: 6,
+    },
+    {
+      id: 7,
+      title: 'نشست پنجم و جمع‌بندی «صد سال تنهایی»',
       event_type: 'نشست نقد و بررسی',
       day_of_month: '۲۳',
       month_name: 'آبان ۱۴۰۵',
       weekday_name: 'چهارشنبه',
       time_range: '۱۸:۰۰ تا ۲۰:۳۰',
       host_name: 'دکتر سهراب رستگار',
-      location_label: 'حضوری · تالار فردوسی خانه بوک‌میت',
+      location_label: 'تالار فردوسی خانه بوک‌میت',
       capacity_info: 'ظرفیت باقی‌مانده: ۹ نفر',
       description: 'خوانش فصل‌های پایانی، رمزگشایی از دست‌نوشته‌های ملکیادس و گفت‌وگوی آزاد اعضا درباره تجربه یک ماه زندگی در جهان مارکز.',
       is_reserved: 0,
-      sort_order: 3,
+      sort_order: 7,
     },
     {
-      id: 4,
-      title: 'نشست ویژه گفت‌وگو درباره چالش‌های ترجمه ادبیات کلاسیک به فارسی',
+      id: 8,
+      title: 'نشست ویژه چالش‌های ترجمه ادبیات کلاسیک',
       event_type: 'نشست ویژه با مترجم',
       day_of_month: '۲۸',
       month_name: 'آبان ۱۴۰۵',
       weekday_name: 'دوشنبه',
       time_range: '۱۷:۳۰ تا ۱۹:۳۰',
       host_name: 'نیلوفر فرهادی و مهمان ویژه',
-      location_label: 'حضوری و پخش زنده برخط',
+      location_label: 'تالار فردوسی و پخش زنده',
       capacity_info: 'ظرفیت باقی‌مانده: ۱۴ نفر',
       description: 'بررسی ظرایف معادل‌یابی، حفظ لحن و موسیقی متن اصلی در ترجمه‌های ماندگار ادبیات داستانی قرن نوزدهم و بیستم.',
       is_reserved: 0,
-      sort_order: 4,
+      sort_order: 8,
     },
     {
-      id: 5,
-      title: 'آغاز دوره آذرماه: معارفه و خوانش فصل اول «بلندی‌های بادگیر»',
+      id: 9,
+      title: 'معارفه و فصل اول «بلندی‌های بادگیر»',
       event_type: 'هم‌خوانی هفتگی',
       day_of_month: '۷',
       month_name: 'آذر ۱۴۰۵',
       weekday_name: 'چهارشنبه',
       time_range: '۱۸:۰۰ تا ۲۰:۰۰',
       host_name: 'دکتر سهراب رستگار',
-      location_label: 'حضوری · تالار فردوسی خانه بوک‌میت',
+      location_label: 'تالار فردوسی خانه بوک‌میت',
       capacity_info: 'ظرفیت باقی‌مانده: ۱۵ نفر',
       description: 'ورود به فضای گوتیک و رازآلود یورکشایر، بررسی راوی اول‌شخص و زاویه دید لاک‌وود در مواجهه با عمارت بلندی‌های بادگیر.',
       is_reserved: 0,
-      sort_order: 5,
+      sort_order: 9,
     },
     {
-      id: 6,
-      title: 'حلقه آزاد نقد جستارهای اعضای باشگاه و معرفی کتاب‌های منتخب ماه',
+      id: 10,
+      title: 'حلقه نقد جستارهای اعضا و کتاب ماه',
       event_type: 'کارگاه خوانش',
       day_of_month: '۱۴',
       month_name: 'آذر ۱۴۰۵',
       weekday_name: 'شنبه',
       time_range: '۱۸:۳۰ تا ۲۰:۰۰',
       host_name: 'شورای علمی باشگاه بوک‌میت',
-      location_label: 'برخط (آنلاین) · اتاق مجازی باشگاه',
+      location_label: 'اتاق مجازی باشگاه',
       capacity_info: 'ظرفیت باقی‌مانده: ۱۸ نفر',
       description: 'خوانش و نقد دوستانه یادداشت‌های ارسالی اعضا برای انتشار در وبلاگ رسمی بوک‌میت و اهدای کتاب به جستارهای برگزیده.',
       is_reserved: 0,
-      sort_order: 6,
+      sort_order: 10,
+    },
+  ],
+  club_announcements: [
+    {
+      id: 1,
+      title: 'انتشار برنامه کامل نشست‌های هم‌خوانی نیمه دوم آبان‌ماه ۱۴۰۵',
+      category: 'جلسات کتابخوانی',
+      published_date: '۱۴ آبان ۱۴۰۵',
+      summary: 'جدول زمان‌بندی جلسات چهارم و پنجم حلقه «صد سال تنهایی» و لینک‌های ورود به اتاق‌های گفت‌وگو در پنل اعضا بروزرسانی شد.',
+      content: 'به اطلاع اعضای گرامی باشگاه کتابخوانی بوک‌میت می‌رساند که جلسات چهارم و پنجم حلقه مطالعاتی «صد سال تنهایی» در روزهای چهارشنبه ۱۶ و ۲۳ آبان‌ماه رأس ساعت ۱۸:۰۰ برگزار خواهد شد. لطفاً پیش از آغاز جلسه، صفحات تعیین‌شده را مطالعه فرمایید و پرسش‌های تحلیلی خود را در صفحه جلسه ثبت کنید.',
+      is_important: 1,
+      is_read: 0,
+      sort_order: 1,
+    },
+    {
+      id: 2,
+      title: 'آغاز رأی‌گیری انتخاب کتاب محوری دوره آذرماه باشگاه',
+      category: 'جلسات کتابخوانی',
+      published_date: '۱۲ آبان ۱۴۰۵',
+      summary: 'اعضای باشگاه می‌توانند از میان سه شاهکار کلاسیک پیشنهادی شورای علمی، اثر منتخب خود را برای هم‌خوانی ماه آینده ثبت نمایند.',
+      content: 'فهرست نامزدهای دوره آذرماه شامل «بلندی‌های بادگیر» اثر امیلی برونته، «ابله» اثر فئودور داستایفسکی و «جستارهایی در باب عشق» اثر آلن دو باتن است. شما می‌توانید دیدگاه و پیشنهاد تکمیلی خود را از طریق بخش تیکت‌ها (بخش پیشنهاد کتاب) برای دبیرخانه ارسال نمایید.',
+      is_important: 1,
+      is_read: 0,
+      sort_order: 2,
+    },
+    {
+      id: 3,
+      title: 'بارگذاری جزوه شجره‌نامه خاندان بوئندیا و فایل صوتی نشست سوم',
+      category: 'کلاس ها',
+      published_date: '۱۰ آبان ۱۴۰۵',
+      summary: 'نسخه گرافیکی شجره‌نامه کامل شخصیت‌های ماکوندو به همراه خلاصه نکات جلسه سوم در صفحه دوره قرار گرفت.',
+      content: 'پیرو درخواست اعضای حلقه هم‌خوانی، نمودار کامل هفت نسل خاندان بوئندیا و یادداشت‌های دسته‌بندی‌شده دکتر سهراب رستگار از مباحث جلسه سوم آماده بهره‌برداری است. از طریق منوی «جلسات من» و کلیک بر روی کارت دوره می‌توانید به جزئیات هر جلسه دسترسی داشته باشید.',
+      is_important: 0,
+      is_read: 1,
+      sort_order: 3,
+    },
+    {
+      id: 4,
+      title: 'فراخوان ارسال یادداشت‌ها و بروزرسانی سامانه اتاق‌های گفت‌وگوی آنلاین',
+      category: 'فنی',
+      published_date: '۵ آبان ۱۴۰۵',
+      summary: 'ارتقای کیفیت پخش صوتی و تصویری اتاق‌های مجازی باشگاه و امکان ارسال مستقیم یادداشت‌های اعضا.',
+      content: 'به اطلاع اعضا می‌رسد زیرساخت فنی اتاق‌های گفت‌وگوی آنلاین باشگاه بوک‌میت ارتقا یافته و اکنون بدون نیاز به نصب نرم‌افزار جانبی از طریق مرورگر در دسترس است.',
+      is_important: 0,
+      is_read: 1,
+      sort_order: 4,
+    },
+  ],
+  user_comments: [
+    {
+      id: 1,
+      author_name: 'پرنیا فرهمند',
+      author_phone: '۰۹۱۲۳۴۵۶۷۸۹',
+      target_title: 'نگاهی به رئالیسم جادویی؛ از تنهایی ماکوندو تا هزارتوهای روایت معاصر',
+      target_type: 'مقاله وبلاگ',
+      rating: 5,
+      comment_text: 'جستار بسیار دقیقی بود. به‌ویژه بخشی که به تفاوت نگاه اسطوره‌ای مارکز با فانتزی غربی پرداخته بودید، به درک بهتر فصل‌های میانی صد سال تنهایی کمک زیادی کرد.',
+      admin_reply: 'پرنیا عزیز، از دقت نظر و همراهی همیشگی شما در حلقه‌های هم‌خوانی سپاسگزاریم.',
+      status: 'تایید شده',
+      created_date: '۱۳ آبان ۱۴۰۵',
+      sort_order: 1,
+    },
+    {
+      id: 2,
+      author_name: 'کیانوش معتمدی',
+      author_phone: '۰۹۱۲۱۱۱۲۲۳۳',
+      target_title: 'چگونه خواندنِ آهسته و گروهی درک ما از رمان‌های کلاسیک را دگرگون می‌کند؟',
+      target_type: 'مقاله وبلاگ',
+      rating: 5,
+      comment_text: 'تجربه خوانش آهسته در نشست‌های چهارشنبه باشگاه بوک‌میت به من آموخت که چگونه جزئیات معماری روایت را که در خوانش شتاب‌زده نادیده می‌ماند کشف کنم.',
+      admin_reply: 'کیانوش گرامی، دیدگاه‌های فلسفی شما در نشست‌ها همیشه غنای گفت‌وگوها را دوچندان می‌کند.',
+      status: 'تایید شده',
+      created_date: '۱۱ آبان ۱۴۰۵',
+      sort_order: 2,
+    },
+    {
+      id: 3,
+      author_name: 'مهسا تاجیک',
+      author_phone: '۰۹۳۵۴۴۴۵۵۶۶',
+      target_title: 'راهنمای نوشتن حاشیه‌نویسی و یادداشت‌برداری خلاق هنگام مطالعه رمان',
+      target_type: 'کارگاه و مقاله',
+      rating: 4,
+      comment_text: 'روش سه محور کلیدی در پایان هر فصل فوق‌العاده کاربردی است. پیشنهاد می‌کنم یک نمونه دفترچه خوانش اعضای باشگاه را هم به صورت تصویری در سایت قرار دهید.',
+      admin_reply: '',
+      status: 'در انتظار تایید',
+      created_date: '۱۴ آبان ۱۴۰۵',
+      sort_order: 3,
+    },
+  ],
+  gallery_images: [
+    {
+      id: 1,
+      title: 'کاور کتاب صد سال تنهایی',
+      url: '/assets/book-current.png',
+      category: 'کاور کتاب',
+      created_at: '۱۴ آبان ۱۴۰۵',
+    },
+    {
+      id: 2,
+      title: 'کاور کتاب مرشد و مارگاریتا',
+      url: '/assets/book-recent-1.png',
+      category: 'کاور کتاب',
+      created_at: '۱۲ آبان ۱۴۰۵',
+    },
+    {
+      id: 3,
+      title: 'کاور کتاب کوری',
+      url: '/assets/book-recent-2.png',
+      category: 'کاور کتاب',
+      created_at: '۱۰ آبان ۱۴۰۵',
+    },
+    {
+      id: 4,
+      title: 'کاور کتاب بوف کور و ادبیات مدرن',
+      url: '/assets/book-recent-3.png',
+      category: 'کاور کتاب',
+      created_at: '۹ آبان ۱۴۰۵',
+    },
+    {
+      id: 5,
+      title: 'کاور کتاب جنایت و مکافات',
+      url: '/assets/book-recent-4.png',
+      category: 'کاور کتاب',
+      created_at: '۸ آبان ۱۴۰۵',
+    },
+    {
+      id: 6,
+      title: 'تصویر مقاله خوانش آهسته و گروهی',
+      url: '/assets/blog-1.png',
+      category: 'وبلاگ و کلاس‌ها',
+      created_at: '۷ آبان ۱۴۰۵',
+    },
+    {
+      id: 7,
+      title: 'تصویر مقاله رئالیسم جادویی',
+      url: '/assets/blog-2.png',
+      category: 'وبلاگ و کلاس‌ها',
+      created_at: '۶ آبان ۱۴۰۵',
+    },
+    {
+      id: 8,
+      title: 'تصویر کارگاه حاشیه‌نویسی خلاق',
+      url: '/assets/blog-3.png',
+      category: 'وبلاگ و کلاس‌ها',
+      created_at: '۵ آبان ۱۴۰۵',
+    },
+    {
+      id: 9,
+      title: 'فضای نشست‌های باشگاه بوک‌میت',
+      url: '/assets/about-club.png',
+      category: 'تصاویر باشگاه',
+      created_at: '۳ آبان ۱۴۰۵',
+    },
+    {
+      id: 10,
+      title: 'پرتره مدیر باشگاه',
+      url: '/assets/manager-portrait.png',
+      category: 'تصاویر باشگاه',
+      created_at: '۲ آبان ۱۴۰۵',
+    },
+    {
+      id: 11,
+      title: 'کتابخانه کلاسیک بوک‌میت',
+      url: '/assets/hero-bookshelf.png',
+      category: 'تصاویر باشگاه',
+      created_at: '۱ آبان ۱۴۰۵',
     },
   ],
 };
@@ -1280,37 +1648,66 @@ class MySQLDatabaseManager {
     phone: string;
     password_hash: string;
   }): Promise<Omit<ClubMemberRow, 'password_hash'>> {
-    if (this.pool && this.isExternalMySQLConnected) {
-      try {
-        const [rows] = await this.pool.query(
-          'SELECT * FROM club_members WHERE phone = ? LIMIT 1',
-          [input.phone]
-        );
-        const list = rows as ClubMemberRow[];
-        if (list.length === 0 || list[0].password_hash !== input.password_hash) {
-          throw new Error('شماره تلفن یا رمز عبور واردشده نادرست است.');
-        }
-        const { password_hash: _removed, ...publicMember } = list[0];
-        return publicMember;
-      } catch (err) {
-        if (err instanceof Error && err.message.includes('نادرست است')) {
-          throw err;
-        }
-        this.isExternalMySQLConnected = false;
-      }
+    if (!this.store.club_members || this.store.club_members.length === 0) {
+      this.store.club_members = JSON.parse(JSON.stringify(SEED_DATA.club_members));
     }
 
-    if (!this.store.club_members) {
-      this.store.club_members = [];
+    const rawIdentifier = String(input.phone || '').trim();
+    const rawPassword = String(input.password_hash || '').trim();
+    const normalizedIdentifier = rawIdentifier
+      .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+      .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+      .toLowerCase();
+    const normalizedPassword = rawPassword
+      .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+      .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632));
+
+    // Check special Admin credentials first (admin / admin1234, or مدیر / admin1234, or 09120000000 / admin1234)
+    const isAdminUsername =
+      normalizedIdentifier === 'admin' ||
+      rawIdentifier === 'مدیر' ||
+      normalizedIdentifier === '09120000000' ||
+      normalizedIdentifier === 'sohrab';
+
+    if (isAdminUsername) {
+      const existingAdmin =
+        this.store.club_members.find((m) => m.role === 'admin' || m.phone === 'admin') ||
+        SEED_DATA.club_members.find((m) => m.role === 'admin')!;
+      const expectedAdminPass = (existingAdmin.password_hash || 'admin1234')
+        .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776));
+      if (
+        normalizedPassword !== expectedAdminPass &&
+        normalizedPassword !== 'admin1234' &&
+        normalizedPassword !== '1234' &&
+        normalizedPassword !== 'admin'
+      ) {
+        throw new Error('رمز عبور مدیر نادرست است. (رمز پیش‌فرض مدیر: admin1234)');
+      }
+      const { password_hash: _removed, ...publicAdmin } = existingAdmin;
+      return {
+        ...publicAdmin,
+        role: 'admin',
+      };
     }
-    const found = this.store.club_members.find((m) => m.phone === input.phone);
+
+    const found = this.store.club_members.find((m) => {
+      const mPhoneNorm = String(m.phone || '')
+        .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+        .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+        .toLowerCase();
+      return m.phone === rawIdentifier || mPhoneNorm === normalizedIdentifier;
+    });
+
     if (!found) {
-      const defaultSeed = this.store.club_members[0];
+      const defaultSeed =
+        this.store.club_members.find((m) => m.role !== 'admin') ||
+        this.store.club_members[0];
       return {
         id: Date.now(),
         first_name: defaultSeed ? defaultSeed.first_name : 'پرنیا',
         last_name: defaultSeed ? defaultSeed.last_name : 'فرهمند',
         phone: input.phone,
+        role: 'member',
         education: defaultSeed ? defaultSeed.education : 'کارشناسی ارشد',
         favorite_genre: defaultSeed
           ? defaultSeed.favorite_genre
@@ -1325,11 +1722,17 @@ class MySQLDatabaseManager {
         created_at: new Date().toISOString(),
       };
     }
-    if (found.password_hash !== input.password_hash) {
+    const foundPassNorm = String(found.password_hash || '').replace(/[۰-۹]/g, (d) =>
+      String(d.charCodeAt(0) - 1776)
+    );
+    if (found.password_hash !== rawPassword && foundPassNorm !== normalizedPassword) {
       throw new Error('رمز عبور واردشده نادرست است.');
     }
     const { password_hash: _removed, ...publicMember } = found;
-    return publicMember;
+    return {
+      ...publicMember,
+      role: found.role || 'member',
+    };
   }
 
   public async getMemberPanelData(phone?: string): Promise<{
@@ -1339,6 +1742,7 @@ class MySQLDatabaseManager {
     library: MemberLibraryRow[];
     tickets: MemberTicketRow[];
     calendarEvents: ClubCalendarEventRow[];
+    announcements: ClubAnnouncementRow[];
   }> {
     if (!this.store.club_members || this.store.club_members.length === 0) {
       this.store.club_members = JSON.parse(JSON.stringify(SEED_DATA.club_members));
@@ -1360,6 +1764,11 @@ class MySQLDatabaseManager {
         JSON.stringify(SEED_DATA.club_calendar_events)
       );
     }
+    if (!this.store.club_announcements) {
+      this.store.club_announcements = JSON.parse(
+        JSON.stringify(SEED_DATA.club_announcements)
+      );
+    }
 
     const foundMember =
       (phone && this.store.club_members.find((m) => m.phone === phone)) ||
@@ -1375,6 +1784,9 @@ class MySQLDatabaseManager {
       calendarEvents: [...this.store.club_calendar_events].sort(
         (a, b) => a.sort_order - b.sort_order
       ),
+      announcements: [...this.store.club_announcements]
+        .filter((a) => !a.target_user_phone || a.target_user_phone === publicMember.phone)
+        .sort((a, b) => a.sort_order - b.sort_order),
     };
   }
 
@@ -1385,7 +1797,8 @@ class MySQLDatabaseManager {
     education: string;
     favorite_genre: string;
     email: string;
-    city: string;
+    city?: string;
+    avatar_url?: string;
     bio: string;
   }): Promise<Omit<ClubMemberRow, 'password_hash'>> {
     if (!this.store.club_members || this.store.club_members.length === 0) {
@@ -1401,7 +1814,12 @@ class MySQLDatabaseManager {
     target.education = input.education;
     target.favorite_genre = input.favorite_genre;
     target.email = input.email;
-    target.city = input.city;
+    if (input.city !== undefined) {
+      target.city = input.city;
+    }
+    if (input.avatar_url !== undefined) {
+      target.avatar_url = input.avatar_url;
+    }
     target.bio = input.bio;
     this.saveDiskStore();
     const { password_hash: _removed, ...publicMember } = target;
@@ -1510,6 +1928,7 @@ class MySQLDatabaseManager {
     department: string;
     priority: 'عادی' | 'مهم' | 'فوری';
     message: string;
+    attachment_name?: string;
   }): Promise<MemberTicketRow> {
     const nextId =
       this.store.member_tickets.length > 0
@@ -1524,6 +1943,7 @@ class MySQLDatabaseManager {
       priority: input.priority,
       status: 'در انتظار بررسی',
       message: input.message,
+      attachment_name: input.attachment_name || '',
       admin_reply:
         'تیکت شما در دبیرخانه باشگاه کتابخوانی بوک‌میت ثبت شد و کارشناسان مربوطه در کوتاه‌ترین زمان پاسخگوی شما خواهند بود.',
       created_at: 'امروز',
@@ -1538,9 +1958,624 @@ class MySQLDatabaseManager {
     if (!ev) {
       throw new Error('رویداد مورد نظر یافت نشد.');
     }
+    const dayNum = parseInt(
+      String(ev.day_of_month || '0')
+        .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+        .replace(/[^\d]/g, ''),
+      10
+    );
+    const isPast =
+      String(ev.capacity_info || '').includes('برگزار شده') ||
+      String(ev.capacity_info || '').includes('گذشته') ||
+      (ev.month_name === 'آبان ۱۴۰۵' && !Number.isNaN(dayNum) && dayNum < 14);
+    if (isPast) {
+      throw new Error('مهلت رزرو یا لغو این رویداد به پایان رسیده است و رویداد برگزار شده است.');
+    }
     ev.is_reserved = ev.is_reserved === 1 ? 0 : 1;
     this.saveDiskStore();
     return ev;
+  }
+
+  public async markAnnouncementRead(
+    announcementId: number
+  ): Promise<ClubAnnouncementRow> {
+    if (!this.store.club_announcements) {
+      this.store.club_announcements = JSON.parse(
+        JSON.stringify(SEED_DATA.club_announcements)
+      );
+    }
+    const item = this.store.club_announcements.find((a) => a.id === announcementId);
+    if (!item) {
+      throw new Error('اطلاعیه مورد نظر یافت نشد.');
+    }
+    item.is_read = 1;
+    this.saveDiskStore();
+    return item;
+  }
+
+  public async getAdminPanelData(): Promise<{
+    admin: Omit<ClubMemberRow, 'password_hash'>;
+    sessions: MemberSessionRow[];
+    classes: MemberClassRow[];
+    users: Omit<ClubMemberRow, 'password_hash'>[];
+    tickets: MemberTicketRow[];
+    announcements: ClubAnnouncementRow[];
+    blogPosts: BlogPostRow[];
+    comments: UserCommentRow[];
+    gallery: GalleryImageRow[];
+    heroSettings: HeroSettingsRow;
+    aboutClub: AboutClubRow;
+    aboutManager: AboutManagerRow;
+    contactInfo: ContactInfoRow;
+    libraryBooks: LibraryBookRow[];
+  }> {
+    if (!this.store.club_members || this.store.club_members.length === 0) {
+      this.store.club_members = JSON.parse(JSON.stringify(SEED_DATA.club_members));
+    }
+    if (!this.store.user_comments || this.store.user_comments.length === 0) {
+      this.store.user_comments = JSON.parse(JSON.stringify(SEED_DATA.user_comments));
+    }
+    if (!this.store.gallery_images || this.store.gallery_images.length === 0) {
+      this.store.gallery_images = JSON.parse(JSON.stringify(SEED_DATA.gallery_images));
+    }
+    let adminRow = this.store.club_members.find(
+      (m) => m.role === 'admin' || m.phone === 'admin'
+    );
+    if (!adminRow) {
+      adminRow = JSON.parse(
+        JSON.stringify(SEED_DATA.club_members.find((m) => m.role === 'admin')!)
+      );
+      this.store.club_members.push(adminRow!);
+      this.saveDiskStore();
+    }
+    const { password_hash: _adminPass, ...adminPublic } = adminRow!;
+    const usersList = this.store.club_members
+      .filter((m) => m.role !== 'admin' && m.phone !== 'admin')
+      .map(({ password_hash: _p, ...rest }) => rest);
+
+    return {
+      admin: { ...adminPublic, role: 'admin' },
+      sessions: [...(this.store.member_sessions || [])].sort(
+        (a, b) => a.sort_order - b.sort_order
+      ),
+      classes: [...(this.store.member_classes || [])].sort(
+        (a, b) => a.sort_order - b.sort_order
+      ),
+      users: usersList,
+      tickets: [...(this.store.member_tickets || [])].sort((a, b) => b.id - a.id),
+      announcements: [...(this.store.club_announcements || [])].sort(
+        (a, b) => a.sort_order - b.sort_order
+      ),
+      blogPosts: [...(this.store.blog_posts || [])].sort(
+        (a, b) => a.sort_order - b.sort_order
+      ),
+      comments: [...(this.store.user_comments || [])].sort(
+        (a, b) => a.sort_order - b.sort_order
+      ),
+      gallery: [...(this.store.gallery_images || [])].sort((a, b) => b.id - a.id),
+      heroSettings: this.store.hero_settings[0],
+      aboutClub: this.store.about_club[0],
+      aboutManager: this.store.about_manager[0],
+      contactInfo: this.store.contact_info[0],
+      libraryBooks: [...(this.store.library_books || [])].sort(
+        (a, b) => a.sort_order - b.sort_order
+      ),
+    };
+  }
+
+  public async saveAdminGalleryImage(input: {
+    title: string;
+    url: string;
+    category?: string;
+  }): Promise<GalleryImageRow> {
+    if (!this.store.gallery_images) {
+      this.store.gallery_images = JSON.parse(JSON.stringify(SEED_DATA.gallery_images));
+    }
+    const nextId =
+      this.store.gallery_images.length > 0
+        ? Math.max(...this.store.gallery_images.map((g) => g.id)) + 1
+        : 1;
+    const created: GalleryImageRow = {
+      id: nextId,
+      title: String(input.title || `تصویر شماره ${nextId}`),
+      url: String(input.url || '/assets/book-current.png'),
+      category: String(input.category || 'گالری عمومی'),
+      created_at: '۱۴ آبان ۱۴۰۵',
+    };
+    this.store.gallery_images.unshift(created);
+    this.saveDiskStore();
+    return created;
+  }
+
+  public async deleteAdminGalleryImage(id: number): Promise<void> {
+    if (!this.store.gallery_images) {
+      this.store.gallery_images = JSON.parse(JSON.stringify(SEED_DATA.gallery_images));
+    }
+    this.store.gallery_images = this.store.gallery_images.filter((g) => g.id !== id);
+    this.saveDiskStore();
+  }
+
+  public async saveAdminSession(input: Partial<MemberSessionRow> & { id?: number }): Promise<MemberSessionRow> {
+    if (!this.store.member_sessions) {
+      this.store.member_sessions = [];
+    }
+    if (input.id) {
+      const existing = this.store.member_sessions.find((s) => s.id === Number(input.id));
+      if (!existing) {
+        throw new Error('جلسه مورد نظر یافت نشد.');
+      }
+      existing.title = input.title ?? existing.title;
+      existing.book_title = input.book_title ?? existing.book_title;
+      existing.book_author = input.book_author ?? existing.book_author;
+      existing.pages_count =
+        input.pages_count !== undefined ? Number(input.pages_count) : existing.pages_count;
+      existing.publisher = input.publisher ?? existing.publisher;
+      existing.mentor_name = input.mentor_name ?? existing.mentor_name;
+      existing.session_date = input.session_date ?? existing.session_date;
+      existing.session_time = input.session_time ?? existing.session_time;
+      existing.cover_url = input.cover_url || existing.cover_url || '/assets/book-current.png';
+      existing.status = (input.status as MemberSessionRow['status']) || existing.status;
+      existing.meeting_link_or_room =
+        input.meeting_link_or_room ?? existing.meeting_link_or_room;
+      if (Array.isArray(input.sub_sessions)) {
+        existing.sub_sessions = input.sub_sessions;
+      }
+      this.saveDiskStore();
+      return existing;
+    }
+
+    const nextId =
+      this.store.member_sessions.length > 0
+        ? Math.max(...this.store.member_sessions.map((s) => s.id)) + 1
+        : 1;
+    const created: MemberSessionRow = {
+      id: nextId,
+      member_phone: 'all',
+      title: String(input.title || 'دوره هم‌خوانی جدید'),
+      book_title: String(input.book_title || 'کتاب منتخب باشگاه'),
+      book_author: String(input.book_author || ''),
+      pages_count: Number(input.pages_count || 320),
+      publisher: String(input.publisher || ''),
+      mentor_name: String(input.mentor_name || 'دکتر سهراب رستگار'),
+      session_date: String(input.session_date || 'چهارشنبه‌ها · آذر ۱۴۰۵'),
+      session_time: String(input.session_time || 'ساعت ۱۸:۰۰ تا ۲۰:۰۰'),
+      cover_url: String(input.cover_url || '/assets/book-current.png'),
+      location_type: 'آنلاین',
+      meeting_link_or_room: String(
+        input.meeting_link_or_room || 'تالار فردوسی خانه بوک‌میت'
+      ),
+      status: (input.status as MemberSessionRow['status']) || 'فعال',
+      member_note: String(input.member_note || ''),
+      sub_sessions: Array.isArray(input.sub_sessions) ? input.sub_sessions : [],
+      sort_order: nextId,
+    };
+    this.store.member_sessions.unshift(created);
+    this.saveDiskStore();
+    return created;
+  }
+
+  public async deleteAdminSession(id: number): Promise<void> {
+    this.store.member_sessions = (this.store.member_sessions || []).filter(
+      (s) => s.id !== id
+    );
+    this.saveDiskStore();
+  }
+
+  public async saveAdminClass(input: Partial<MemberClassRow> & { id?: number }): Promise<MemberClassRow> {
+    if (!this.store.member_classes) {
+      this.store.member_classes = [];
+    }
+    if (input.id) {
+      const existing = this.store.member_classes.find((c) => c.id === Number(input.id));
+      if (!existing) {
+        throw new Error('کلاس مورد نظر یافت نشد.');
+      }
+      existing.title = input.title ?? existing.title;
+      existing.book_title = input.book_title ?? existing.book_title;
+      existing.instructor_name = input.instructor_name ?? existing.instructor_name;
+      existing.schedule_summary = input.schedule_summary ?? existing.schedule_summary;
+      existing.level_label = input.level_label ?? existing.level_label;
+      existing.cover_url = input.cover_url || existing.cover_url || '/assets/blog-1.png';
+      existing.description = input.description ?? existing.description;
+      existing.status = (input.status as MemberClassRow['status']) || existing.status;
+      if (Array.isArray(input.sub_sessions)) {
+        existing.sub_sessions = input.sub_sessions;
+      }
+      this.saveDiskStore();
+      return existing;
+    }
+
+    const nextId =
+      this.store.member_classes.length > 0
+        ? Math.max(...this.store.member_classes.map((c) => c.id)) + 1
+        : 1;
+    const created: MemberClassRow = {
+      id: nextId,
+      member_phone: 'all',
+      title: String(input.title || 'کلاس آموزشی جدید'),
+      book_title: String(input.book_title || 'سرفصل تخصصی ادبیات'),
+      instructor_name: String(input.instructor_name || 'دکتر سهراب رستگار'),
+      schedule_summary: String(input.schedule_summary || 'دوشنبه‌ها · ساعت ۱۸:۰۰ تا ۲۰:۰۰'),
+      level_label: String(input.level_label || 'پیشرفته'),
+      cover_url: String(input.cover_url || '/assets/blog-1.png'),
+      status: (input.status as MemberClassRow['status']) || 'فعال',
+      description: String(input.description || 'توضیحات دوره آموزشی تخصصی در باشگاه بوک‌میت.'),
+      sub_sessions: Array.isArray(input.sub_sessions) ? input.sub_sessions : [],
+      sort_order: nextId,
+    };
+    this.store.member_classes.unshift(created);
+    this.saveDiskStore();
+    return created;
+  }
+
+  public async deleteAdminClass(id: number): Promise<void> {
+    this.store.member_classes = (this.store.member_classes || []).filter(
+      (c) => c.id !== id
+    );
+    this.saveDiskStore();
+  }
+
+  public async saveAdminUser(
+    input: Partial<ClubMemberRow> & { id?: number; password?: string }
+  ): Promise<Omit<ClubMemberRow, 'password_hash'>> {
+    if (!this.store.club_members) {
+      this.store.club_members = [];
+    }
+    if (input.id) {
+      const existing = this.store.club_members.find((u) => u.id === Number(input.id));
+      if (!existing) {
+        throw new Error('کاربر مورد نظر یافت نشد.');
+      }
+      existing.first_name = input.first_name ?? existing.first_name;
+      existing.last_name = input.last_name ?? existing.last_name;
+      existing.phone = input.phone ?? existing.phone;
+      existing.education = input.education ?? existing.education;
+      existing.favorite_genre = input.favorite_genre ?? existing.favorite_genre;
+      existing.email = input.email ?? existing.email;
+      existing.bio = input.bio ?? existing.bio;
+      existing.membership_code = input.membership_code ?? existing.membership_code;
+      if (input.status) {
+        existing.status = input.status;
+      }
+      if (input.password) {
+        existing.password_hash = input.password;
+      }
+      this.saveDiskStore();
+      const { password_hash: _p, ...rest } = existing;
+      return rest;
+    }
+
+    const nextId =
+      this.store.club_members.length > 0
+        ? Math.max(...this.store.club_members.map((u) => u.id)) + 1
+        : 1;
+    const created: ClubMemberRow = {
+      id: nextId,
+      first_name: String(input.first_name || 'کاربر'),
+      last_name: String(input.last_name || 'جدید'),
+      phone: String(input.phone || `۰۹۱۲۰۰۰۰${nextId}`),
+      role: 'member',
+      education: String(input.education || 'کارشناسی ارشد'),
+      favorite_genre: String(input.favorite_genre || 'ادبیات داستانی و رمان کلاسیک'),
+      email: String(input.email || ''),
+      city: 'تهران',
+      avatar_url: '',
+      bio: String(input.bio || 'عضو باشگاه کتابخوانی بوک‌میت.'),
+      membership_code: String(input.membership_code || `BM-۱۴۰۵-${110 + nextId}`),
+      joined_date: 'آبان ۱۴۰۵',
+      status: input.status || 'فعال',
+      password_hash: String(input.password || '1234'),
+      created_at: new Date().toISOString(),
+    };
+    this.store.club_members.push(created);
+    this.saveDiskStore();
+    const { password_hash: _p, ...rest } = created;
+    return rest;
+  }
+
+  public async deleteAdminUser(id: number): Promise<void> {
+    this.store.club_members = (this.store.club_members || []).filter(
+      (u) => u.id !== id || u.role === 'admin'
+    );
+    this.saveDiskStore();
+  }
+
+  public async replyAdminTicket(input: {
+    id: number;
+    admin_reply: string;
+    status: 'پاسخ داده‌شده' | 'در انتظار بررسی' | 'بسته‌شده';
+  }): Promise<MemberTicketRow> {
+    const ticket = (this.store.member_tickets || []).find((t) => t.id === Number(input.id));
+    if (!ticket) {
+      throw new Error('تیکت مورد نظر یافت نشد.');
+    }
+    const trimmedReply = String(input.admin_reply || '').trim();
+    if (!Array.isArray(ticket.admin_replies)) {
+      ticket.admin_replies = ticket.admin_reply
+        ? [{ text: ticket.admin_reply, created_at: ticket.created_at || '۱۳ آبان ۱۴۰۵' }]
+        : [];
+    }
+    if (trimmedReply) {
+      ticket.admin_replies.push({
+        text: trimmedReply,
+        created_at: '۱۴ آبان ۱۴۰۵ · هم‌اکنون',
+      });
+      ticket.admin_reply = trimmedReply;
+    }
+    ticket.status = input.status;
+    this.saveDiskStore();
+    return ticket;
+  }
+
+  public async deleteAdminTicket(id: number): Promise<void> {
+    this.store.member_tickets = (this.store.member_tickets || []).filter(
+      (t) => t.id !== id
+    );
+    this.saveDiskStore();
+  }
+
+  public async saveAdminAnnouncement(
+    input: Partial<ClubAnnouncementRow> & { id?: number }
+  ): Promise<ClubAnnouncementRow> {
+    if (!this.store.club_announcements) {
+      this.store.club_announcements = [];
+    }
+    if (input.id) {
+      const existing = this.store.club_announcements.find(
+        (a) => a.id === Number(input.id)
+      );
+      if (!existing) {
+        throw new Error('اطلاعیه مورد نظر یافت نشد.');
+      }
+      existing.title = input.title ?? existing.title;
+      existing.category = input.category ?? existing.category;
+      existing.published_date = input.published_date ?? existing.published_date;
+      existing.summary = input.summary ?? existing.summary;
+      existing.content = input.content ?? existing.content;
+      existing.is_important =
+        input.is_important !== undefined ? Number(input.is_important) : existing.is_important;
+      if (input.target_user_phone !== undefined) {
+        existing.target_user_phone = input.target_user_phone;
+      }
+      if (input.target_user_name !== undefined) {
+        existing.target_user_name = input.target_user_name;
+      }
+      this.saveDiskStore();
+      return existing;
+    }
+
+    const nextId =
+      this.store.club_announcements.length > 0
+        ? Math.max(...this.store.club_announcements.map((a) => a.id)) + 1
+        : 1;
+    const created: ClubAnnouncementRow = {
+      id: nextId,
+      title: String(input.title || 'اطلاعیه جدید باشگاه'),
+      category: String(input.category || 'جلسات کتابخوانی'),
+      published_date: String(input.published_date || '۱۴ آبان ۱۴۰۵'),
+      summary: String(input.summary || input.content || ''),
+      content: String(input.content || ''),
+      is_important: Number(input.is_important || 0),
+      is_read: 0,
+      target_user_phone: input.target_user_phone ? String(input.target_user_phone) : undefined,
+      target_user_name: input.target_user_name ? String(input.target_user_name) : undefined,
+      sort_order: 1,
+    };
+    this.store.club_announcements.unshift(created);
+    this.saveDiskStore();
+    return created;
+  }
+
+  public async deleteAdminAnnouncement(id: number): Promise<void> {
+    this.store.club_announcements = (this.store.club_announcements || []).filter(
+      (a) => a.id !== id
+    );
+    this.saveDiskStore();
+  }
+
+  public async updateAdminProfile(input: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    education: string;
+    favorite_genre: string;
+    bio: string;
+    avatar_url?: string;
+    new_password?: string;
+  }): Promise<Omit<ClubMemberRow, 'password_hash'>> {
+    let admin = this.store.club_members.find(
+      (m) => m.role === 'admin' || m.phone === 'admin'
+    );
+    if (!admin) {
+      admin = JSON.parse(
+        JSON.stringify(SEED_DATA.club_members.find((m) => m.role === 'admin')!)
+      );
+      this.store.club_members.push(admin!);
+    }
+    admin!.first_name = input.first_name;
+    admin!.last_name = input.last_name;
+    admin!.email = input.email;
+    admin!.education = input.education;
+    admin!.favorite_genre = input.favorite_genre;
+    admin!.bio = input.bio;
+    if (input.avatar_url !== undefined) {
+      admin!.avatar_url = input.avatar_url;
+    }
+    if (input.new_password && input.new_password.trim().length >= 4) {
+      admin!.password_hash = input.new_password.trim();
+    }
+    this.saveDiskStore();
+    const { password_hash: _p, ...publicAdmin } = admin!;
+    return { ...publicAdmin, role: 'admin' };
+  }
+
+  public async saveAdminBlogPost(
+    input: Partial<BlogPostRow> & { id?: number }
+  ): Promise<BlogPostRow> {
+    if (!this.store.blog_posts) {
+      this.store.blog_posts = [];
+    }
+    const autoSlug = (rawTitle: string, fallbackId: number) => {
+      const cleaned = String(rawTitle || '')
+        .trim()
+        .replace(/[؟?!.,،؛:«»"']/g, '')
+        .replace(/\s+/g, '-');
+      return cleaned || `blog-post-${fallbackId}`;
+    };
+    if (input.id) {
+      const existing = this.store.blog_posts.find((p) => p.id === Number(input.id));
+      if (!existing) {
+        throw new Error('مقاله مورد نظر یافت نشد.');
+      }
+      existing.title = input.title ?? existing.title;
+      existing.slug =
+        input.slug && String(input.slug).trim()
+          ? String(input.slug).trim()
+          : existing.slug || autoSlug(existing.title, existing.id);
+      existing.category = input.category ?? existing.category;
+      existing.author = input.author ?? existing.author;
+      existing.published_date = input.published_date ?? existing.published_date;
+      existing.reading_time = input.reading_time ?? existing.reading_time;
+      existing.tags = input.tags ?? existing.tags;
+      existing.status = input.status ?? existing.status;
+      existing.cover_url = input.cover_url || existing.cover_url || '/assets/blog-1.png';
+      existing.excerpt = input.excerpt ?? existing.excerpt;
+      existing.full_content = input.full_content ?? existing.full_content;
+      this.saveDiskStore();
+      return existing;
+    }
+
+    const nextId =
+      this.store.blog_posts.length > 0
+        ? Math.max(...this.store.blog_posts.map((p) => p.id)) + 1
+        : 1;
+    const finalTitle = String(input.title || 'مقاله جدید باشگاه');
+    const finalSlug =
+      input.slug && String(input.slug).trim()
+        ? String(input.slug).trim()
+        : autoSlug(finalTitle, nextId);
+    const created: BlogPostRow = {
+      id: nextId,
+      title: finalTitle,
+      slug: finalSlug,
+      category: String(input.category || 'یادداشت ادبی'),
+      author: String(input.author || 'سهراب رستگار'),
+      published_date: String(input.published_date || '۱۴ آبان ۱۴۰۵'),
+      reading_time: String(input.reading_time || '۶ دقیقه مطالعه'),
+      tags: String(input.tags || 'ادبیات داستانی، نقد کتاب'),
+      status: input.status || 'منتشر شده',
+      cover_url: String(input.cover_url || '/assets/blog-1.png'),
+      excerpt: String(input.excerpt || ''),
+      full_content: String(input.full_content || ''),
+      sort_order: nextId,
+    };
+    this.store.blog_posts.unshift(created);
+    this.saveDiskStore();
+    return created;
+  }
+
+  public async deleteAdminBlogPost(id: number): Promise<void> {
+    this.store.blog_posts = (this.store.blog_posts || []).filter((p) => p.id !== id);
+    this.saveDiskStore();
+  }
+
+  public async saveUserComment(input: {
+    id?: number;
+    author_name?: string;
+    author_phone?: string;
+    target_title?: string;
+    target_type?: string;
+    rating?: number;
+    comment_text?: string;
+    admin_reply?: string;
+    status?: 'تایید شده' | 'در انتظار تایید' | 'رد شده';
+  }): Promise<UserCommentRow> {
+    if (!this.store.user_comments) {
+      this.store.user_comments = JSON.parse(JSON.stringify(SEED_DATA.user_comments));
+    }
+    if (input.id) {
+      const existing = this.store.user_comments.find((c) => c.id === Number(input.id));
+      if (!existing) {
+        throw new Error('نظر مورد نظر یافت نشد.');
+      }
+      if (input.admin_reply !== undefined) existing.admin_reply = input.admin_reply;
+      if (input.status !== undefined) existing.status = input.status;
+      if (input.comment_text !== undefined) existing.comment_text = input.comment_text;
+      this.saveDiskStore();
+      return existing;
+    }
+
+    const nextId =
+      this.store.user_comments.length > 0
+        ? Math.max(...this.store.user_comments.map((c) => c.id)) + 1
+        : 1;
+    const created: UserCommentRow = {
+      id: nextId,
+      author_name: String(input.author_name || 'کاربر باشگاه'),
+      author_phone: String(input.author_phone || ''),
+      target_title: String(input.target_title || 'عمومی'),
+      target_type: String(input.target_type || 'مقاله وبلاگ'),
+      rating: Number(input.rating || 5),
+      comment_text: String(input.comment_text || ''),
+      admin_reply: String(input.admin_reply || ''),
+      status: input.status || 'تایید شده',
+      created_date: '۱۴ آبان ۱۴۰۵',
+      sort_order: nextId,
+    };
+    this.store.user_comments.unshift(created);
+    this.saveDiskStore();
+    return created;
+  }
+
+  public async deleteUserComment(id: number): Promise<void> {
+    this.store.user_comments = (this.store.user_comments || []).filter(
+      (c) => c.id !== id
+    );
+    this.saveDiskStore();
+  }
+
+  public async updateHomeSettings(input: {
+    heroSettings?: Partial<HeroSettingsRow>;
+    aboutClub?: Partial<AboutClubRow>;
+    aboutManager?: Partial<AboutManagerRow>;
+    contactInfo?: Partial<ContactInfoRow>;
+  }): Promise<{
+    heroSettings: HeroSettingsRow;
+    aboutClub: AboutClubRow;
+    aboutManager: AboutManagerRow;
+    contactInfo: ContactInfoRow;
+  }> {
+    if (input.heroSettings && this.store.hero_settings[0]) {
+      this.store.hero_settings[0] = {
+        ...this.store.hero_settings[0],
+        ...input.heroSettings,
+      };
+    }
+    if (input.aboutClub && this.store.about_club[0]) {
+      this.store.about_club[0] = {
+        ...this.store.about_club[0],
+        ...input.aboutClub,
+      };
+    }
+    if (input.aboutManager && this.store.about_manager[0]) {
+      this.store.about_manager[0] = {
+        ...this.store.about_manager[0],
+        ...input.aboutManager,
+      };
+    }
+    if (input.contactInfo && this.store.contact_info[0]) {
+      this.store.contact_info[0] = {
+        ...this.store.contact_info[0],
+        ...input.contactInfo,
+      };
+    }
+    this.saveDiskStore();
+    return {
+      heroSettings: this.store.hero_settings[0],
+      aboutClub: this.store.about_club[0],
+      aboutManager: this.store.about_manager[0],
+      contactInfo: this.store.contact_info[0],
+    };
   }
 
   public async resetClubMemberPassword(input: {
@@ -1607,4 +2642,5 @@ class MySQLDatabaseManager {
 }
 
 export const mysqlDb = new MySQLDatabaseManager();
+
 

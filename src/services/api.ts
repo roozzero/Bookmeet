@@ -1,17 +1,27 @@
 import $ from 'jquery';
 import type {
+  AboutClubData,
+  AboutManagerData,
+  AdminPanelPayload,
+  BlogPost,
   BootstrapPayload,
+  ClubAnnouncement,
   ClubCalendarEvent,
   ClubForgotPasswordInput,
   ClubLoginInput,
   ClubMember,
   ClubRegisterInput,
+  ContactInfoData,
   ContactMessageInput,
   FeaturedBook,
+  GalleryImage,
+  HeroSettings,
+  MemberClassItem,
   MemberLibraryItem,
   MemberPanelPayload,
   MemberSession,
   MemberTicket,
+  UserComment,
 } from '../types/models.ts';
 
 export const ApiService = {
@@ -137,7 +147,8 @@ export const ApiService = {
     education: string;
     favorite_genre: string;
     email: string;
-    city: string;
+    city?: string;
+    avatar_url?: string;
     bio: string;
   }): Promise<{ success: boolean; member: ClubMember }> {
     return new Promise((resolve, reject) => {
@@ -229,6 +240,7 @@ export const ApiService = {
     department: string;
     priority: 'عادی' | 'مهم' | 'فوری';
     message: string;
+    attachment_name?: string;
   }): Promise<{ success: boolean; ticket: MemberTicket }> {
     return new Promise((resolve, reject) => {
       $.ajax({
@@ -264,7 +276,374 @@ export const ApiService = {
       });
     });
   },
+
+  markAnnouncementRead(
+    announcementId: number
+  ): Promise<{ success: boolean; announcement: ClubAnnouncement }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/panel/announcements/read',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ announcementId }),
+        dataType: 'json',
+        success: (data: { success: boolean; announcement: ClubAnnouncement }) =>
+          resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  // ==================== ADMIN PANEL API CLIENT METHODS ====================
+  fetchAdminPanelData(): Promise<AdminPanelPayload> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/admin',
+        method: 'GET',
+        dataType: 'json',
+        success: (data: AdminPanelPayload) => resolve(data),
+        error: (_jqXHR, textStatus, errorThrown) =>
+          reject(new Error(errorThrown || textStatus || 'خطا در دریافت پنل مدیریت')),
+      });
+    });
+  },
+
+  saveAdminSession(
+    payload: Partial<MemberSession> & { id?: number }
+  ): Promise<{ success: boolean; session: MemberSession }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/admin/sessions',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data: { success: boolean; session: MemberSession }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  deleteAdminSession(id: number): Promise<{ success: boolean }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/admin/sessions/${id}`,
+        method: 'DELETE',
+        dataType: 'json',
+        success: (data: { success: boolean }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  saveAdminClass(
+    payload: Partial<MemberClassItem> & { id?: number }
+  ): Promise<{ success: boolean; classItem: MemberClassItem }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/admin/classes',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data: { success: boolean; classItem: MemberClassItem }) =>
+          resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  deleteAdminClass(id: number): Promise<{ success: boolean }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/admin/classes/${id}`,
+        method: 'DELETE',
+        dataType: 'json',
+        success: (data: { success: boolean }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  saveAdminUser(
+    payload: Partial<ClubMember> & { id?: number; password?: string }
+  ): Promise<{ success: boolean; user: ClubMember }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/admin/users',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data: { success: boolean; user: ClubMember }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  deleteAdminUser(id: number): Promise<{ success: boolean }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/admin/users/${id}`,
+        method: 'DELETE',
+        dataType: 'json',
+        success: (data: { success: boolean }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  replyAdminTicket(payload: {
+    id: number;
+    admin_reply: string;
+    status: 'پاسخ داده‌شده' | 'در انتظار بررسی' | 'بسته‌شده';
+  }): Promise<{ success: boolean; ticket: MemberTicket }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/admin/tickets/reply',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data: { success: boolean; ticket: MemberTicket }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  deleteAdminTicket(id: number): Promise<{ success: boolean }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/admin/tickets/${id}`,
+        method: 'DELETE',
+        dataType: 'json',
+        success: (data: { success: boolean }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  saveAdminAnnouncement(
+    payload: Partial<ClubAnnouncement> & { id?: number }
+  ): Promise<{ success: boolean; announcement: ClubAnnouncement }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/admin/announcements',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data: { success: boolean; announcement: ClubAnnouncement }) =>
+          resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  deleteAdminAnnouncement(id: number): Promise<{ success: boolean }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/admin/announcements/${id}`,
+        method: 'DELETE',
+        dataType: 'json',
+        success: (data: { success: boolean }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  updateAdminProfile(payload: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    education: string;
+    favorite_genre: string;
+    bio: string;
+    avatar_url?: string;
+    new_password?: string;
+  }): Promise<{ success: boolean; admin: ClubMember }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/admin/profile',
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data: { success: boolean; admin: ClubMember }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  saveAdminBlogPost(
+    payload: Partial<BlogPost> & { id?: number }
+  ): Promise<{ success: boolean; post: BlogPost }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/admin/blog',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data: { success: boolean; post: BlogPost }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  deleteAdminBlogPost(id: number): Promise<{ success: boolean }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/admin/blog/${id}`,
+        method: 'DELETE',
+        dataType: 'json',
+        success: (data: { success: boolean }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  saveAdminComment(
+    payload: Partial<UserComment> & { id?: number }
+  ): Promise<{ success: boolean; comment: UserComment }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/admin/comments',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data: { success: boolean; comment: UserComment }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  deleteAdminComment(id: number): Promise<{ success: boolean }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/admin/comments/${id}`,
+        method: 'DELETE',
+        dataType: 'json',
+        success: (data: { success: boolean }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  updateAdminHomeSettings(payload: {
+    heroSettings?: Partial<HeroSettings>;
+    aboutClub?: Partial<AboutClubData>;
+    aboutManager?: Partial<AboutManagerData>;
+    contactInfo?: Partial<ContactInfoData>;
+  }): Promise<{
+    success: boolean;
+    heroSettings: HeroSettings;
+    aboutClub: AboutClubData;
+    aboutManager: AboutManagerData;
+    contactInfo: ContactInfoData;
+  }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/admin/home-settings',
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  saveAdminGalleryImage(payload: {
+    title: string;
+    url: string;
+    category?: string;
+  }): Promise<{ success: boolean; image: GalleryImage }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/admin/gallery',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data: { success: boolean; image: GalleryImage }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  deleteAdminGalleryImage(id: number): Promise<{ success: boolean }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/admin/gallery/${id}`,
+        method: 'DELETE',
+        dataType: 'json',
+        success: (data: { success: boolean }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
 };
+
 
 
 

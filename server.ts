@@ -7,7 +7,7 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
 
   // MySQL-backed API endpoint for Navigation + Hero + About Club + Manager + Library + Blog + Contact
   app.get('/api/bootstrap', async (_req, res) => {
@@ -235,20 +235,22 @@ async function startServer() {
         favorite_genre,
         email,
         city,
+        avatar_url,
         bio,
       } = req.body || {};
-      if (!first_name || !last_name || !phone) {
-        res.status(400).json({ error: 'نام، نام خانوادگی و شماره تلفن الزامی است.' });
+      if (!first_name || !last_name) {
+        res.status(400).json({ error: 'نام و نام خانوادگی الزامی است.' });
         return;
       }
       const member = await mysqlDb.updateMemberProfile({
-        phone: String(phone).trim(),
+        phone: String(phone || '۰۹۱۲۳۴۵۶۷۸۹').trim(),
         first_name: String(first_name).trim(),
         last_name: String(last_name).trim(),
         education: String(education || 'کارشناسی ارشد').trim(),
         favorite_genre: String(favorite_genre || 'ادبیات داستانی و رمان کلاسیک').trim(),
         email: String(email || '').trim(),
-        city: String(city || 'تهران').trim(),
+        city: city !== undefined ? String(city).trim() : undefined,
+        avatar_url: avatar_url !== undefined ? String(avatar_url) : undefined,
         bio: String(bio || '').trim(),
       });
       res.json({ success: true, member });
@@ -326,7 +328,14 @@ async function startServer() {
 
   app.post('/api/panel/tickets', async (req, res) => {
     try {
-      const { member_phone, subject, department, priority, message } = req.body || {};
+      const {
+        member_phone,
+        subject,
+        department,
+        priority,
+        message,
+        attachment_name,
+      } = req.body || {};
       if (!subject || !message) {
         res.status(400).json({ error: 'عنوان تیکت و متن پیام الزامی است.' });
         return;
@@ -334,9 +343,10 @@ async function startServer() {
       const created = await mysqlDb.createMemberTicket({
         member_phone: String(member_phone || 'all').trim(),
         subject: String(subject).trim(),
-        department: String(department || 'دبیرخانه باشگاه').trim(),
+        department: String(department || 'پیشنهاد کتاب').trim(),
         priority: priority || 'عادی',
         message: String(message).trim(),
+        attachment_name: String(attachment_name || '').trim(),
       });
       res.status(201).json({ success: true, ticket: created });
     } catch (error) {
@@ -354,6 +364,244 @@ async function startServer() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'خطا در تغییر وضعیت رزرو رویداد';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/panel/announcements/read', async (req, res) => {
+    try {
+      const { announcementId } = req.body || {};
+      const updated = await mysqlDb.markAnnouncementRead(Number(announcementId));
+      res.json({ success: true, announcement: updated });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در بروزرسانی وضعیت اطلاعیه';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  // ==================== ADMIN PANEL API ROUTES ====================
+  app.get('/api/admin', async (_req, res) => {
+    try {
+      const adminData = await mysqlDb.getAdminPanelData();
+      res.json(adminData);
+    } catch (error) {
+      console.error('Failed to load admin panel data:', error);
+      res.status(500).json({ error: 'خطا در دریافت اطلاعات پنل مدیریت از دیتابیس' });
+    }
+  });
+
+  app.post('/api/admin/sessions', async (req, res) => {
+    try {
+      const saved = await mysqlDb.saveAdminSession(req.body || {});
+      res.json({ success: true, session: saved });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ذخیره اطلاعات جلسه';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.delete('/api/admin/sessions/:id', async (req, res) => {
+    try {
+      await mysqlDb.deleteAdminSession(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'خطا در حذف جلسه';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/admin/classes', async (req, res) => {
+    try {
+      const saved = await mysqlDb.saveAdminClass(req.body || {});
+      res.json({ success: true, classItem: saved });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ذخیره اطلاعات کلاس';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.delete('/api/admin/classes/:id', async (req, res) => {
+    try {
+      await mysqlDb.deleteAdminClass(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'خطا در حذف کلاس';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/admin/users', async (req, res) => {
+    try {
+      const saved = await mysqlDb.saveAdminUser(req.body || {});
+      res.json({ success: true, user: saved });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ذخیره اطلاعات کاربر';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.delete('/api/admin/users/:id', async (req, res) => {
+    try {
+      await mysqlDb.deleteAdminUser(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'خطا در حذف کاربر';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/admin/tickets/reply', async (req, res) => {
+    try {
+      const { id, admin_reply, status } = req.body || {};
+      const updated = await mysqlDb.replyAdminTicket({
+        id: Number(id),
+        admin_reply: String(admin_reply || '').trim(),
+        status: status || 'پاسخ داده‌شده',
+      });
+      res.json({ success: true, ticket: updated });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ثبت پاسخ تیکت';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.delete('/api/admin/tickets/:id', async (req, res) => {
+    try {
+      await mysqlDb.deleteAdminTicket(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'خطا در حذف تیکت';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/admin/announcements', async (req, res) => {
+    try {
+      const saved = await mysqlDb.saveAdminAnnouncement(req.body || {});
+      res.json({ success: true, announcement: saved });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ذخیره اطلاعیه';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.delete('/api/admin/announcements/:id', async (req, res) => {
+    try {
+      await mysqlDb.deleteAdminAnnouncement(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'خطا در حذف اطلاعیه';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.put('/api/admin/profile', async (req, res) => {
+    try {
+      const {
+        first_name,
+        last_name,
+        email,
+        education,
+        favorite_genre,
+        bio,
+        avatar_url,
+        new_password,
+      } = req.body || {};
+      const admin = await mysqlDb.updateAdminProfile({
+        first_name: String(first_name || 'سهراب').trim(),
+        last_name: String(last_name || 'رستگار').trim(),
+        email: String(email || 'admin@bookmeet.ir').trim(),
+        education: String(education || 'دکتری').trim(),
+        favorite_genre: String(favorite_genre || 'ادبیات تطبیقی و نقد ادبی').trim(),
+        bio: String(bio || '').trim(),
+        avatar_url: avatar_url !== undefined ? String(avatar_url) : undefined,
+        new_password: new_password ? String(new_password) : undefined,
+      });
+      res.json({ success: true, admin });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در بروزرسانی پروفایل مدیر';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/admin/blog', async (req, res) => {
+    try {
+      const saved = await mysqlDb.saveAdminBlogPost(req.body || {});
+      res.json({ success: true, post: saved });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ذخیره مقاله وبلاگ';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.delete('/api/admin/blog/:id', async (req, res) => {
+    try {
+      await mysqlDb.deleteAdminBlogPost(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'خطا در حذف مقاله';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/admin/comments', async (req, res) => {
+    try {
+      const saved = await mysqlDb.saveUserComment(req.body || {});
+      res.json({ success: true, comment: saved });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در بروزرسانی نظر کاربر';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.delete('/api/admin/comments/:id', async (req, res) => {
+    try {
+      await mysqlDb.deleteUserComment(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'خطا در حذف نظر کاربر';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.put('/api/admin/home-settings', async (req, res) => {
+    try {
+      const updated = await mysqlDb.updateHomeSettings(req.body || {});
+      res.json({ success: true, ...updated });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ذخیره تنظیمات صفحه اصلی';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/admin/gallery', async (req, res) => {
+    try {
+      const saved = await mysqlDb.saveAdminGalleryImage(req.body || {});
+      res.json({ success: true, image: saved });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در افزودن تصویر به گالری';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.delete('/api/admin/gallery/:id', async (req, res) => {
+    try {
+      await mysqlDb.deleteAdminGalleryImage(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در حذف تصویر از گالری';
       res.status(400).json({ error: message });
     }
   });

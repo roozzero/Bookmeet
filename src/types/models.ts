@@ -74,6 +74,7 @@ export interface LibraryBook {
 export interface BlogPost {
   id: number;
   title: string;
+  slug?: string;
   category: string;
   author: string;
   published_date: string;
@@ -81,7 +82,17 @@ export interface BlogPost {
   cover_url: string;
   excerpt: string;
   full_content: string;
+  tags?: string;
+  status?: 'منتشر شده' | 'پیش‌نویس';
   sort_order: number;
+}
+
+export interface GalleryImage {
+  id: number;
+  title: string;
+  url: string;
+  category: string;
+  created_at: string;
 }
 
 export interface ContactInfoData {
@@ -108,24 +119,42 @@ export interface ClubMember {
   first_name: string;
   last_name: string;
   phone: string;
+  role?: 'member' | 'admin';
+  status?: 'فعال' | 'غیرفعال';
   education: string;
   favorite_genre: string;
   email?: string;
   city?: string;
+  avatar_url?: string;
   bio?: string;
   membership_code?: string;
   joined_date?: string;
   created_at: string;
 }
 
+export interface UserComment {
+  id: number;
+  author_name: string;
+  author_phone: string;
+  target_title: string;
+  target_type: string;
+  rating: number;
+  comment_text: string;
+  admin_reply: string;
+  status: 'تایید شده' | 'در انتظار تایید' | 'رد شده';
+  created_date: string;
+  sort_order: number;
+}
+
 export interface SessionSubItem {
   id: number;
-  session_number: string;
+  session_number: string | number;
   title: string;
-  status: 'برگزار شده' | 'تعریف شده';
+  status: 'برگزار شده' | 'تعریف شده' | 'جلسه آتی';
   session_date: string;
   session_time: string;
-  pages_read?: number;
+  cover_url?: string;
+  pages_read?: number | string;
   pages_to_read?: string;
   reviewed_topics?: string;
   session_notes?: string;
@@ -137,12 +166,16 @@ export interface MemberSession {
   member_phone: string;
   title: string;
   book_title: string;
+  book_author?: string;
+  pages_count?: number;
+  publisher?: string;
   mentor_name: string;
   session_date: string;
   session_time: string;
+  cover_url?: string;
   location_type: string;
   meeting_link_or_room: string;
-  status: 'ثبت‌نام‌شده' | 'برگزارشده' | 'ظرفیت باز';
+  status: 'فعال' | 'غیرفعال' | 'ثبت‌نام‌شده' | 'برگزارشده' | 'ظرفیت باز';
   member_note: string;
   sub_sessions: SessionSubItem[];
   sort_order: number;
@@ -155,10 +188,11 @@ export interface MemberClassItem {
   book_title: string;
   instructor_name: string;
   schedule_summary: string;
-  level_label: string;
-  total_sessions: number;
-  held_sessions: number;
-  status: string;
+  level_label: 'مبتدی' | 'پیشرفته' | 'تخصصی' | string;
+  cover_url?: string;
+  total_sessions?: number;
+  held_sessions?: number;
+  status: 'فعال' | 'غیرفعال' | 'ثبت‌نام‌شده' | 'برگزارشده' | string;
   description: string;
   sub_sessions: SessionSubItem[];
   sort_order: number;
@@ -188,7 +222,9 @@ export interface MemberTicket {
   priority: 'عادی' | 'مهم' | 'فوری';
   status: 'پاسخ داده‌شده' | 'در انتظار بررسی' | 'بسته‌شده';
   message: string;
+  attachment_name?: string;
   admin_reply: string;
+  admin_replies?: Array<{ text: string; created_at?: string; date?: string }>;
   created_at: string;
 }
 
@@ -208,6 +244,20 @@ export interface ClubCalendarEvent {
   sort_order: number;
 }
 
+export interface ClubAnnouncement {
+  id: number;
+  title: string;
+  category: 'جلسات کتابخوانی' | 'کلاس ها' | 'فنی' | string;
+  published_date: string;
+  summary: string;
+  content: string;
+  is_important: number;
+  is_read: number;
+  target_user_phone?: string;
+  target_user_name?: string;
+  sort_order: number;
+}
+
 export interface MemberPanelPayload {
   member: ClubMember;
   sessions: MemberSession[];
@@ -215,6 +265,24 @@ export interface MemberPanelPayload {
   library: MemberLibraryItem[];
   tickets: MemberTicket[];
   calendarEvents: ClubCalendarEvent[];
+  announcements: ClubAnnouncement[];
+}
+
+export interface AdminPanelPayload {
+  admin: ClubMember;
+  gallery: GalleryImage[];
+  sessions: MemberSession[];
+  classes: MemberClassItem[];
+  users: ClubMember[];
+  tickets: MemberTicket[];
+  announcements: ClubAnnouncement[];
+  blogPosts: BlogPost[];
+  comments: UserComment[];
+  heroSettings: HeroSettings;
+  aboutClub: AboutClubData;
+  aboutManager: AboutManagerData;
+  contactInfo: ContactInfoData;
+  libraryBooks: LibraryBook[];
 }
 
 export interface ClubRegisterInput {
@@ -246,6 +314,7 @@ export interface BootstrapPayload {
   blogPosts: BlogPost[];
   contactInfo: ContactInfoData;
 }
+
 
 
 

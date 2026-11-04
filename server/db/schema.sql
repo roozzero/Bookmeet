@@ -84,15 +84,26 @@ CREATE TABLE IF NOT EXISTS library_books (
 CREATE TABLE IF NOT EXISTS blog_posts (
   id INT AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(220) NOT NULL,
+  slug VARCHAR(220) NOT NULL DEFAULT '',
   category VARCHAR(100) NOT NULL,
   author VARCHAR(150) NOT NULL,
   published_date VARCHAR(80) NOT NULL,
   reading_time VARCHAR(60) NOT NULL,
-  cover_url VARCHAR(255) NOT NULL,
+  cover_url LONGTEXT NOT NULL,
   excerpt TEXT NOT NULL,
-  full_content TEXT NOT NULL,
+  full_content LONGTEXT NOT NULL,
+  tags VARCHAR(255) NOT NULL DEFAULT '',
+  status VARCHAR(40) NOT NULL DEFAULT 'منتشر شده',
   sort_order INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS gallery_images (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(180) NOT NULL,
+  url LONGTEXT NOT NULL,
+  category VARCHAR(80) NOT NULL DEFAULT 'عمومی',
+  created_at VARCHAR(80) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS contact_info (
@@ -122,10 +133,11 @@ CREATE TABLE IF NOT EXISTS club_members (
   first_name VARCHAR(100) NOT NULL,
   last_name VARCHAR(100) NOT NULL,
   phone VARCHAR(40) NOT NULL UNIQUE,
+  role VARCHAR(20) NOT NULL DEFAULT 'member',
   education VARCHAR(120) NOT NULL,
   favorite_genre VARCHAR(120) NOT NULL DEFAULT 'ادبیات داستانی و رمان کلاسیک',
   email VARCHAR(150) NOT NULL DEFAULT '',
-  city VARCHAR(100) NOT NULL DEFAULT 'تهران',
+  avatar_url LONGTEXT,
   bio TEXT NOT NULL,
   membership_code VARCHAR(40) NOT NULL DEFAULT 'BM-۱۴۰۵-۱۰۸',
   joined_date VARCHAR(60) NOT NULL DEFAULT 'مهر ۱۴۰۵',
@@ -133,15 +145,33 @@ CREATE TABLE IF NOT EXISTS club_members (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS user_comments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  author_name VARCHAR(150) NOT NULL,
+  author_phone VARCHAR(40) NOT NULL DEFAULT '',
+  target_title VARCHAR(220) NOT NULL,
+  target_type VARCHAR(60) NOT NULL DEFAULT 'مقاله وبلاگ',
+  rating INT NOT NULL DEFAULT 5,
+  comment_text TEXT NOT NULL,
+  admin_reply TEXT NOT NULL,
+  status VARCHAR(40) NOT NULL DEFAULT 'تایید شده',
+  created_date VARCHAR(80) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS member_sessions (
   id INT AUTO_INCREMENT PRIMARY KEY,
   member_phone VARCHAR(40) NOT NULL DEFAULT 'all',
   title VARCHAR(220) NOT NULL,
   book_title VARCHAR(180) NOT NULL,
+  book_author VARCHAR(150) NOT NULL DEFAULT '',
+  pages_count INT NOT NULL DEFAULT 350,
+  publisher VARCHAR(150) NOT NULL DEFAULT '',
   mentor_name VARCHAR(150) NOT NULL,
   session_date VARCHAR(80) NOT NULL,
   session_time VARCHAR(80) NOT NULL,
-  status VARCHAR(60) NOT NULL,
+  cover_url LONGTEXT NOT NULL,
+  status VARCHAR(60) NOT NULL DEFAULT 'فعال',
   member_note TEXT NOT NULL,
   sub_sessions_json LONGTEXT NOT NULL,
   sort_order INT NOT NULL DEFAULT 0,
@@ -153,11 +183,12 @@ CREATE TABLE IF NOT EXISTS member_classes (
   member_phone VARCHAR(40) NOT NULL DEFAULT 'all',
   title VARCHAR(220) NOT NULL,
   book_title VARCHAR(180) NOT NULL,
-  mentor_name VARCHAR(150) NOT NULL,
-  session_date VARCHAR(80) NOT NULL,
-  session_time VARCHAR(80) NOT NULL,
+  instructor_name VARCHAR(150) NOT NULL,
+  schedule_summary VARCHAR(120) NOT NULL,
+  level_label VARCHAR(80) NOT NULL DEFAULT 'پیشرفته',
+  cover_url VARCHAR(255) NOT NULL DEFAULT '/assets/blog-1.png',
   status VARCHAR(60) NOT NULL,
-  member_note TEXT NOT NULL,
+  description TEXT NOT NULL,
   sub_sessions_json LONGTEXT NOT NULL,
   sort_order INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -187,6 +218,7 @@ CREATE TABLE IF NOT EXISTS member_tickets (
   priority VARCHAR(40) NOT NULL,
   status VARCHAR(60) NOT NULL,
   message TEXT NOT NULL,
+  attachment_name VARCHAR(255) NOT NULL DEFAULT '',
   admin_reply TEXT NOT NULL,
   created_at VARCHAR(80) NOT NULL
 );
@@ -206,6 +238,19 @@ CREATE TABLE IF NOT EXISTS club_calendar_events (
   is_reserved TINYINT(1) NOT NULL DEFAULT 0,
   sort_order INT NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS club_announcements (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(220) NOT NULL,
+  category VARCHAR(80) NOT NULL,
+  published_date VARCHAR(80) NOT NULL,
+  summary TEXT NOT NULL,
+  content TEXT NOT NULL,
+  is_important TINYINT(1) NOT NULL DEFAULT 0,
+  is_read TINYINT(1) NOT NULL DEFAULT 0,
+  sort_order INT NOT NULL DEFAULT 0
+);
+
 
 
 
