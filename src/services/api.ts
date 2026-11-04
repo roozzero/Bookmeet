@@ -178,7 +178,8 @@ export const ApiService = {
 
   updateMemberLibraryBook(payload: {
     bookId: number;
-    progress_percent: number;
+    pages_read: number;
+    progress_percent?: number;
     reading_status: 'در حال مطالعه' | 'خوانده‌شده' | 'در نوبت مطالعه';
     personal_note: string;
   }): Promise<{ success: boolean; book: MemberLibraryItem }> {

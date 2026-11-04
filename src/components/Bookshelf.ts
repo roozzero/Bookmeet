@@ -58,7 +58,11 @@ export function createBookshelfComponent(props: BookshelfProps): JQuery<HTMLElem
         <img
           src="${imageSrc}"
           alt="قفسه کتاب‌های باشگاه کتابخوانی بوک میت"
-          referrerpolicy="no-referrer"
+          width="860"
+          height="367"
+          loading="eager"
+          fetchpriority="high"
+          decoding="async"
           class="js-hero-asset-img hero-asset-image"
         />
 

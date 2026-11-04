@@ -118,6 +118,20 @@ export interface ClubMember {
   created_at: string;
 }
 
+export interface SessionSubItem {
+  id: number;
+  session_number: string;
+  title: string;
+  status: 'برگزار شده' | 'تعریف شده';
+  session_date: string;
+  session_time: string;
+  pages_read?: number;
+  pages_to_read?: string;
+  reviewed_topics?: string;
+  session_notes?: string;
+  meeting_link?: string;
+}
+
 export interface MemberSession {
   id: number;
   member_phone: string;
@@ -130,6 +144,23 @@ export interface MemberSession {
   meeting_link_or_room: string;
   status: 'ثبت‌نام‌شده' | 'برگزارشده' | 'ظرفیت باز';
   member_note: string;
+  sub_sessions: SessionSubItem[];
+  sort_order: number;
+}
+
+export interface MemberClassItem {
+  id: number;
+  member_phone: string;
+  title: string;
+  book_title: string;
+  instructor_name: string;
+  schedule_summary: string;
+  level_label: string;
+  total_sessions: number;
+  held_sessions: number;
+  status: string;
+  description: string;
+  sub_sessions: SessionSubItem[];
   sort_order: number;
 }
 
@@ -141,6 +172,7 @@ export interface MemberLibraryItem {
   translator: string;
   cover_url: string;
   reading_status: 'در حال مطالعه' | 'خوانده‌شده' | 'در نوبت مطالعه';
+  pages_read: number;
   progress_percent: number;
   pages_count: number;
   personal_note: string;
@@ -179,6 +211,7 @@ export interface ClubCalendarEvent {
 export interface MemberPanelPayload {
   member: ClubMember;
   sessions: MemberSession[];
+  classes: MemberClassItem[];
   library: MemberLibraryItem[];
   tickets: MemberTicket[];
   calendarEvents: ClubCalendarEvent[];

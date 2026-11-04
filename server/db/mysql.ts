@@ -125,6 +125,20 @@ export interface ClubMemberRow {
   created_at: string;
 }
 
+export interface SessionSubItemRow {
+  id: number;
+  session_number: number;
+  title: string;
+  status: 'برگزار شده' | 'تعریف شده';
+  session_date: string;
+  session_time: string;
+  pages_read: string;
+  pages_to_read: string;
+  reviewed_topics: string;
+  session_notes: string;
+  meeting_link: string;
+}
+
 export interface MemberSessionRow {
   id: number;
   member_phone: string;
@@ -137,6 +151,21 @@ export interface MemberSessionRow {
   meeting_link_or_room: string;
   status: 'ثبت‌نام‌شده' | 'برگزارشده' | 'ظرفیت باز';
   member_note: string;
+  sub_sessions: SessionSubItemRow[];
+  sort_order: number;
+}
+
+export interface MemberClassRow {
+  id: number;
+  member_phone: string;
+  title: string;
+  book_title: string;
+  mentor_name: string;
+  session_date: string;
+  session_time: string;
+  status: 'ثبت‌نام‌شده' | 'برگزارشده';
+  member_note: string;
+  sub_sessions: SessionSubItemRow[];
   sort_order: number;
 }
 
@@ -149,6 +178,7 @@ export interface MemberLibraryRow {
   cover_url: string;
   reading_status: 'در حال مطالعه' | 'خوانده‌شده' | 'در نوبت مطالعه';
   progress_percent: number;
+  pages_read: number;
   pages_count: number;
   personal_note: string;
   updated_at: string;
@@ -196,13 +226,14 @@ export interface MySQLStoreSchema {
   contact_messages: ContactMessageRow[];
   club_members: ClubMemberRow[];
   member_sessions: MemberSessionRow[];
+  member_classes: MemberClassRow[];
   member_library: MemberLibraryRow[];
   member_tickets: MemberTicketRow[];
   club_calendar_events: ClubCalendarEventRow[];
   custom_tables?: Record<string, Record<string, unknown>[]>;
 }
 
-const CURRENT_SCHEMA_VERSION = 9;
+const CURRENT_SCHEMA_VERSION = 10;
 const STORAGE_FILE = path.resolve(process.cwd(), 'server/db/mysql_data.json');
 
 const SEED_DATA: MySQLStoreSchema = {
@@ -471,58 +502,304 @@ const SEED_DATA: MySQLStoreSchema = {
     {
       id: 1,
       member_phone: 'all',
-      title: 'نشست چهارم هم‌خوانی و تحلیل ساختار زمان در ماکوندو',
-      book_title: 'صد سال تنهایی (فصل‌های ۱۲ تا ۱۵)',
+      title: 'حلقه هم‌خوانی و تحلیل ساختار زمان در «صد سال تنهایی»',
+      book_title: 'صد سال تنهایی · گابریل گارسیا مارکز',
       mentor_name: 'دکتر سهراب رستگار',
-      session_date: 'چهارشنبه ۱۶ آبان ۱۴۰۵',
+      session_date: 'چهارشنبه‌ها · آبان ۱۴۰۵',
       session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-      location_type: 'حضوری',
-      meeting_link_or_room: 'تهران، خانه فرهنگ بوک‌میت، تالار فردوسی',
+      location_type: 'آنلاین',
+      meeting_link_or_room: 'تالار فردوسی خانه بوک‌میت',
       status: 'ثبت‌نام‌شده',
-      member_note: 'بررسی تکرار نام‌های اورلیانو و خوزه آرکادیو و ارتباط آن با مفهوم تنهایی ابدی در فصل چهاردهم.',
+      member_note: 'بررسی تکرار نام‌های اورلیانو و خوزه آرکادیو و ارتباط آن با مفهوم تنهایی ابدی در ماکوندو.',
+      sub_sessions: [
+        {
+          id: 101,
+          session_number: 1,
+          title: 'جلسه اول: پیدایش ماکوندو و کیمیاگری ملکیادس',
+          status: 'برگزار شده',
+          session_date: '۲۵ مهر ۱۴۰۵',
+          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+          pages_read: '۱۱۵ صفحه (صفحات ۱ تا ۱۱۵)',
+          pages_to_read: 'صفحات ۱ تا ۱۱۵',
+          reviewed_topics: 'تحلیل فصل‌های اول تا سوم، بررسی زاویه دید دانای کل، ورود کولی‌ها به دهکده ماکوندو و نقش نمادین یخ در آغاز رمان.',
+          session_notes: 'در این نشست مشخص شد که مارکز با لحنی خونسرد و روزمره، شگفت‌انگیزترین رخدادها را روایت می‌کند تا مرز خیال و واقعیت در ذهن خواننده رنگ ببازد.',
+          meeting_link: 'https://meet.bookmeet.ir/macondo-s1',
+        },
+        {
+          id: 102,
+          session_number: 2,
+          title: 'جلسه دوم: بیماری بی‌خوابی و فراموشی جمعی در ماکوندو',
+          status: 'برگزار شده',
+          session_date: '۲ آبان ۱۴۰۵',
+          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+          pages_read: '۱۱۰ صفحه (صفحات ۱۱۶ تا ۲۲۵)',
+          pages_to_read: 'صفحات ۱۱۶ تا ۲۲۵',
+          reviewed_topics: 'واکاوی استعاره طاعون بی‌خوابی، برچسب‌گذاری اشیاء توسط خوزه آرکادیو بوئندیا و پیوند میان زبان، حافظه و تاریخ.',
+          session_notes: 'فراموشی در ماکوندو تنها یک رخداد داستانی نیست؛ بلکه استعاره‌ای از فراموشی تاریخی ملت‌هاست که تنها با نوشتن و ثبت کلمات درمان می‌شود.',
+          meeting_link: 'https://meet.bookmeet.ir/macondo-s2',
+        },
+        {
+          id: 103,
+          session_number: 3,
+          title: 'جلسه سوم: جنگ‌های داخلی سرهنگ اورلیانو بوئندیا',
+          status: 'برگزار شده',
+          session_date: '۹ آبان ۱۴۰۵',
+          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+          pages_read: '۹۳ صفحه (صفحات ۲۲۶ تا ۳۱۸)',
+          pages_to_read: 'صفحات ۲۲۶ تا ۳۱۸',
+          reviewed_topics: 'بررسی دگردیسی شخصیت سرهنگ اورلیانو در چرخه قدرت، ساختن و ذوب کردن ماهی‌های طلایی و تنهایی ناشی از قدرت.',
+          session_notes: 'تکرار ساختن ماهی‌های طلایی نماد دور باطل زمان و پناه بردن انسان تنها به کارهای تکرارشونده برای گریز از هجوم خاطرات است.',
+          meeting_link: 'https://meet.bookmeet.ir/macondo-s3',
+        },
+        {
+          id: 104,
+          session_number: 4,
+          title: 'جلسه چهارم: ورود شرکت موز و باران‌های چهارساله',
+          status: 'تعریف شده',
+          session_date: '۱۶ آبان ۱۴۰۵',
+          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+          pages_read: '۰ صفحه',
+          pages_to_read: 'صفحات ۳۱۹ تا ۳۹۵ (فصل‌های ۱۲ تا ۱۵)',
+          reviewed_topics: '',
+          session_notes: '',
+          meeting_link: 'https://meet.bookmeet.ir/macondo-s4',
+        },
+        {
+          id: 105,
+          session_number: 5,
+          title: 'جلسه پنجم: رمزگشایی از دست‌نوشته‌های ملکیادس و پایان ماکوندو',
+          status: 'تعریف شده',
+          session_date: '۲۳ آبان ۱۴۰۵',
+          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۳۰',
+          pages_read: '۰ صفحه',
+          pages_to_read: 'صفحات ۳۹۶ تا ۴۶۸ (فصل‌های ۱۶ تا پایان کتاب)',
+          reviewed_topics: '',
+          session_notes: '',
+          meeting_link: 'https://meet.bookmeet.ir/macondo-s5',
+        },
+      ],
       sort_order: 1,
     },
     {
       id: 2,
       member_phone: 'all',
-      title: 'کارگاه برخط حاشیه‌نویسی و پیوند نظریه روایت با تجربه زیسته',
-      book_title: 'کارگاه تخصصی خوانش خلاق رمان',
+      title: 'کارگاه تخصصی حاشیه‌نویسی و خوانش خلاق رمان',
+      book_title: 'هنر داستان‌نویسی و روایت‌شناسی کاربردی',
       mentor_name: 'آرمان کاظمی',
-      session_date: 'جمعه ۱۸ آبان ۱۴۰۵',
+      session_date: 'جمعه‌ها · آبان ۱۴۰۵',
       session_time: 'ساعت ۱۹:۰۰ تا ۲۰:۳۰',
-      location_type: 'برخط (آنلاین)',
+      location_type: 'آنلاین',
       meeting_link_or_room: 'اتاق مجازی شماره ۲ باشگاه بوک‌میت',
       status: 'ثبت‌نام‌شده',
       member_note: 'آماده‌سازی سه پرسش کلیدی از فصل آخر کتاب برای طرح در گروه هم‌خوانی.',
+      sub_sessions: [
+        {
+          id: 201,
+          session_number: 1,
+          title: 'جلسه اول: معماری پیرنگ و کشف گره‌های پنهان روایت',
+          status: 'برگزار شده',
+          session_date: '۴ آبان ۱۴۰۵',
+          session_time: 'ساعت ۱۹:۰۰ تا ۲۰:۳۰',
+          pages_read: '۸۵ صفحه (بخش اول کتاب کارگاه)',
+          pages_to_read: 'صفحات ۱ تا ۸۵',
+          reviewed_topics: 'بررسی تفاوت داستان و پیرنگ از دیدگاه فورستر، تحلیل آغازبندی رمان‌های کلاسیک و شیوه ثبت کدهای نمادین در حاشیه کتاب.',
+          session_notes: 'در حاشیه‌نویسی خلاق، به جای خلاصه‌نویسی خطی باید به دنبال الگوهای تکرارشونده، تضادهای شخصیتی و سکوت‌های معنادار راوی گشت.',
+          meeting_link: 'https://meet.bookmeet.ir/creative-reading-1',
+        },
+        {
+          id: 202,
+          session_number: 2,
+          title: 'جلسه دوم: ترسیم نقشه شخصیت‌ها و تحلیل دیالوگ‌ها',
+          status: 'برگزار شده',
+          session_date: '۱۱ آبان ۱۴۰۵',
+          session_time: 'ساعت ۱۹:۰۰ تا ۲۰:۳۰',
+          pages_read: '۹۰ صفحه (صفحات ۸۶ تا ۱۷۵)',
+          pages_to_read: 'صفحات ۸۶ تا ۱۷۵',
+          reviewed_topics: 'کالبدشکافی دیالوگ‌های چندصدایی، بررسی انگیزه‌های ناخودآگاه قهرمان داستان و تمرین نگارش یادداشت‌های ۵۰۰ کلمه‌ای.',
+          session_notes: 'هر شخصیت بزرگ ادبی با یک تناقض درونی زنده می‌شود؛ ثبت لحظات تصمیم‌گیری شخصیت در دفترچه خوانش، کلید فهم تحول اوست.',
+          meeting_link: 'https://meet.bookmeet.ir/creative-reading-2',
+        },
+        {
+          id: 203,
+          session_number: 3,
+          title: 'جلسه سوم: پیوند نظریه روایت با تجربه زیسته خواننده',
+          status: 'تعریف شده',
+          session_date: '۱۸ آبان ۱۴۰۵',
+          session_time: 'ساعت ۱۹:۰۰ تا ۲۰:۳۰',
+          pages_read: '۰ صفحه',
+          pages_to_read: 'صفحات ۱۷۶ تا ۲۵۰ (فصل‌های ۵ و ۶)',
+          reviewed_topics: '',
+          session_notes: '',
+          meeting_link: 'https://meet.bookmeet.ir/creative-reading-3',
+        },
+      ],
       sort_order: 2,
     },
     {
       id: 3,
       member_phone: 'all',
-      title: 'نشست جمع‌بندی و نقد تطبیقی طنز فلسفی در ادبیات روسیه',
-      book_title: 'مرشد و مارگاریتا',
+      title: 'دوره نقد تطبیقی طنز فلسفی در «مرشد و مارگاریتا»',
+      book_title: 'مرشد و مارگاریتا · میخائیل بولگاکف',
       mentor_name: 'دکتر سهراب رستگار',
-      session_date: 'چهارشنبه ۳۰ مهر ۱۴۰۵',
+      session_date: 'مهرماه ۱۴۰۵',
       session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-      location_type: 'حضوری',
-      meeting_link_or_room: 'تهران، خانه فرهنگ بوک‌میت، تالار فردوسی',
+      location_type: 'آنلاین',
+      meeting_link_or_room: 'تالار فردوسی خانه بوک‌میت',
       status: 'برگزارشده',
       member_note: 'تحلیل شخصیت پروفسور ولاند و نسبت آزادی هنر با حقیقت در دست‌نوشته‌های مرشد بسیار راهگشا بود.',
+      sub_sessions: [
+        {
+          id: 301,
+          session_number: 1,
+          title: 'جلسه اول: حضور پروفسور ولاند در پارک پاتریارخ مسکو',
+          status: 'برگزار شده',
+          session_date: '۹ مهر ۱۴۰۵',
+          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+          pages_read: '۱۷۰ صفحه (صفحات ۱ تا ۱۷۰)',
+          pages_to_read: 'صفحات ۱ تا ۱۷۰',
+          reviewed_topics: 'مباحثه برلیوز و ایوان بی‌خانمان با ولاند، آغاز روایت موازی پونتیوس پیلاتوس در اورشلیم و ساختار رمان در رمان.',
+          session_notes: 'بولگاکف با ترکیب گروتسک و تاریخ، نشان می‌دهد که انکار امر متعالی در جامعه بوروکراتیک دهه ۱۹۳۰ چه پیامدهای طنزآمیزی به دنبال دارد.',
+          meeting_link: 'https://meet.bookmeet.ir/bulgakov-s1',
+        },
+        {
+          id: 302,
+          session_number: 2,
+          title: 'جلسه دوم: دست‌نوشته‌ها نمی‌سوزند؛ عشق مرشد و مارگاریتا',
+          status: 'برگزار شده',
+          session_date: '۲۳ مهر ۱۴۰۵',
+          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+          pages_read: '۳۴۲ صفحه (صفحات ۱۷۱ تا ۵۱۲)',
+          pages_to_read: 'صفحات ۱۷۱ تا ۵۱۲',
+          reviewed_topics: 'ورود شخصیت مارگاریتا، جشن بزرگ بهار، رهایی مرشد و جاودانگی اثر هنری در برابر سانسور و ترس.',
+          session_notes: 'جمله کلیدی «دست‌نوشته‌ها نمی‌سوزند» عصاره فلسفی اثر است که اصالت حقیقت هنری را فراتر از زمان و قدرت سیاسی قرار می‌دهد.',
+          meeting_link: 'https://meet.bookmeet.ir/bulgakov-s2',
+        },
+      ],
       sort_order: 3,
     },
     {
       id: 4,
       member_phone: 'all',
-      title: 'حلقه گفت‌وگو درباره تمثیل اخلاقی و بیداری وجدان انسانی',
-      book_title: 'کوری (ژوزه ساراماگو)',
+      title: 'حلقه گفت‌وگو درباره تمثیل اخلاقی در رمان «کوری»',
+      book_title: 'کوری · ژوزه ساراماگو',
       mentor_name: 'نیلوفر فرهادی',
-      session_date: 'چهارشنبه ۲۵ شهریور ۱۴۰۵',
+      session_date: 'شهریور و آبان ۱۴۰۵',
       session_time: 'ساعت ۱۸:۰۰ تا ۱۹:۴۵',
-      location_type: 'برخط (آنلاین)',
+      location_type: 'آنلاین',
       meeting_link_or_room: 'اتاق مجازی شماره ۱ باشگاه بوک‌میت',
-      status: 'برگزارشده',
+      status: 'ثبت‌نام‌شده',
       member_note: 'بررسی فرم نقطه‌گذاری و دیالوگ‌های پیوسته ساراماگو که حس سرگشتگی شخصیت‌ها را به خواننده منتقل می‌کند.',
+      sub_sessions: [
+        {
+          id: 401,
+          session_number: 1,
+          title: 'جلسه اول: شیوع نابینایی سفید و قرنطینه نخستین گروه',
+          status: 'برگزار شده',
+          session_date: '۱۸ شهریور ۱۴۰۵',
+          session_time: 'ساعت ۱۸:۰۰ تا ۱۹:۴۵',
+          pages_read: '۱۸۰ صفحه (صفحات ۱ تا ۱۸۰)',
+          pages_to_read: 'صفحات ۱ تا ۱۸۰',
+          reviewed_topics: 'بررسی حذف نام شخصیت‌ها در رمان، فرم خاص جمله‌بندی ساراماگو و نقش همسر دکتر به عنوان تنها شاهد بینا.',
+          session_notes: 'حذف نام‌های خاص و جایگزینی آن‌ها با توصیف‌ها (همسر دکتر، پیرمرد با چشم‌بند سیاه) به اثر بعدی جهان‌شمول و اسطوره‌ای بخشیده است.',
+          meeting_link: 'https://meet.bookmeet.ir/blindness-s1',
+        },
+        {
+          id: 402,
+          session_number: 2,
+          title: 'جلسه دوم: بازگشت به شهر و بازتعریف همدلی انسانی',
+          status: 'تعریف شده',
+          session_date: '۲۵ آبان ۱۴۰۵',
+          session_time: 'ساعت ۱۸:۰۰ تا ۱۹:۴۵',
+          pages_read: '۰ صفحه',
+          pages_to_read: 'صفحات ۱۸۱ تا ۳۴۸ (بخش پایانی کتاب)',
+          reviewed_topics: '',
+          session_notes: '',
+          meeting_link: 'https://meet.bookmeet.ir/blindness-s2',
+        },
+      ],
       sort_order: 4,
+    },
+  ],
+  member_classes: [
+    {
+      id: 1,
+      member_phone: 'all',
+      title: 'کلاس جامع تاریخ تحلیلی رمان مدرن و پست‌مدرن جهان',
+      book_title: 'از پروست و جویس تا کالوینو و مارکز',
+      mentor_name: 'دکتر سهراب رستگار',
+      session_date: 'دوشنبه‌ها · پاییز ۱۴۰۵',
+      session_time: 'ساعت ۱۷:۳۰ تا ۱۹:۳۰',
+      status: 'ثبت‌نام‌شده',
+      member_note: 'کلاس تخصصی بررسی تحول فرم و جریان سیال ذهن در ادبیات قرن بیستم.',
+      sub_sessions: [
+        {
+          id: 501,
+          session_number: 1,
+          title: 'جلسه اول: جریان سیال ذهن و زمان درونی در آثار ویرجینیا وولف',
+          status: 'برگزار شده',
+          session_date: '۷ آبان ۱۴۰۵',
+          session_time: 'ساعت ۱۷:۳۰ تا ۱۹:۳۰',
+          pages_read: '۹۵ صفحه (فصل اول و دوم «به سوی فانوس دریایی»)',
+          pages_to_read: 'صفحات ۱ تا ۹۵',
+          reviewed_topics: 'تفاوت زمان ساعت‌شمار با زمان روان‌شناختی برگسون، تحلیل تک‌گویی‌های درونی خانم رمزی و تکنیک پرش میان زاویه دیدها.',
+          session_notes: 'در رمان مدرن، حادثه بیرونی جای خود را به بازتاب آن حادثه در آگاهی و حافظه شخصیت‌ها می‌دهد.',
+          meeting_link: 'https://meet.bookmeet.ir/modern-novel-c1',
+        },
+        {
+          id: 502,
+          session_number: 2,
+          title: 'جلسه دوم: هزارتوی فراروایت در آثار ایتالو کالوینو',
+          status: 'تعریف شده',
+          session_date: '۲۱ آبان ۱۴۰۵',
+          session_time: 'ساعت ۱۷:۳۰ تا ۱۹:۳۰',
+          pages_read: '۰ صفحه',
+          pages_to_read: 'صفحات ۱ تا ۱۲۰ کتاب «اگر شبی از شب‌های زمستان مسافری»',
+          reviewed_topics: '',
+          session_notes: '',
+          meeting_link: 'https://meet.bookmeet.ir/modern-novel-c2',
+        },
+      ],
+      sort_order: 1,
+    },
+    {
+      id: 2,
+      member_phone: 'all',
+      title: 'کلاس فلسفه و ادبیات؛ کاوش مفاهیم اگزیستانسیال در رمان',
+      book_title: 'داستایفسکی، کامو و سارتر',
+      mentor_name: 'نیلوفر فرهادی',
+      session_date: 'شنبه‌ها · پاییز ۱۴۰۵',
+      session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+      status: 'ثبت‌نام‌شده',
+      member_note: 'بررسی مفهوم آزادی، مسئولیت و انتخاب اخلاقی در شخصیت‌های داستانی.',
+      sub_sessions: [
+        {
+          id: 601,
+          session_number: 1,
+          title: 'جلسه اول: آزادی و عصیان در «بیگانه» و «طاعون» آلبر کامو',
+          status: 'برگزار شده',
+          session_date: '۵ آبان ۱۴۰۵',
+          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+          pages_read: '۱۳۰ صفحه (متن کامل رمان «بیگانه»)',
+          pages_to_read: 'صفحات ۱ تا ۱۳۰',
+          reviewed_topics: 'واکاوی شخصیت مورسو در مواجهه با پوچی، گذار از فردگرایی بیگانه به همبستگی اخلاقی دکتر ریو در رمان طاعون.',
+          session_notes: 'کامو در گذار از بیگانه به طاعون نشان می‌دهد که پاسخ اصیل انسان به رنج جمعی، همدلی و مسئولیت‌پذیری بی‌چشمداشت است.',
+          meeting_link: 'https://meet.bookmeet.ir/philo-lit-c1',
+        },
+        {
+          id: 602,
+          session_number: 2,
+          title: 'جلسه دوم: چندصدایی و جدال ایده‌ها در «برادران کارامازوف»',
+          status: 'تعریف شده',
+          session_date: '۱۹ آبان ۱۴۰۵',
+          session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+          pages_read: '۰ صفحه',
+          pages_to_read: 'صفحات ۲۱۰ تا ۳۴۰ (فصل مفتش بزرگ)',
+          reviewed_topics: '',
+          session_notes: '',
+          meeting_link: 'https://meet.bookmeet.ir/philo-lit-c2',
+        },
+      ],
+      sort_order: 2,
     },
   ],
   member_library: [
@@ -535,6 +812,7 @@ const SEED_DATA: MySQLStoreSchema = {
       cover_url: '/assets/book-current.png',
       reading_status: 'در حال مطالعه',
       progress_percent: 68,
+      pages_read: 318,
       pages_count: 468,
       personal_note: 'تا پایان فصل یازدهم مطالعه شد. فضاسازی باران‌های چهارساله ماکوندو شگفت‌انگیز است.',
       updated_at: '۱۴ آبان ۱۴۰۵',
@@ -548,6 +826,7 @@ const SEED_DATA: MySQLStoreSchema = {
       cover_url: '/assets/book-recent-1.png',
       reading_status: 'خوانده‌شده',
       progress_percent: 100,
+      pages_read: 512,
       pages_count: 512,
       personal_note: 'یکی از درخشان‌ترین آثار قرن بیستم؛ پیوند دو روایت مسکو و اورشلیم با ظرافت بی‌نظیری شکل گرفته است.',
       updated_at: '۲۸ مهر ۱۴۰۵',
@@ -561,6 +840,7 @@ const SEED_DATA: MySQLStoreSchema = {
       cover_url: '/assets/book-recent-2.png',
       reading_status: 'خوانده‌شده',
       progress_percent: 100,
+      pages_read: 348,
       pages_count: 348,
       personal_note: 'تجربه‌ای تکان‌دهنده از معنای دیدن و مسئولیت اخلاقی انسان در برابر دیگری.',
       updated_at: '۲۴ شهریور ۱۴۰۵',
@@ -574,6 +854,7 @@ const SEED_DATA: MySQLStoreSchema = {
       cover_url: '/assets/book-recent-4.png',
       reading_status: 'در نوبت مطالعه',
       progress_percent: 15,
+      pages_read: 92,
       pages_count: 614,
       personal_note: 'برنامه‌ریزی برای مطالعه کامل در دوره آذرماه باشگاه به همراه یادداشت‌برداری از استعاره‌های موسیقایی.',
       updated_at: '۱۰ آبان ۱۴۰۵',
@@ -1054,6 +1335,7 @@ class MySQLDatabaseManager {
   public async getMemberPanelData(phone?: string): Promise<{
     member: Omit<ClubMemberRow, 'password_hash'>;
     sessions: MemberSessionRow[];
+    classes: MemberClassRow[];
     library: MemberLibraryRow[];
     tickets: MemberTicketRow[];
     calendarEvents: ClubCalendarEventRow[];
@@ -1063,6 +1345,9 @@ class MySQLDatabaseManager {
     }
     if (!this.store.member_sessions) {
       this.store.member_sessions = JSON.parse(JSON.stringify(SEED_DATA.member_sessions));
+    }
+    if (!this.store.member_classes) {
+      this.store.member_classes = JSON.parse(JSON.stringify(SEED_DATA.member_classes));
     }
     if (!this.store.member_library) {
       this.store.member_library = JSON.parse(JSON.stringify(SEED_DATA.member_library));
@@ -1084,6 +1369,7 @@ class MySQLDatabaseManager {
     return {
       member: publicMember,
       sessions: [...this.store.member_sessions].sort((a, b) => a.sort_order - b.sort_order),
+      classes: [...this.store.member_classes].sort((a, b) => a.sort_order - b.sort_order),
       library: [...this.store.member_library],
       tickets: [...this.store.member_tickets].sort((a, b) => b.id - a.id),
       calendarEvents: [...this.store.club_calendar_events].sort(
@@ -1137,7 +1423,8 @@ class MySQLDatabaseManager {
 
   public async updateMemberLibraryItem(input: {
     bookId: number;
-    progress_percent: number;
+    pages_read?: number;
+    progress_percent?: number;
     reading_status: 'در حال مطالعه' | 'خوانده‌شده' | 'در نوبت مطالعه';
     personal_note: string;
   }): Promise<MemberLibraryRow> {
@@ -1145,8 +1432,26 @@ class MySQLDatabaseManager {
     if (!item) {
       throw new Error('کتاب مورد نظر در کتابخانه شخصی یافت نشد.');
     }
-    item.progress_percent = Math.max(0, Math.min(100, Number(input.progress_percent)));
-    item.reading_status = input.reading_status;
+    const totalPages = Math.max(1, item.pages_count || 300);
+    if (typeof input.pages_read === 'number' && !Number.isNaN(input.pages_read)) {
+      const clampedPages = Math.max(0, Math.min(totalPages, Math.round(input.pages_read)));
+      item.pages_read = clampedPages;
+      item.progress_percent = Math.min(
+        100,
+        Math.round((clampedPages / totalPages) * 100)
+      );
+    } else if (typeof input.progress_percent === 'number') {
+      item.progress_percent = Math.max(0, Math.min(100, Number(input.progress_percent)));
+      item.pages_read = Math.round((item.progress_percent / 100) * totalPages);
+    }
+
+    if (item.pages_read >= totalPages || input.reading_status === 'خوانده‌شده') {
+      item.reading_status = 'خوانده‌شده';
+      item.pages_read = totalPages;
+      item.progress_percent = 100;
+    } else {
+      item.reading_status = input.reading_status;
+    }
     item.personal_note = input.personal_note;
     item.updated_at = 'هم‌اکنون';
     this.saveDiskStore();
@@ -1172,6 +1477,13 @@ class MySQLDatabaseManager {
       '/assets/book-recent-2.png',
       '/assets/book-recent-4.png',
     ];
+    const totalPages = input.pages_count || 320;
+    const initialProgress =
+      input.reading_status === 'خوانده‌شده'
+        ? 100
+        : input.reading_status === 'در حال مطالعه'
+        ? 20
+        : 0;
     const newBook: MemberLibraryRow = {
       id: nextId,
       member_phone: 'all',
@@ -1180,13 +1492,9 @@ class MySQLDatabaseManager {
       translator: input.translator || '—',
       cover_url: covers[nextId % covers.length],
       reading_status: input.reading_status,
-      progress_percent:
-        input.reading_status === 'خوانده‌شده'
-          ? 100
-          : input.reading_status === 'در حال مطالعه'
-          ? 20
-          : 0,
-      pages_count: input.pages_count || 320,
+      progress_percent: initialProgress,
+      pages_read: Math.round((initialProgress / 100) * totalPages),
+      pages_count: totalPages,
       personal_note:
         input.personal_note || 'افزوده‌شده به قفسه مطالعات شخصی در باشگاه بوک‌میت.',
       updated_at: 'امروز',

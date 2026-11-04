@@ -339,6 +339,7 @@ function mountApplication(payload: BootstrapPayload): void {
         renderMemberPanelView({
           member: fallbackMember,
           sessions: [],
+          classes: [],
           library: [],
           tickets: [],
           calendarEvents: [],
@@ -356,6 +357,7 @@ function mountApplication(payload: BootstrapPayload): void {
     const $navbar = createNavbarComponent({
       navigationLinks: payload.navigationLinks,
       ctaText: getNavbarCtaLabel(),
+      isStationaryCta: true,
       onNavigate: (href) => {
         renderMainHomeView(href);
       },
@@ -408,6 +410,7 @@ function mountApplication(payload: BootstrapPayload): void {
     const $navbar = createNavbarComponent({
       navigationLinks: payload.navigationLinks,
       ctaText: getNavbarCtaLabel(),
+      isStationaryCta: Boolean(currentMember),
       onNavigate: (href) => {
         scrollToSection(href);
       },
@@ -490,6 +493,7 @@ function mountApplication(payload: BootstrapPayload): void {
       navigationLinks: payload.navigationLinks,
       ctaText: getNavbarCtaLabel(),
       activeHref: '#blog',
+      isStationaryCta: Boolean(currentMember),
       onNavigate: (href) => {
         renderMainHomeView(href);
       },
@@ -530,12 +534,18 @@ function mountApplication(payload: BootstrapPayload): void {
 }
 
 $(function () {
+  // Mount immediately so the Hero section and preloaded image appear with zero network delay
+  mountApplication(FALLBACK_BOOTSTRAP);
+
   ApiService.fetchBootstrapData()
     .then((data) => {
-      mountApplication(data);
+      // Only refresh if user has not opened a modal or navigated away from home
+      if ($('#home').length && $('.js-auth-modal-backdrop:not(.hidden)').length === 0 && ($(window).scrollTop() || 0) < 40) {
+        mountApplication(data);
+      }
     })
     .catch(() => {
-      mountApplication(FALLBACK_BOOTSTRAP);
+      // Already mounted with FALLBACK_BOOTSTRAP
     });
 });
 

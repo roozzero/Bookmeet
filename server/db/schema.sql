@@ -141,10 +141,24 @@ CREATE TABLE IF NOT EXISTS member_sessions (
   mentor_name VARCHAR(150) NOT NULL,
   session_date VARCHAR(80) NOT NULL,
   session_time VARCHAR(80) NOT NULL,
-  location_type VARCHAR(60) NOT NULL,
-  meeting_link_or_room VARCHAR(220) NOT NULL,
   status VARCHAR(60) NOT NULL,
   member_note TEXT NOT NULL,
+  sub_sessions_json LONGTEXT NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS member_classes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  member_phone VARCHAR(40) NOT NULL DEFAULT 'all',
+  title VARCHAR(220) NOT NULL,
+  book_title VARCHAR(180) NOT NULL,
+  mentor_name VARCHAR(150) NOT NULL,
+  session_date VARCHAR(80) NOT NULL,
+  session_time VARCHAR(80) NOT NULL,
+  status VARCHAR(60) NOT NULL,
+  member_note TEXT NOT NULL,
+  sub_sessions_json LONGTEXT NOT NULL,
   sort_order INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -158,6 +172,7 @@ CREATE TABLE IF NOT EXISTS member_library (
   cover_url VARCHAR(255) NOT NULL,
   reading_status VARCHAR(60) NOT NULL,
   progress_percent INT NOT NULL DEFAULT 0,
+  pages_read INT NOT NULL DEFAULT 0,
   pages_count INT NOT NULL DEFAULT 300,
   personal_note TEXT NOT NULL,
   updated_at VARCHAR(80) NOT NULL
@@ -191,5 +206,6 @@ CREATE TABLE IF NOT EXISTS club_calendar_events (
   is_reserved TINYINT(1) NOT NULL DEFAULT 0,
   sort_order INT NOT NULL DEFAULT 0
 );
+
 
 

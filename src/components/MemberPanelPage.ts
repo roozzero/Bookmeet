@@ -1,18 +1,21 @@
 import $ from 'jquery';
 import { ApiService } from '../services/api.ts';
-import { toPersianDigits } from '../utils/persianNumbers.ts';
 import type {
   ClubCalendarEvent,
   ClubMember,
+  MemberClassItem,
   MemberLibraryItem,
   MemberPanelPayload,
   MemberSession,
   MemberTicket,
+  SessionSubItem,
 } from '../types/models.ts';
+import { toPersianDigits } from '../utils/persianNumbers.ts';
 
-export type MemberPanelTabId =
+export type PanelTabKey =
   | 'dashboard'
   | 'sessions'
+  | 'classes'
   | 'library'
   | 'tickets'
   | 'profile'
@@ -20,826 +23,1061 @@ export type MemberPanelTabId =
 
 export interface MemberPanelPageProps {
   initialData: MemberPanelPayload;
-  initialTab?: MemberPanelTabId;
   onBackToSite: () => void;
   onLogout: () => void;
-  onMemberUpdated?: (member: ClubMember) => void;
+  onMemberUpdated: (member: ClubMember) => void;
 }
 
-const EDUCATION_OPTIONS = [
-  'دیپلم',
-  'کاردانی',
-  'کارشناسی',
-  'کارشناسی ارشد',
-  'دکتری',
-  'سایر',
-];
+function parseLocalizedInt(raw: string, fallback = 0): number {
+  const normalized = String(raw || '')
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .replace(/[^\d]/g, '');
+  const parsed = parseInt(normalized, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
 
-export function createMemberPanelPageComponent(
-  props: MemberPanelPageProps
-): JQuery<HTMLElement> {
-  const state: MemberPanelPayload = JSON.parse(JSON.stringify(props.initialData));
-  let activeTab: MemberPanelTabId = props.initialTab || 'dashboard';
-  let sessionFilter: 'all' | 'ثبت‌نام‌شده' | 'برگزارشده' = 'all';
-  let libraryFilter: 'all' | 'در حال مطالعه' | 'خوانده‌شده' | 'در نوبت مطالعه' = 'all';
-  let calendarFilter = 'all';
+export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQuery {
+  let state: MemberPanelPayload = {
+    member: { ...props.initialData.member },
+    sessions: [...(props.initialData.sessions || [])],
+    classes: [...(props.initialData.classes || [])],
+    library: [...(props.initialData.library || [])],
+    tickets: [...(props.initialData.tickets || [])],
+    calendarEvents: [...(props.initialData.calendarEvents || [])],
+  };
 
-  const navItems: { id: MemberPanelTabId; label: string; iconSvg: string }[] = [
-    {
-      id: 'dashboard',
-      label: 'داشبورد',
-      iconSvg:
-        '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
-    },
-    {
-      id: 'sessions',
-      label: 'جلسات من',
-      iconSvg:
-        '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-    },
-    {
-      id: 'library',
-      label: 'کتابخانه من',
-      iconSvg:
-        '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
-    },
-    {
-      id: 'tickets',
-      label: 'تیکت',
-      iconSvg:
-        '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
-    },
-    {
-      id: 'profile',
-      label: 'پروفایل',
-      iconSvg:
-        '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
-    },
-    {
-      id: 'calendar',
-      label: 'تقویم باشگاه',
-      iconSvg:
-        '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
-    },
-  ];
+  let activeTab: PanelTabKey = 'dashboard';
+  let selectedSessionId: number | null = null;
+  let selectedClassId: number | null = null;
+  let activeSubSessionModal: {
+    subItem: SessionSubItem;
+    parentTitle: string;
+    bookTitle: string;
+    mentorName: string;
+  } | null = null;
 
   const $wrapper = $(`
     <section
-      dir="rtl"
       aria-label="پنل کاربری اعضای باشگاه کتابخوانی بوک‌میت"
-      class="w-full min-h-screen py-8 md:py-12 px-4 sm:px-8 md:px-14"
-    >
-      <div class="max-w-6xl mx-auto space-y-6">
-        <!-- Top Member Panel Header Bar -->
-        <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-2xl p-4 sm:p-6 flex flex-wrap items-center justify-between gap-4 shadow-[0_14px_34px_-18px_rgba(48,31,17,0.14)]">
-          <div class="flex items-center gap-3.5">
-            <div class="w-12 h-12 rounded-2xl bg-[#382315] text-[#faf6ec] flex items-center justify-center font-bold text-base shrink-0 shadow-sm js-member-avatar">
-              ${toPersianDigits((state.member.first_name || 'ع').charAt(0))}
-            </div>
-            <div>
-              <div class="flex flex-wrap items-center gap-2">
-                <h1 class="text-base sm:text-lg font-bold text-[#2c1b0e] js-header-member-name">
-                  پنل کاربری ${toPersianDigits(state.member.first_name)} ${toPersianDigits(state.member.last_name)}
-                </h1>
-                <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-[#ebe2cf] text-[#5a422e] border border-[#d8cbb4]">
-                  کد عضویت: ${toPersianDigits(state.member.membership_code || 'BM-۱۴۰۵-۱۰۸')}
-                </span>
-              </div>
-              <p class="text-xs text-[#6f5a48] mt-0.5 text-justify">
-                مدیریت جلسات هم‌خوانی، قفسه کتاب‌های شخصی، تیکت‌های دبیرخانه و تقویم نشست‌های باشگاه بوک‌میت
-              </p>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2.5">
-            <button
-              type="button"
-              class="js-back-to-site-btn px-3.5 py-2 text-xs font-semibold text-[#382315] bg-[#efe7d6] hover:bg-[#e4d9c3] border border-[#d5c8b2] rounded-xl transition-colors cursor-pointer"
-            >
-              صفحه اصلی سایت
-            </button>
-            <button
-              type="button"
-              class="js-logout-btn px-3.5 py-2 text-xs font-semibold text-[#7a3126] hover:text-[#4f1b13] bg-transparent border border-[#d9b8b2] hover:border-[#7a3126] rounded-xl transition-colors cursor-pointer"
-            >
-              خروج از حساب
-            </button>
-          </div>
-        </div>
-
-        <!-- Main Layout: Sidebar Navigation + Content Area -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <!-- Sidebar Navigation (6 Sections) -->
-          <aside class="lg:col-span-3 bg-[#f8f4ea] border border-[#dcd0bb] rounded-2xl p-3 shadow-[0_14px_34px_-18px_rgba(48,31,17,0.12)]">
-            <div class="px-3 py-2 mb-1 border-b border-[#e6dccb]">
-              <span class="text-[11px] font-bold text-[#7a6451]">بخش‌های پنل کاربری</span>
-            </div>
-            <nav class="js-panel-sidebar-nav flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0" aria-label="منوی پنل کاربری"></nav>
-          </aside>
-
-          <!-- Dynamic Section Content Container -->
-          <div class="js-panel-content lg:col-span-9 space-y-6"></div>
-        </div>
-      </div>
-    </section>
+      class="w-full max-w-[1440px] mx-auto px-5 sm:px-10 md:px-16 lg:px-20 pt-6 pb-20"
+    ></section>
   `);
 
-  const $sidebarNav = $wrapper.find('.js-panel-sidebar-nav');
-  const $content = $wrapper.find('.js-panel-content');
-
-  function renderSidebar(): void {
-    $sidebarNav.empty();
-    navItems.forEach((item) => {
-      const isActive = item.id === activeTab;
-      const badgeCount =
-        item.id === 'sessions'
-          ? toPersianDigits(state.sessions.length)
-          : item.id === 'library'
-          ? toPersianDigits(state.library.length)
-          : item.id === 'tickets'
-          ? toPersianDigits(state.tickets.length)
-          : item.id === 'calendar'
-          ? toPersianDigits(
-              state.calendarEvents.filter((e) => e.is_reserved === 1).length
-            )
-          : '';
-
-      const $btn = $(`
-        <button
-          type="button"
-          data-tab="${item.id}"
-          class="js-panel-tab-btn w-full flex items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
-            isActive
-              ? 'bg-[#382315] text-[#faf6ec] shadow-sm'
-              : 'text-[#4e3d2f] hover:bg-[#efe7d6] hover:text-[#23180f]'
-          }"
-        >
-          <span class="inline-flex items-center gap-2.5">
-            ${item.iconSvg}
-            <span>${item.label}</span>
-          </span>
-          ${
-            badgeCount
-              ? `<span class="text-[11px] px-2 py-0.5 rounded-md ${
-                  isActive
-                    ? 'bg-[#543824] text-[#f7f2e6]'
-                    : 'bg-[#e9e0ce] text-[#5c4838]'
-                }">${badgeCount}</span>`
-              : ''
-          }
-        </button>
-      `);
-
-      $btn.on('click', () => {
-        activeTab = item.id;
-        renderSidebar();
-        renderActiveSection();
-      });
-
-      $sidebarNav.append($btn);
-    });
+  function showToast(message: string, isError = false): void {
+    const $existing = $wrapper.find('.js-panel-toast');
+    $existing.remove();
+    const $toast = $(`
+      <div class="js-panel-toast fixed bottom-6 left-6 z-50 px-5 py-3.5 rounded-xl border shadow-[0_16px_36px_rgba(44,30,22,0.18)] text-[13.5px] font-medium flex items-center gap-2.5 transition-all duration-300 ${
+        isError
+          ? 'bg-[#FDF3F2] border-[#E6B8B3] text-[#8E2A22]'
+          : 'bg-[#F4F9F5] border-[#BBD9C2] text-[#235332]'
+      }">
+        <span class="w-2 h-2 rounded-full ${isError ? 'bg-[#B43E34]' : 'bg-[#2E6F40]'}"></span>
+        <span>${toPersianDigits(message)}</span>
+      </div>
+    `);
+    $wrapper.append($toast);
+    window.setTimeout(() => {
+      $toast.fadeOut(250, () => $toast.remove());
+    }, 3400);
   }
 
-  // =========================================================================
-  // 1. DASHBOARD VIEW
-  // =========================================================================
-  function renderDashboardSection(): void {
-    const activeBook =
-      state.library.find((b) => b.reading_status === 'در حال مطالعه') ||
-      state.library[0];
-    const upcomingSessions = state.sessions.filter(
-      (s) => s.status === 'ثبت‌نام‌شده'
-    );
+  function renderSubSessionModal(): string {
+    if (!activeSubSessionModal) return '';
+    const { subItem, parentTitle, bookTitle, mentorName } = activeSubSessionModal;
+    const isHeld = subItem.status === 'برگزار شده';
+
+    if (isHeld) {
+      return `
+        <div
+          class="js-subsession-modal-backdrop fixed inset-0 z-50 bg-[#1E140E]/60 backdrop-blur-[3px] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div class="js-subsession-modal-dialog w-full max-w-[620px] rounded-2xl bg-[#FAF5EC] border border-[#DECBB3] shadow-[0_24px_64px_rgba(28,18,12,0.32)] overflow-hidden animate-[fadeIn_0.2s_ease-out]">
+            <div class="px-6 py-4 bg-[#F2E6D5] border-b border-[#E2D2BC] flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5">
+                <span class="px-2.5 py-1 rounded-md text-[11.5px] font-semibold bg-[#E4F2E7] text-[#235332]">
+                  ${toPersianDigits(subItem.session_number)} · برگزار شده
+                </span>
+                <h4 class="font-display text-[17px] font-bold text-[#231912]">
+                  ${toPersianDigits(subItem.title)}
+                </h4>
+              </div>
+              <button
+                type="button"
+                class="js-close-subsession-modal text-[#6B5444] hover:text-[#231912] p-1.5 transition-colors cursor-pointer"
+                aria-label="بستن مودال"
+              >
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+              <div class="text-[12.5px] text-[#6B5444] flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span>دوره: <strong class="text-[#2B1E16]">${toPersianDigits(parentTitle)}</strong></span>
+                <span>کتاب: <strong class="text-[#2B1E16]">${toPersianDigits(bookTitle)}</strong></span>
+                <span>تسهیل‌گر: <strong class="text-[#2B1E16]">${toPersianDigits(mentorName)}</strong></span>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="p-3.5 rounded-xl bg-[#F4E9DA]/85 border border-[#E5D6C3]">
+                  <span class="block text-[11.5px] text-[#7D6452] mb-1">تاریخ برگزاری</span>
+                  <strong class="text-[13.5px] font-bold text-[#231912]">
+                    ${toPersianDigits(subItem.session_date)}
+                  </strong>
+                </div>
+                <div class="p-3.5 rounded-xl bg-[#F4E9DA]/85 border border-[#E5D6C3]">
+                  <span class="block text-[11.5px] text-[#7D6452] mb-1">زمان برگزاری</span>
+                  <strong class="text-[13.5px] font-bold text-[#231912]">
+                    ${toPersianDigits(subItem.session_time)}
+                  </strong>
+                </div>
+                <div class="p-3.5 rounded-xl bg-[#F4E9DA]/85 border border-[#E5D6C3]">
+                  <span class="block text-[11.5px] text-[#7D6452] mb-1">تعداد صفحات خوانده شده</span>
+                  <strong class="text-[13.5px] font-bold text-[#235332]">
+                    ${toPersianDigits(subItem.pages_read || 0)} صفحه
+                  </strong>
+                </div>
+              </div>
+
+              <div class="p-4 rounded-xl bg-[#FDFBF7] border border-[#E6D7C3]">
+                <h5 class="text-[13px] font-bold text-[#6E4526] mb-1.5 flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#7A4B2A]"></span>
+                  <span>مواردی که در جلسه قبل بررسی شده است</span>
+                </h5>
+                <p class="text-[13px] text-[#3F2F23] leading-[1.9] text-justify">
+                  ${toPersianDigits(subItem.reviewed_topics || 'مرور سرفصل‌های آغازین کتاب و تحلیل ساختار کلی اثر.')}
+                </p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-[#FDFBF7] border border-[#E6D7C3]">
+                <h5 class="text-[13px] font-bold text-[#6E4526] mb-1.5 flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#2E6F40]"></span>
+                  <span>نکات آن جلسه</span>
+                </h5>
+                <p class="text-[13px] text-[#3F2F23] leading-[1.9] text-justify">
+                  ${toPersianDigits(subItem.session_notes || 'تحلیل شخصیت‌پردازی و بررسی یادداشت‌های اعضای حلقه مطالعاتی.')}
+                </p>
+              </div>
+
+              <div class="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  class="js-close-subsession-modal px-5 py-2.5 rounded-xl border border-[#C5B198] text-[13px] font-semibold text-[#3D2E22] hover:bg-[#EFE2CE] transition-colors cursor-pointer"
+                >
+                  بستن پنجره
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div
+        class="js-subsession-modal-backdrop fixed inset-0 z-50 bg-[#1E140E]/60 backdrop-blur-[3px] flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div class="js-subsession-modal-dialog w-full max-w-[580px] rounded-2xl bg-[#FAF5EC] border border-[#DECBB3] shadow-[0_24px_64px_rgba(28,18,12,0.32)] overflow-hidden animate-[fadeIn_0.2s_ease-out]">
+          <div class="px-6 py-4 bg-[#F2E6D5] border-b border-[#E2D2BC] flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <span class="px-2.5 py-1 rounded-md text-[11.5px] font-semibold bg-[#EFE0CC] text-[#6E4526]">
+                ${toPersianDigits(subItem.session_number)} · جلسه تعریف شده
+              </span>
+              <h4 class="font-display text-[17px] font-bold text-[#231912]">
+                ${toPersianDigits(subItem.title)}
+              </h4>
+            </div>
+            <button
+              type="button"
+              class="js-close-subsession-modal text-[#6B5444] hover:text-[#231912] p-1.5 transition-colors cursor-pointer"
+              aria-label="بستن مودال"
+            >
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <div class="text-[12.5px] text-[#6B5444] flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span>دوره: <strong class="text-[#2B1E16]">${toPersianDigits(parentTitle)}</strong></span>
+              <span>کتاب: <strong class="text-[#2B1E16]">${toPersianDigits(bookTitle)}</strong></span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="p-3.5 rounded-xl bg-[#F4E9DA]/85 border border-[#E5D6C3]">
+                <span class="block text-[11.5px] text-[#7D6452] mb-1">تاریخ برگزاری</span>
+                <strong class="text-[14px] font-bold text-[#231912]">
+                  ${toPersianDigits(subItem.session_date)}
+                </strong>
+              </div>
+              <div class="p-3.5 rounded-xl bg-[#F4E9DA]/85 border border-[#E5D6C3]">
+                <span class="block text-[11.5px] text-[#7D6452] mb-1">زمان برگزاری</span>
+                <strong class="text-[14px] font-bold text-[#231912]">
+                  ${toPersianDigits(subItem.session_time)}
+                </strong>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-[#FDFBF7] border border-[#E6D7C3]">
+              <h5 class="text-[13px] font-bold text-[#6E4526] mb-1.5 flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#7A4B2A]"></span>
+                <span>صفحاتی که باید خوانده شود</span>
+              </h5>
+              <p class="text-[13.5px] font-semibold text-[#231912] leading-[1.85]">
+                ${toPersianDigits(subItem.pages_to_read || 'طبق برنامه اعلام‌شده در سرفصل جلسه')}
+              </p>
+            </div>
+
+            <div class="p-4 rounded-xl bg-[#F3E7D6] border border-[#DEC8AC]">
+              <span class="block text-[12px] font-bold text-[#5A4332] mb-2">
+                لینک ورود به جلسه:
+              </span>
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <span dir="ltr" class="text-[12.5px] font-mono text-[#3F2E21] bg-[#FAF5EC] px-3 py-2 rounded-lg border border-[#E2D2BC] select-all truncate">
+                  ${subItem.meeting_link || 'https://meet.bookmeet.ir/live-session'}
+                </span>
+                <a
+                  href="${subItem.meeting_link || 'https://meet.bookmeet.ir/live-session'}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="px-4 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold text-center transition-colors shrink-0"
+                >
+                  ورود مستقیم به جلسه
+                </a>
+              </div>
+            </div>
+
+            <div class="pt-2 flex justify-end">
+              <button
+                type="button"
+                class="js-close-subsession-modal px-5 py-2.5 rounded-xl border border-[#C5B198] text-[13px] font-semibold text-[#3D2E22] hover:bg-[#EFE2CE] transition-colors cursor-pointer"
+              >
+                بستن پنجره
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderDashboardTab(): string {
+    const activeBooksCount = state.library.filter(
+      (b) => b.reading_status === 'در حال مطالعه'
+    ).length;
     const completedBooksCount = state.library.filter(
       (b) => b.reading_status === 'خوانده‌شده'
     ).length;
-    const totalPagesRead = state.library.reduce(
-      (acc, b) => acc + Math.round((b.pages_count * b.progress_percent) / 100),
-      0
-    );
-    const reservedEventsCount = state.calendarEvents.filter(
-      (e) => e.is_reserved === 1
+    const upcomingSessionsCount = state.sessions.length;
+    const openTicketsCount = state.tickets.filter(
+      (t) => t.status !== 'بسته‌شده'
     ).length;
 
-    const $view = $(`
-      <div class="space-y-6">
-        <!-- Welcome Overview Card -->
-        <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-2xl p-5 sm:p-6 space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <h2 class="text-base sm:text-lg font-bold text-[#382315]">
-              خوش آمدید، ${toPersianDigits(state.member.first_name)} ${toPersianDigits(state.member.last_name)} عزیز
+    const nextSession = state.sessions[0];
+    const currentReadingBook =
+      state.library.find((b) => b.reading_status === 'در حال مطالعه') || state.library[0];
+
+    return `
+      <div class="space-y-7">
+        <!-- Welcome Banner -->
+        <div class="p-6 sm:p-7 rounded-2xl bg-gradient-to-l from-[#EFE3D1] via-[#F5ECDE] to-[#FAF5EC] border border-[#E2D3BF] flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div>
+            <span class="inline-block text-[12px] font-semibold text-[#7A4B2A] mb-1.5">
+              خوش آمدید به میز مطالعه شخصی شما
+            </span>
+            <h2 class="font-display text-[22px] sm:text-[26px] font-bold text-[#231912] mb-2">
+              ${state.member.first_name} ${state.member.last_name} عزیز، هم‌خوانی این هفته در جریان است
             </h2>
-            <span class="text-xs text-[#7a6451]">
-              عضویت از: ${toPersianDigits(state.member.joined_date || 'مهر ۱۴۰۵')} · مقطع: ${toPersianDigits(state.member.education)}
+            <p class="text-[13.5px] text-[#5B4739] leading-[1.85] text-justify max-w-[680px]">
+              از طریق این پنل می‌توانید به کارت جلسات ثبت‌نام شده و کلاس‌های خود وارد شوید، جزئیات جلسات برگزار شده و تعریف شده را مشاهده کنید و با ثبت صفحات خوانده‌شده، پیشرفت مطالعه خود را دنبال نمایید.
+            </p>
+          </div>
+          <div class="shrink-0 flex flex-col items-start md:items-end gap-2 bg-[#FAF5EC]/90 px-4 py-3.5 rounded-xl border border-[#DFCWB7]">
+            <span class="text-[11.5px] text-[#7A6352]">کد عضویت باشگاه:</span>
+            <strong class="text-[14.5px] font-bold text-[#2C1E16] tracking-wide">
+              ${toPersianDigits(state.member.membership_code || 'BM-۱۴۰۵-۱۰۸')}
+            </strong>
+            <span class="text-[11.5px] text-[#6E5644]">
+              عضویت از ${toPersianDigits(state.member.joined_date || 'مهر ۱۴۰۴')}
             </span>
           </div>
-          <p class="text-xs sm:text-[13.5px] text-[#4e3d2f] leading-[2.05] text-justify" style="text-align: justify; text-justify: inter-word;">
-            ${toPersianDigits(
-              state.member.bio ||
-                'در داشبورد اختصاصی باشگاه کتابخوانی بوک‌میت می‌توانید وضعیت پیشرفت مطالعه هفتگی، یادداشت‌های نشست‌های هم‌خوانی، پاسخ دبیرخانه به تیکت‌ها و برنامه تقویم ماهانه باشگاه را مدیریت و پیگیری کنید.'
-            )}
-          </p>
         </div>
 
-        <!-- 4 KPI Stat Cards -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div class="bg-[#f8f4ea] border border-[#ded3be] rounded-2xl p-4 space-y-1">
-            <div class="text-2xl font-bold text-[#382315]">
-              ${toPersianDigits(state.sessions.length)}
+        <!-- 4 KPI Cards (Item 4: جلسات ثبت‌نام شده من) -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] shadow-[0_6px_20px_rgba(61,46,34,0.04)]">
+            <span class="text-[12px] text-[#7A6250] block mb-1.5">جلسات ثبت‌نام شده من</span>
+            <div class="font-display text-[28px] font-bold text-[#231912]">
+              ${toPersianDigits(upcomingSessionsCount)}
             </div>
-            <div class="text-xs font-semibold text-[#645140]">جلسات ثبت‌شده من</div>
-            <div class="text-[11px] text-[#8a7562]">
-              ${toPersianDigits(upcomingSessions.length)} نشست پیش‌رو
-            </div>
+            <span class="text-[11.5px] text-[#5E7A65] mt-1 inline-block">حلقه مطالعاتی فعال</span>
           </div>
 
-          <div class="bg-[#f8f4ea] border border-[#ded3be] rounded-2xl p-4 space-y-1">
-            <div class="text-2xl font-bold text-[#382315]">
-              ${toPersianDigits(state.library.length)}
+          <div class="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] shadow-[0_6px_20px_rgba(61,46,34,0.04)]">
+            <span class="text-[12px] text-[#7A6250] block mb-1.5">کتاب‌های در حال مطالعه</span>
+            <div class="font-display text-[28px] font-bold text-[#231912]">
+              ${toPersianDigits(activeBooksCount)}
             </div>
-            <div class="text-xs font-semibold text-[#645140]">کتاب‌های قفسه من</div>
-            <div class="text-[11px] text-[#8a7562]">
-              ${toPersianDigits(completedBooksCount)} اثر خوانده‌شده
-            </div>
+            <span class="text-[11.5px] text-[#7A4B2A] mt-1 inline-block">در قفسه شخصی شما</span>
           </div>
 
-          <div class="bg-[#f8f4ea] border border-[#ded3be] rounded-2xl p-4 space-y-1">
-            <div class="text-2xl font-bold text-[#382315]">
-              ${toPersianDigits(totalPagesRead)}
+          <div class="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] shadow-[0_6px_20px_rgba(61,46,34,0.04)]">
+            <span class="text-[12px] text-[#7A6250] block mb-1.5">آثار خوانده‌شده</span>
+            <div class="font-display text-[28px] font-bold text-[#231912]">
+              ${toPersianDigits(completedBooksCount)}
             </div>
-            <div class="text-xs font-semibold text-[#645140]">صفحات مطالعه‌شده</div>
-            <div class="text-[11px] text-[#8a7562]">در دوره‌های هم‌خوانی</div>
+            <span class="text-[11.5px] text-[#6B5444] mt-1 inline-block">ثبت‌شده در کارنامه</span>
           </div>
 
-          <div class="bg-[#f8f4ea] border border-[#ded3be] rounded-2xl p-4 space-y-1">
-            <div class="text-2xl font-bold text-[#382315]">
-              ${toPersianDigits(reservedEventsCount)}
+          <div class="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] shadow-[0_6px_20px_rgba(61,46,34,0.04)]">
+            <span class="text-[12px] text-[#7A6250] block mb-1.5">تیکت‌های پشتیبانی</span>
+            <div class="font-display text-[28px] font-bold text-[#231912]">
+              ${toPersianDigits(openTicketsCount)}
             </div>
-            <div class="text-xs font-semibold text-[#645140]">رویدادهای رزروشده</div>
-            <div class="text-[11px] text-[#8a7562]">
-              ${toPersianDigits(state.tickets.length)} تیکت ثبت‌شده
-            </div>
+            <span class="text-[11.5px] text-[#6B5444] mt-1 inline-block">پاسخگویی دبیرخانه</span>
           </div>
         </div>
 
-        <!-- Current Reading + Upcoming Sessions Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <!-- Current Reading Book Card -->
-          <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-2xl p-5 flex flex-col justify-between space-y-4">
-            <div class="space-y-3">
-              <div class="flex items-center justify-between border-b border-[#e6dccb] pb-2.5">
-                <h3 class="text-sm font-bold text-[#382315]">کتاب در حال مطالعه من</h3>
+        <!-- Two Column Overview -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Next Session Card -->
+          <div class="p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="font-display text-[17px] font-bold text-[#231912]">
+                  نشست پیشِ روی شما
+                </h3>
                 <button
                   type="button"
-                  data-goto="library"
-                  class="js-quick-nav text-xs font-semibold text-[#7a5436] hover:text-[#23180f] cursor-pointer"
+                  data-switch-tab="sessions"
+                  class="js-switch-tab-btn text-[12px] font-semibold text-[#7A4B2A] hover:text-[#231912] cursor-pointer"
                 >
-                  مشاهده کتابخانه من ←
+                  مشاهده همه جلسات ←
                 </button>
               </div>
-
               ${
-                activeBook
+                nextSession
                   ? `
-                <div class="flex items-start gap-4 pt-1">
-                  <img
-                    src="${activeBook.cover_url}"
-                    alt="${toPersianDigits(activeBook.book_title)}"
-                    class="w-20 h-28 object-cover rounded-xl border border-[#d8cbb4] shrink-0 shadow-sm"
-                  />
-                  <div class="space-y-1.5 flex-1">
-                    <div class="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded bg-[#ebe2cf] text-[#5a422e]">
-                      ${toPersianDigits(activeBook.reading_status)}
-                    </div>
-                    <h4 class="text-sm sm:text-base font-bold text-[#2c1b0e]">
-                      ${toPersianDigits(activeBook.book_title)}
-                    </h4>
-                    <div class="text-xs text-[#6e5947]">
-                      نویسنده: ${toPersianDigits(activeBook.author)} · ترجمه: ${toPersianDigits(activeBook.translator)}
-                    </div>
-                    <p class="text-xs text-[#594636] leading-6 text-justify" style="text-align: justify; text-justify: inter-word;">
-                      ${toPersianDigits(activeBook.personal_note)}
-                    </p>
+                <div
+                  data-open-session-id="${nextSession.id}"
+                  class="js-open-session-card p-4 rounded-xl bg-[#F3E9DA]/80 border border-[#E2D2BC] space-y-2.5 cursor-pointer hover:border-[#8B5A36] transition-all"
+                >
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-[#E4F0E6] text-[#265934]">
+                      ${toPersianDigits(nextSession.status)}
+                    </span>
+                    <span class="text-[11.5px] font-semibold text-[#7A4B2A]">
+                      ${toPersianDigits((nextSession.sub_sessions || []).length)} جلسه در این دوره
+                    </span>
+                  </div>
+                  <h4 class="font-bold text-[15px] text-[#231912]">
+                    ${toPersianDigits(nextSession.title)}
+                  </h4>
+                  <p class="text-[12.5px] text-[#5E493A]">
+                    کتاب محور نشست: <strong>${toPersianDigits(nextSession.book_title)}</strong> · با حضور ${toPersianDigits(nextSession.mentor_name)}
+                  </p>
+                  <div class="pt-2 border-t border-[#E2D2BC]/70 flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#4E3B2D]">
+                    <span>زمان: ${toPersianDigits(nextSession.session_date)}</span>
+                    <span>ساعت ${toPersianDigits(nextSession.session_time)}</span>
                   </div>
                 </div>
               `
-                  : ''
+                  : `<p class="text-[13px] text-[#6B5444]">هنوز جلسه‌ای ثبت نشده است.</p>`
               }
             </div>
-
-            ${
-              activeBook
-                ? `
-              <div class="space-y-1.5 pt-2 border-t border-[#e8dfd0]">
-                <div class="flex items-center justify-between text-xs font-semibold text-[#473425]">
-                  <span>میزان پیشرفت مطالعه</span>
-                  <span>٪${toPersianDigits(activeBook.progress_percent)} (${toPersianDigits(activeBook.pages_count)} صفحه)</span>
-                </div>
-                <div class="w-full h-2.5 bg-[#e5dac6] rounded-full overflow-hidden">
-                  <div
-                    class="h-full bg-[#4a321f] rounded-full transition-all duration-500"
-                    style="width: ${activeBook.progress_percent}%"
-                  ></div>
-                </div>
-              </div>
-            `
-                : ''
-            }
           </div>
 
-          <!-- Next Session Card -->
-          <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-2xl p-5 flex flex-col justify-between space-y-4">
-            <div class="space-y-3">
-              <div class="flex items-center justify-between border-b border-[#e6dccb] pb-2.5">
-                <h3 class="text-sm font-bold text-[#382315]">نشست‌های پیش‌روی من</h3>
+          <!-- Current Reading Progress Card -->
+          <div class="p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="font-display text-[17px] font-bold text-[#231912]">
+                  کتاب در دست مطالعه من
+                </h3>
                 <button
                   type="button"
-                  data-goto="sessions"
-                  class="js-quick-nav text-xs font-semibold text-[#7a5436] hover:text-[#23180f] cursor-pointer"
+                  data-switch-tab="library"
+                  class="js-switch-tab-btn text-[12px] font-semibold text-[#7A4B2A] hover:text-[#231912] cursor-pointer"
                 >
-                  همه جلسات من ←
+                  مدیریت کتابخانه من ←
                 </button>
               </div>
-
-              <div class="space-y-2.5">
-                ${upcomingSessions
-                  .slice(0, 2)
-                  .map(
-                    (s) => `
-                  <div class="p-3 rounded-xl bg-[#f2ecde] border border-[#e2d6c1] space-y-1">
-                    <div class="flex items-center justify-between text-[11px] text-[#7a5c43] font-semibold">
-                      <span>${toPersianDigits(s.session_date)} · ${toPersianDigits(s.session_time)}</span>
-                      <span class="px-2 py-0.5 rounded bg-[#382315] text-[#faf6ec]">${toPersianDigits(s.location_type)}</span>
-                    </div>
-                    <div class="text-xs sm:text-[13px] font-bold text-[#2c1b0e]">
-                      ${toPersianDigits(s.title)}
-                    </div>
-                    <div class="text-[11px] text-[#5e4b3b]">
-                      کتاب: ${toPersianDigits(s.book_title)} · منتور: ${toPersianDigits(s.mentor_name)}
+              ${
+                currentReadingBook
+                  ? `
+                <div class="flex items-start gap-4 p-4 rounded-xl bg-[#F3E9DA]/80 border border-[#E2D2BC]">
+                  <img
+                    src="${currentReadingBook.cover_url}"
+                    alt="${currentReadingBook.book_title}"
+                    class="w-16 h-24 object-cover rounded-lg border border-[#D8C5AC] shrink-0"
+                  />
+                  <div class="flex-1 min-w-0">
+                    <h4 class="font-bold text-[15px] text-[#231912] truncate">
+                      ${toPersianDigits(currentReadingBook.book_title)}
+                    </h4>
+                    <p class="text-[12px] text-[#6B5444] mt-0.5">
+                      ${toPersianDigits(currentReadingBook.author)} · ترجمه ${toPersianDigits(currentReadingBook.translator)}
+                    </p>
+                    <div class="mt-3">
+                      <div class="flex items-center justify-between text-[11.5px] text-[#4E3B2D] mb-1">
+                        <span>پیشرفت مطالعه (${toPersianDigits(currentReadingBook.pages_read || 0)} از ${toPersianDigits(currentReadingBook.pages_count)} صفحه)</span>
+                        <strong class="font-bold">${toPersianDigits(currentReadingBook.progress_percent)}٪</strong>
+                      </div>
+                      <div class="w-full h-2 rounded-full bg-[#E3D3BE] overflow-hidden">
+                        <div
+                          class="h-full rounded-full bg-[#7A4B2A] transition-all duration-700"
+                          style="width: ${currentReadingBook.progress_percent}%"
+                        ></div>
+                      </div>
                     </div>
                   </div>
-                `
-                  )
-                  .join('')}
-              </div>
-            </div>
-
-            <div class="pt-2 border-t border-[#e8dfd0] flex items-center justify-between">
-              <span class="text-xs text-[#6e5947]">برای رزرو جلسات جدید به تقویم مراجعه کنید</span>
-              <button
-                type="button"
-                data-goto="calendar"
-                class="js-quick-nav text-xs font-bold text-[#382315] underline underline-offset-4 cursor-pointer"
-              >
-                تقویم باشگاه
-              </button>
+                </div>
+              `
+                  : `<p class="text-[13px] text-[#6B5444]">کتابی در قفسه شما ثبت نشده است.</p>`
+              }
             </div>
           </div>
         </div>
       </div>
-    `);
-
-    $view.find('.js-quick-nav').on('click', function () {
-      const target = $(this).attr('data-goto') as MemberPanelTabId;
-      if (target) {
-        activeTab = target;
-        renderSidebar();
-        renderActiveSection();
-      }
-    });
-
-    $content.empty().append($view);
+    `;
   }
 
-  // =========================================================================
-  // 2. MY SESSIONS VIEW (جلسات من)
-  // =========================================================================
-  function renderSessionsSection(): void {
-    const filteredSessions =
-      sessionFilter === 'all'
-        ? state.sessions
-        : state.sessions.filter((s) => s.status === sessionFilter);
+  function renderSubSessionsDetailSection(params: {
+    parentTitle: string;
+    bookTitle: string;
+    mentorLabel: string;
+    mentorName: string;
+    scheduleText: string;
+    subSessions: SessionSubItem[];
+    backButtonClass: string;
+    backButtonLabel: string;
+    extraFooterHtml?: string;
+  }): string {
+    const heldList = (params.subSessions || []).filter(
+      (item) => item.status === 'برگزار شده'
+    );
+    const definedList = (params.subSessions || []).filter(
+      (item) => item.status === 'تعریف شده'
+    );
 
-    const $view = $(`
-      <div class="space-y-5">
-        <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
+    return `
+      <div class="space-y-7">
+        <!-- Top Header & Back Button -->
+        <div class="p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 class="text-base sm:text-lg font-bold text-[#382315]">جلسات من در باشگاه بوک‌میت</h2>
-            <p class="text-xs text-[#645140] mt-1 text-justify">
-              فهرست نشست‌های هم‌خوانی و کارگاه‌های ثبت‌نام‌شده شما به همراه قابلیت ثبت یادداشت‌های تحلیلی هر جلسه.
-            </p>
-          </div>
-
-          <div class="flex items-center gap-1.5 bg-[#efe7d6] p-1 rounded-xl border border-[#dfd3be]">
-            <button type="button" data-filter="all" class="js-session-filter px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
-              sessionFilter === 'all'
-                ? 'bg-[#382315] text-[#faf6ec]'
-                : 'text-[#5c4838]'
-            }">همه (${toPersianDigits(state.sessions.length)})</button>
-            <button type="button" data-filter="ثبت‌نام‌شده" class="js-session-filter px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
-              sessionFilter === 'ثبت‌نام‌شده'
-                ? 'bg-[#382315] text-[#faf6ec]'
-                : 'text-[#5c4838]'
-            }">پیش‌رو</button>
-            <button type="button" data-filter="برگزارشده" class="js-session-filter px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
-              sessionFilter === 'برگزارشده'
-                ? 'bg-[#382315] text-[#faf6ec]'
-                : 'text-[#5c4838]'
-            }">برگزارشده</button>
-          </div>
-        </div>
-
-        <div class="js-sessions-list space-y-4"></div>
-      </div>
-    `);
-
-    $view.find('.js-session-filter').on('click', function () {
-      sessionFilter = $(this).attr('data-filter') as
-        | 'all'
-        | 'ثبت‌نام‌شده'
-        | 'برگزارشده';
-      renderSessionsSection();
-    });
-
-    const $list = $view.find('.js-sessions-list');
-    filteredSessions.forEach((session: MemberSession) => {
-      const isUpcoming = session.status === 'ثبت‌نام‌شده';
-      const $card = $(`
-        <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-2xl p-5 space-y-3.5">
-          <div class="flex flex-wrap items-start justify-between gap-3 border-b border-[#e6dccb] pb-3">
-            <div class="space-y-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-md ${
-                  isUpcoming
-                    ? 'bg-emerald-900/15 text-emerald-900 border border-emerald-800/25'
-                    : 'bg-[#e6dccb] text-[#5c4838]'
-                }">
-                  ${toPersianDigits(session.status)}
-                </span>
-                <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-[#efe7d6] text-[#5a422e]">
-                  ${toPersianDigits(session.location_type)}
-                </span>
-                <span class="text-xs text-[#7a6451]">
-                  ${toPersianDigits(session.session_date)} · ${toPersianDigits(session.session_time)}
-                </span>
-              </div>
-              <h3 class="text-sm sm:text-base font-bold text-[#2c1b0e] pt-1">
-                ${toPersianDigits(session.title)}
-              </h3>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-[#4e3d2f] bg-[#f2ecde] p-3.5 rounded-xl border border-[#e3d7c3]">
-            <div><strong class="text-[#2c1b0e]">محور نشست:</strong> ${toPersianDigits(session.book_title)}</div>
-            <div><strong class="text-[#2c1b0e]">تسهیل‌گر و منتور:</strong> ${toPersianDigits(session.mentor_name)}</div>
-            <div><strong class="text-[#2c1b0e]">محل برگزاری:</strong> ${toPersianDigits(session.meeting_link_or_room)}</div>
-          </div>
-
-          <div class="space-y-2">
-            <label class="block text-xs font-semibold text-[#473425]">
-              یادداشت و پرسش‌های من برای این نشست:
-            </label>
-            <textarea
-              rows="2"
-              class="js-session-note-input w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d] text-justify"
-            >${toPersianDigits(session.member_note)}</textarea>
-            <div class="flex items-center justify-between">
-              <span class="js-session-save-msg text-xs text-emerald-800 hidden">یادداشت شما در دیتابیس ذخیره شد ✓</span>
-              <button
-                type="button"
-                class="js-save-session-note mr-auto px-4 py-1.5 text-xs font-bold text-[#382315] border border-[#8c6f56] hover:border-[#23180f] rounded-xl transition-colors cursor-pointer bg-transparent"
-              >
-                ذخیره یادداشت جلسه
-              </button>
-            </div>
-          </div>
-        </div>
-      `);
-
-      $card.find('.js-save-session-note').on('click', function () {
-        const $btn = $(this);
-        const noteVal = toPersianDigits(
-          String($card.find('.js-session-note-input').val() || '').trim()
-        );
-        $btn.prop('disabled', true).text('در حال ذخیره...');
-        ApiService.saveMemberSessionNote({
-          sessionId: session.id,
-          member_note: noteVal,
-        })
-          .then((res) => {
-            session.member_note = res.session.member_note;
-            $card.find('.js-session-save-msg').removeClass('hidden');
-            window.setTimeout(() => {
-              $card.find('.js-session-save-msg').addClass('hidden');
-            }, 2200);
-          })
-          .finally(() => {
-            $btn.prop('disabled', false).text('ذخیره یادداشت جلسه');
-          });
-      });
-
-      $list.append($card);
-    });
-
-    $content.empty().append($view);
-  }
-
-  // =========================================================================
-  // 3. MY LIBRARY VIEW (کتابخانه من)
-  // =========================================================================
-  function renderLibrarySection(): void {
-    const filteredBooks =
-      libraryFilter === 'all'
-        ? state.library
-        : state.library.filter((b) => b.reading_status === libraryFilter);
-
-    const $view = $(`
-      <div class="space-y-5">
-        <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-2xl p-5 space-y-4">
-          <div class="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 class="text-base sm:text-lg font-bold text-[#382315]">کتابخانه شخصی من</h2>
-              <p class="text-xs text-[#645140] mt-1 text-justify">
-                مدیریت کتاب‌های در حال مطالعه، ثبت درصد پیشرفت خوانش و افزودن آثار جدید به قفسه مطالعاتی شما.
-              </p>
-            </div>
-
             <button
               type="button"
-              class="js-toggle-add-book px-4 py-2 text-xs font-bold text-[#faf6ec] bg-[#382315] hover:bg-[#27180e] rounded-xl transition-colors cursor-pointer"
+              class="${params.backButtonClass} inline-flex items-center gap-2 text-[12.5px] font-semibold text-[#7A4B2A] hover:text-[#231912] mb-2.5 cursor-pointer"
             >
-              + افزودن کتاب به قفسه من
+              <span>→</span>
+              <span>${params.backButtonLabel}</span>
             </button>
+            <h2 class="font-display text-[21px] sm:text-[24px] font-bold text-[#231912]">
+              ${toPersianDigits(params.parentTitle)}
+            </h2>
+            <div class="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px] text-[#5B4739]">
+              <span>اثر مورد بررسی: <strong class="text-[#231912]">${toPersianDigits(params.bookTitle)}</strong></span>
+              <span>${params.mentorLabel}: <strong class="text-[#231912]">${toPersianDigits(params.mentorName)}</strong></span>
+              <span>برنامه: <strong class="text-[#231912]">${toPersianDigits(params.scheduleText)}</strong></span>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            <div class="px-4 py-2.5 rounded-xl bg-[#E4F2E7] text-[#235332] text-[12.5px] font-semibold">
+              ${toPersianDigits(heldList.length)} جلسه برگزار شده
+            </div>
+            <div class="px-4 py-2.5 rounded-xl bg-[#EFE0CC] text-[#6E4526] text-[12.5px] font-semibold">
+              ${toPersianDigits(definedList.length)} جلسه تعریف شده
+            </div>
+          </div>
+        </div>
+
+        <!-- Held Sessions Cards (جلسات برگزار شده) -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="font-display text-[18px] font-bold text-[#231912] flex items-center gap-2.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#2E6F40]"></span>
+              <span>جلسات برگزار شده</span>
+            </h3>
+            <span class="text-[12px] text-[#6B5444]">
+              برای مشاهده موارد بررسی‌شده، نکات جلسه و صفحات خوانده‌شده روی هر کارت کلیک کنید
+            </span>
           </div>
 
-          <!-- Filter Bar -->
-          <div class="flex flex-wrap items-center gap-1.5 bg-[#efe7d6] p-1 rounded-xl border border-[#dfd3be] w-fit">
-            ${(['all', 'در حال مطالعه', 'خوانده‌شده', 'در نوبت مطالعه'] as const)
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            ${heldList
               .map(
-                (st) => `
-              <button
-                type="button"
-                data-status="${st}"
-                class="js-lib-filter px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
-                  libraryFilter === st
-                    ? 'bg-[#382315] text-[#faf6ec]'
-                    : 'text-[#5c4838]'
-                }"
+                (sub) => `
+              <div
+                data-subsession-id="${sub.id}"
+                class="js-open-subsession-modal group p-5 rounded-2xl bg-[#FAF5EC] border border-[#E2D3BF] hover:border-[#2E6F40] hover:shadow-[0_12px_28px_rgba(46,111,64,0.1)] transition-all cursor-pointer flex flex-col justify-between gap-4"
               >
-                ${st === 'all' ? `همه (${toPersianDigits(state.library.length)})` : st}
-              </button>
+                <div>
+                  <div class="flex items-center justify-between gap-2 mb-3">
+                    <span class="px-2.5 py-1 rounded-md text-[11.5px] font-semibold bg-[#E4F2E7] text-[#235332]">
+                      ${toPersianDigits(sub.session_number)} · برگزار شده
+                    </span>
+                    <span class="text-[12px] font-semibold text-[#235332]">
+                      ${toPersianDigits(sub.pages_read || 0)} صفحه خوانده شده
+                    </span>
+                  </div>
+                  <h4 class="font-display text-[16.5px] font-bold text-[#231912] group-hover:text-[#235332] transition-colors mb-2">
+                    ${toPersianDigits(sub.title)}
+                  </h4>
+                  <p class="text-[12.5px] text-[#5B4739] line-clamp-2 leading-[1.8] text-justify">
+                    ${toPersianDigits(sub.session_notes || sub.reviewed_topics || '')}
+                  </p>
+                </div>
+
+                <div class="pt-3 border-t border-[#E6D8C5] flex items-center justify-between text-[12px] text-[#6B5444]">
+                  <span>تاریخ: <strong class="text-[#231912]">${toPersianDigits(sub.session_date)}</strong> · ساعت <strong class="text-[#231912]">${toPersianDigits(sub.session_time)}</strong></span>
+                  <span class="text-[#235332] font-semibold group-hover:translate-x-[-3px] transition-transform">
+                    مشاهده جزئیات جلسه ←
+                  </span>
+                </div>
+              </div>
             `
               )
               .join('')}
           </div>
+        </div>
 
-          <!-- Collapsible Add New Book Form -->
-          <form class="js-add-book-form hidden pt-3 border-t border-[#e5dccb] space-y-3">
-            <h3 class="text-xs font-bold text-[#382315]">افزودن کتاب جدید به کتابخانه من</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <!-- Defined / Upcoming Sessions Cards (جلسات تعریف شده / برگزار نشده) -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="font-display text-[18px] font-bold text-[#231912] flex items-center gap-2.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#7A4B2A]"></span>
+              <span>جلسات تعریف شده (برگزار نشده)</span>
+            </h3>
+            <span class="text-[12px] text-[#6B5444]">
+              برای مشاهده زمان، صفحات مورد نیاز برای مطالعه و لینک ورود روی کارت کلیک کنید
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            ${definedList
+              .map(
+                (sub) => `
+              <div
+                data-subsession-id="${sub.id}"
+                class="js-open-subsession-modal group p-5 rounded-2xl bg-[#FAF5EC] border border-[#E2D3BF] hover:border-[#7A4B2A] hover:shadow-[0_12px_28px_rgba(122,75,42,0.12)] transition-all cursor-pointer flex flex-col justify-between gap-4"
+              >
+                <div>
+                  <div class="flex items-center justify-between gap-2 mb-3">
+                    <span class="px-2.5 py-1 rounded-md text-[11.5px] font-semibold bg-[#EFE0CC] text-[#6E4526]">
+                      ${toPersianDigits(sub.session_number)} · تعریف شده
+                    </span>
+                    <span class="text-[12px] font-semibold text-[#7A4B2A]">
+                      آماده برگزاری
+                    </span>
+                  </div>
+                  <h4 class="font-display text-[16.5px] font-bold text-[#231912] group-hover:text-[#7A4B2A] transition-colors mb-2">
+                    ${toPersianDigits(sub.title)}
+                  </h4>
+                  <p class="text-[12.5px] text-[#5B4739] leading-[1.8] text-justify">
+                    صفحات مورد مطالعه: <strong class="text-[#231912]">${toPersianDigits(sub.pages_to_read || 'اعلام در سرفصل')}</strong>
+                  </p>
+                </div>
+
+                <div class="pt-3 border-t border-[#E6D8C5] flex items-center justify-between text-[12px] text-[#6B5444]">
+                  <span>تاریخ: <strong class="text-[#231912]">${toPersianDigits(sub.session_date)}</strong> · ساعت <strong class="text-[#231912]">${toPersianDigits(sub.session_time)}</strong></span>
+                  <span class="text-[#7A4B2A] font-semibold group-hover:translate-x-[-3px] transition-transform">
+                    مشاهده و لینک ورود ←
+                  </span>
+                </div>
+              </div>
+            `
+              )
+              .join('')}
+          </div>
+        </div>
+
+        ${params.extraFooterHtml || ''}
+      </div>
+    `;
+  }
+
+  function renderSessionsTab(): string {
+    if (selectedSessionId !== null) {
+      const session = state.sessions.find((s) => s.id === selectedSessionId);
+      if (session) {
+        const noteSectionHtml = `
+          <div class="p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5]">
+            <label class="block text-[13px] font-bold text-[#231912] mb-2">
+              یادداشت و پرسش شخصی شما برای این دوره هم‌خوانی:
+            </label>
+            <div class="flex flex-col sm:flex-row gap-2.5">
+              <input
+                type="text"
+                data-session-id="${session.id}"
+                value="${toPersianDigits(session.member_note || '')}"
+                placeholder="یادداشت یا محور مدنظر خود برای طرح در جلسه را بنویسید..."
+                class="js-session-note-input flex-1 px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+              />
+              <button
+                type="button"
+                data-session-id="${session.id}"
+                class="js-save-session-note px-5 py-2.5 rounded-xl border border-[#7A4B2A] text-[#7A4B2A] hover:bg-[#7A4B2A] hover:text-[#FAF5EC] text-[12.5px] font-semibold transition-colors cursor-pointer shrink-0"
+              >
+                ذخیره یادداشت
+              </button>
+            </div>
+          </div>
+        `;
+
+        return renderSubSessionsDetailSection({
+          parentTitle: session.title,
+          bookTitle: session.book_title,
+          mentorLabel: 'تسهیل‌گر',
+          mentorName: session.mentor_name,
+          scheduleText: `${session.session_date} · ساعت ${session.session_time}`,
+          subSessions: session.sub_sessions || [],
+          backButtonClass: 'js-back-to-sessions-list',
+          backButtonLabel: 'بازگشت به کارت‌های جلسات ثبت‌نام شده',
+          extraFooterHtml: noteSectionHtml,
+        });
+      }
+    }
+
+    // Card Grid View for Registered Sessions (Items 5 & 6: No حضوری badge, Card layout, Clickable to enter session detail)
+    return `
+      <div class="space-y-6">
+        <div>
+          <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">
+            جلسات ثبت‌نام شده من
+          </h2>
+          <p class="text-[13.5px] text-[#6B5444] mt-1 text-justify">
+            در این بخش کارت جلسات و حلقه‌های هم‌خوانی که در آن‌ها ثبت‌نام کرده‌اید نمایش داده می‌شود. برای مشاهده جلسات برگزار شده و جلسات تعریف شده روی کارت مورد نظر کلیک کنید.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          ${state.sessions
+            .map((session) => {
+              const heldCount = (session.sub_sessions || []).filter(
+                (s) => s.status === 'برگزار شده'
+              ).length;
+              const definedCount = (session.sub_sessions || []).filter(
+                (s) => s.status === 'تعریف شده'
+              ).length;
+
+              return `
+                <article
+                  data-open-session-id="${session.id}"
+                  class="js-open-session-card group p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] hover:border-[#8B5A36] hover:shadow-[0_14px_34px_rgba(61,46,34,0.1)] transition-all cursor-pointer flex flex-col justify-between gap-5"
+                >
+                  <div>
+                    <div class="flex items-center justify-between gap-2 mb-3.5">
+                      <span class="px-3 py-1 rounded-md text-[11.5px] font-semibold bg-[#E4F2E7] text-[#235332]">
+                        ${toPersianDigits(session.status)}
+                      </span>
+                      <span class="text-[12px] font-semibold text-[#7A4B2A]">
+                        ${toPersianDigits(heldCount + definedCount)} نشست تخصصی
+                      </span>
+                    </div>
+
+                    <h3 class="font-display text-[17.5px] font-bold text-[#231912] group-hover:text-[#7A4B2A] transition-colors leading-[1.6] mb-2.5">
+                      ${toPersianDigits(session.title)}
+                    </h3>
+
+                    <div class="space-y-1.5 text-[12.5px] text-[#5B4739]">
+                      <div>اثر محور جلسه: <strong class="text-[#231912]">${toPersianDigits(session.book_title)}</strong></div>
+                      <div>تسهیل‌گر: <strong class="text-[#231912]">${toPersianDigits(session.mentor_name)}</strong></div>
+                      <div>نشست پیش رو: <strong class="text-[#231912]">${toPersianDigits(session.session_date)} · ساعت ${toPersianDigits(session.session_time)}</strong></div>
+                    </div>
+                  </div>
+
+                  <div class="pt-4 border-t border-[#E6D8C5] space-y-3">
+                    <div class="flex items-center justify-between text-[11.5px]">
+                      <span class="px-2.5 py-1 rounded-md bg-[#E4F2E7]/80 text-[#235332] font-medium">
+                        ${toPersianDigits(heldCount)} جلسه برگزار شده
+                      </span>
+                      <span class="px-2.5 py-1 rounded-md bg-[#EFE0CC]/80 text-[#6E4526] font-medium">
+                        ${toPersianDigits(definedCount)} جلسه تعریف شده
+                      </span>
+                    </div>
+
+                    <div class="w-full py-2.5 rounded-xl bg-[#F3E7D6] group-hover:bg-[#5A3A22] text-[#3F2E21] group-hover:text-[#FAF5EC] text-[12.5px] font-semibold text-center transition-colors">
+                      ورود به صفحه جلسه و مشاهده جزئیات ←
+                    </div>
+                  </div>
+                </article>
+              `;
+            })
+            .join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderClassesTab(): string {
+    if (selectedClassId !== null) {
+      const cls = state.classes.find((c) => c.id === selectedClassId);
+      if (cls) {
+        return renderSubSessionsDetailSection({
+          parentTitle: cls.title,
+          bookTitle: cls.book_title,
+          mentorLabel: 'مدرس دوره',
+          mentorName: cls.instructor_name,
+          scheduleText: cls.schedule_summary,
+          subSessions: cls.sub_sessions || [],
+          backButtonClass: 'js-back-to-classes-list',
+          backButtonLabel: 'بازگشت به لیست کلاس‌های من',
+        });
+      }
+    }
+
+    return `
+      <div class="space-y-6">
+        <div>
+          <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">
+            کلاس‌های من
+          </h2>
+          <p class="text-[13.5px] text-[#6B5444] mt-1 text-justify">
+            کارگاه‌ها و کلاس‌های آموزشی ثبت‌نام شده شما در باشگاه کتابخوانی بوک‌میت. با کلیک بر روی هر کارت می‌توانید وارد صفحه کلاس شده و جلسات برگزار شده و تعریف شده را بررسی نمایید.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          ${state.classes
+            .map((cls) => {
+              const heldCount = (cls.sub_sessions || []).filter(
+                (s) => s.status === 'برگزار شده'
+              ).length;
+              const definedCount = (cls.sub_sessions || []).filter(
+                (s) => s.status === 'تعریف شده'
+              ).length;
+
+              return `
+                <article
+                  data-open-class-id="${cls.id}"
+                  class="js-open-class-card group p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] hover:border-[#8B5A36] hover:shadow-[0_14px_34px_rgba(61,46,34,0.1)] transition-all cursor-pointer flex flex-col justify-between gap-5"
+                >
+                  <div>
+                    <div class="flex items-center justify-between gap-2 mb-3">
+                      <span class="px-3 py-1 rounded-md text-[11.5px] font-semibold bg-[#E4F2E7] text-[#235332]">
+                        ${toPersianDigits(cls.status)}
+                      </span>
+                      <span class="px-2.5 py-1 rounded-md text-[11.5px] font-semibold bg-[#F3E7D6] text-[#6E4526]">
+                        سطح ${toPersianDigits(cls.level_label)}
+                      </span>
+                    </div>
+
+                    <h3 class="font-display text-[18px] font-bold text-[#231912] group-hover:text-[#7A4B2A] transition-colors mb-2">
+                      ${toPersianDigits(cls.title)}
+                    </h3>
+
+                    <p class="text-[13px] text-[#5B4739] leading-[1.85] text-justify mb-3">
+                      ${toPersianDigits(cls.description)}
+                    </p>
+
+                    <div class="space-y-1 text-[12.5px] text-[#5B4739]">
+                      <div>متن آموزشی: <strong class="text-[#231912]">${toPersianDigits(cls.book_title)}</strong></div>
+                      <div>مدرس دوره: <strong class="text-[#231912]">${toPersianDigits(cls.instructor_name)}</strong></div>
+                      <div>زمان‌بندی: <strong class="text-[#231912]">${toPersianDigits(cls.schedule_summary)}</strong></div>
+                    </div>
+                  </div>
+
+                  <div class="pt-4 border-t border-[#E6D8C5] space-y-3">
+                    <div class="flex items-center justify-between text-[11.5px]">
+                      <span class="px-2.5 py-1 rounded-md bg-[#E4F2E7]/80 text-[#235332] font-medium">
+                        ${toPersianDigits(heldCount)} جلسه برگزار شده
+                      </span>
+                      <span class="px-2.5 py-1 rounded-md bg-[#EFE0CC]/80 text-[#6E4526] font-medium">
+                        ${toPersianDigits(definedCount)} جلسه تعریف شده
+                      </span>
+                    </div>
+
+                    <div class="w-full py-2.5 rounded-xl bg-[#F3E7D6] group-hover:bg-[#5A3A22] text-[#3F2E21] group-hover:text-[#FAF5EC] text-[12.5px] font-semibold text-center transition-colors">
+                      ورود به کلاس و مشاهده جلسات ←
+                    </div>
+                  </div>
+                </article>
+              `;
+            })
+            .join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderLibraryTab(): string {
+    return `
+      <div class="space-y-8">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">
+              کتابخانه شخصی من
+            </h2>
+            <p class="text-[13.5px] text-[#6B5444] mt-1 text-justify">
+              با وارد کردن تعداد صفحات خوانده شده هر کتاب و کلیک بر روی دکمه «ثبت تغییرات»، نوار پیشرفت مطالعه (پروگرس بار) به صورت خودکار محاسبه و بروزرسانی می‌شود.
+            </p>
+          </div>
+        </div>
+
+        <!-- Books Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          ${state.library
+            .map((book) => {
+              const totalPages = Math.max(1, book.pages_count || 320);
+              const pagesRead = Math.min(
+                totalPages,
+                Math.max(
+                  0,
+                  book.pages_read !== undefined
+                    ? book.pages_read
+                    : Math.round(((book.progress_percent || 0) * totalPages) / 100)
+                )
+              );
+              const percent = Math.min(
+                100,
+                Math.round((pagesRead / totalPages) * 100)
+              );
+
+              return `
+            <div
+              data-book-card-id="${book.id}"
+              class="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col justify-between gap-4 shadow-[0_6px_20px_rgba(61,46,34,0.04)]"
+            >
+              <div class="flex items-start gap-4">
+                <img
+                  src="${book.cover_url}"
+                  alt="${book.book_title}"
+                  class="w-20 h-28 object-cover rounded-xl border border-[#D8C5AC] shrink-0"
+                />
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between gap-2 mb-1">
+                    <h3 class="font-display text-[17px] font-bold text-[#231912] truncate">
+                      ${toPersianDigits(book.book_title)}
+                    </h3>
+                    <span class="text-[11px] px-2.5 py-0.5 rounded-md bg-[#EFE3D2] text-[#5C4330] shrink-0">
+                      ${toPersianDigits(totalPages)} صفحه
+                    </span>
+                  </div>
+                  <p class="text-[12.5px] text-[#6B5444]">
+                    ${toPersianDigits(book.author)} · ترجمه ${toPersianDigits(book.translator)}
+                  </p>
+
+                  <!-- Animated Progress Bar -->
+                  <div class="mt-3.5">
+                    <div class="flex items-center justify-between text-[12px] text-[#4E3B2D] mb-1.5">
+                      <span>
+                        صفحات خوانده شده:
+                        <strong class="js-book-pages-read-label text-[#231912]">${toPersianDigits(pagesRead)}</strong>
+                        از ${toPersianDigits(totalPages)} صفحه
+                      </span>
+                      <strong
+                        data-book-id="${book.id}"
+                        class="js-book-progress-label text-[13px] font-bold text-[#7A4B2A]"
+                      >${toPersianDigits(percent)}٪</strong>
+                    </div>
+                    <div class="w-full h-2.5 rounded-full bg-[#E5D5C0] overflow-hidden p-0.5">
+                      <div
+                        data-book-id="${book.id}"
+                        data-total-pages="${totalPages}"
+                        class="js-book-progress-bar h-full rounded-full bg-gradient-to-l from-[#8B5A36] to-[#5A3A22] transition-all duration-700 ease-out"
+                        style="width: ${percent}%"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Controls: Pages Read Input + Status + Note -->
+              <div class="pt-3.5 border-t border-[#E6D8C5] space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[11.5px] font-semibold text-[#5E493A] mb-1">
+                      تعداد صفحات خوانده شده (از ${toPersianDigits(totalPages)}):
+                    </label>
+                    <input
+                      type="text"
+                      inputmode="numeric"
+                      data-book-id="${book.id}"
+                      data-total-pages="${totalPages}"
+                      value="${toPersianDigits(pagesRead)}"
+                      placeholder="مثلاً ${toPersianDigits(Math.min(120, totalPages))}"
+                      class="js-book-pages-read-input w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[13px] font-bold text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11.5px] font-semibold text-[#5E493A] mb-1">
+                      وضعیت مطالعه:
+                    </label>
+                    <select
+                      data-book-id="${book.id}"
+                      class="js-book-status-select w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[12.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                    >
+                      <option value="در حال مطالعه" ${book.reading_status === 'در حال مطالعه' ? 'selected' : ''}>در حال مطالعه</option>
+                      <option value="خوانده‌شده" ${book.reading_status === 'خوانده‌شده' ? 'selected' : ''}>خوانده‌شده</option>
+                      <option value="در نوبت مطالعه" ${book.reading_status === 'در نوبت مطالعه' ? 'selected' : ''}>در نوبت مطالعه</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11.5px] font-semibold text-[#5E493A] mb-1">
+                    یادداشت و برداشت شخصی:
+                  </label>
+                  <input
+                    type="text"
+                    data-book-id="${book.id}"
+                    value="${toPersianDigits(book.personal_note || '')}"
+                    placeholder="برداشت شخصی یا نکته کلیدی کتاب..."
+                    class="js-book-note-input w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[12.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                  />
+                </div>
+
+                <div class="flex justify-end">
+                  <button
+                    type="button"
+                    data-book-id="${book.id}"
+                    data-total-pages="${totalPages}"
+                    class="js-save-book-btn px-5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold transition-colors cursor-pointer"
+                  >
+                    ثبت تغییرات
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+            })
+            .join('')}
+        </div>
+
+        <!-- Add New Book Form -->
+        <div class="p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5]">
+          <h3 class="font-display text-[17px] font-bold text-[#231912] mb-4">
+            افزودن کتاب جدید به کتابخانه شخصی
+          </h3>
+          <form class="js-add-book-form grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">عنوان کتاب *</label>
               <input
                 type="text"
                 name="book_title"
                 required
-                placeholder="عنوان کتاب (مثلاً: ابله)"
-                class="px-3 py-2 text-xs bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d]"
+                placeholder="مثلاً: جنایت و مکافات"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
               />
+            </div>
+            <div>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">نویسنده *</label>
               <input
                 type="text"
                 name="author"
                 required
-                placeholder="نام نویسنده (مثلاً: داستایفسکی)"
-                class="px-3 py-2 text-xs bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d]"
+                placeholder="مثلاً: فئودور داستایفسکی"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
               />
+            </div>
+            <div>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">مترجم</label>
               <input
                 type="text"
                 name="translator"
-                placeholder="نام مترجم (مثلاً: سروش حبیبی)"
-                class="px-3 py-2 text-xs bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d]"
+                placeholder="مثلاً: مهری آهی"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
               />
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">تعداد صفحات</label>
+              <input
+                type="number"
+                name="pages_count"
+                value="350"
+                min="20"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+              />
+            </div>
+            <div>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">وضعیت مطالعه</label>
               <select
                 name="reading_status"
-                class="px-3 py-2 text-xs bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d]"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
               >
-                <option value="در حال مطالعه">در حال مطالعه</option>
                 <option value="در نوبت مطالعه">در نوبت مطالعه</option>
+                <option value="در حال مطالعه">در حال مطالعه</option>
                 <option value="خوانده‌شده">خوانده‌شده</option>
               </select>
-              <input
-                type="text"
-                name="pages_count"
-                placeholder="تعداد صفحات (مثلاً: ۴۵۰)"
-                class="px-3 py-2 text-xs bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d]"
-              />
+            </div>
+            <div>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">یادداشت کوتاه</label>
               <input
                 type="text"
                 name="personal_note"
-                placeholder="یادداشت کوتاه درباره کتاب..."
-                class="px-3 py-2 text-xs bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d]"
+                placeholder="هدف از مطالعه یا یادداشت..."
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
               />
             </div>
-            <div class="flex justify-end gap-2">
+            <div class="sm:col-span-2 lg:col-span-3 flex justify-end pt-1">
               <button
                 type="submit"
-                class="px-4 py-2 text-xs font-bold text-[#382315] border border-[#8c6f56] hover:border-[#23180f] rounded-xl cursor-pointer bg-transparent"
+                class="px-5 py-2.5 rounded-xl border border-[#7A4B2A] text-[#7A4B2A] hover:bg-[#7A4B2A] hover:text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer"
               >
-                ثبت کتاب در قفسه من
+                + افزودن کتاب به قفسه من
               </button>
             </div>
           </form>
         </div>
-
-        <div class="js-member-books-grid grid grid-cols-1 md:grid-cols-2 gap-5"></div>
       </div>
-    `);
-
-    $view.find('.js-toggle-add-book').on('click', () => {
-      $view.find('.js-add-book-form').toggleClass('hidden');
-    });
-
-    $view.find('.js-lib-filter').on('click', function () {
-      libraryFilter = $(this).attr('data-status') as typeof libraryFilter;
-      renderLibrarySection();
-    });
-
-    $view.find('.js-add-book-form').on('submit', function (e) {
-      e.preventDefault();
-      const $f = $(this);
-      const book_title = String($f.find('input[name="book_title"]').val() || '').trim();
-      const author = String($f.find('input[name="author"]').val() || '').trim();
-      const translator = String($f.find('input[name="translator"]').val() || '').trim();
-      const reading_status = String(
-        $f.find('select[name="reading_status"]').val() || 'در حال مطالعه'
-      ) as MemberLibraryItem['reading_status'];
-      const pages_count =
-        parseInt(
-          String($f.find('input[name="pages_count"]').val() || '320').replace(
-            /[۰-۹]/g,
-            (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
-          ),
-          10
-        ) || 320;
-      const personal_note = String(
-        $f.find('input[name="personal_note"]').val() || ''
-      ).trim();
-
-      ApiService.addMemberLibraryBook({
-        book_title,
-        author,
-        translator,
-        reading_status,
-        pages_count,
-        personal_note,
-      }).then((res) => {
-        state.library.unshift(res.book);
-        renderSidebar();
-        renderLibrarySection();
-      });
-    });
-
-    const $grid = $view.find('.js-member-books-grid');
-    filteredBooks.forEach((book: MemberLibraryItem) => {
-      const $card = $(`
-        <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-2xl p-5 flex flex-col justify-between space-y-4">
-          <div class="flex items-start gap-4">
-            <img
-              src="${book.cover_url}"
-              alt="${toPersianDigits(book.book_title)}"
-              class="w-20 h-28 object-cover rounded-xl border border-[#d8cbb4] shrink-0 shadow-sm"
-            />
-            <div class="space-y-1.5 flex-1">
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-[10.5px] font-bold px-2.5 py-0.5 rounded-md bg-[#ebe2cf] text-[#5a422e]">
-                  ${toPersianDigits(book.reading_status)}
-                </span>
-                <span class="text-[11px] text-[#8a7562]">
-                  ${toPersianDigits(book.pages_count)} صفحه
-                </span>
-              </div>
-              <h3 class="text-base font-bold text-[#2c1b0e]">
-                ${toPersianDigits(book.book_title)}
-              </h3>
-              <div class="text-xs text-[#6e5947]">
-                ${toPersianDigits(book.author)} · ترجمه ${toPersianDigits(book.translator)}
-              </div>
-              <p class="text-xs text-[#4e3d2f] leading-6 text-justify pt-1" style="text-align: justify; text-justify: inter-word;">
-                ${toPersianDigits(book.personal_note)}
-              </p>
-            </div>
-          </div>
-
-          <div class="space-y-2.5 pt-3 border-t border-[#e8dfd0]">
-            <div class="flex items-center justify-between text-xs font-semibold text-[#382315]">
-              <span>پیشرفت مطالعه من:</span>
-              <span class="js-book-prog-label">٪${toPersianDigits(book.progress_percent)}</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value="${book.progress_percent}"
-              class="js-book-prog-range w-full accent-[#382315] cursor-pointer"
-            />
-            <div class="flex items-center justify-between gap-2 pt-1">
-              <select class="js-book-status-select px-2.5 py-1 text-xs bg-white border border-[#d5c8b2] rounded-lg text-[#2c1f14]">
-                <option value="در حال مطالعه" ${book.reading_status === 'در حال مطالعه' ? 'selected' : ''}>در حال مطالعه</option>
-                <option value="خوانده‌شده" ${book.reading_status === 'خوانده‌شده' ? 'selected' : ''}>خوانده‌شده</option>
-                <option value="در نوبت مطالعه" ${book.reading_status === 'در نوبت مطالعه' ? 'selected' : ''}>در نوبت مطالعه</option>
-              </select>
-              <button
-                type="button"
-                class="js-save-book-prog px-3.5 py-1.5 text-xs font-bold text-[#382315] border border-[#8c6f56] hover:border-[#23180f] rounded-xl cursor-pointer bg-transparent"
-              >
-                ثبت تغییرات
-              </button>
-            </div>
-          </div>
-        </div>
-      `);
-
-      $card.find('.js-book-prog-range').on('input', function () {
-        const val = Number($(this).val() || 0);
-        $card.find('.js-book-prog-label').text(`٪${toPersianDigits(val)}`);
-      });
-
-      $card.find('.js-save-book-prog').on('click', function () {
-        const $btn = $(this);
-        const progress_percent = Number(
-          $card.find('.js-book-prog-range').val() || 0
-        );
-        const reading_status = String(
-          $card.find('.js-book-status-select').val() || book.reading_status
-        ) as MemberLibraryItem['reading_status'];
-
-        $btn.prop('disabled', true).text('در حال ثبت...');
-        ApiService.updateMemberLibraryBook({
-          bookId: book.id,
-          progress_percent: reading_status === 'خوانده‌شده' ? 100 : progress_percent,
-          reading_status,
-          personal_note: book.personal_note,
-        })
-          .then((res) => {
-            book.progress_percent = res.book.progress_percent;
-            book.reading_status = res.book.reading_status;
-            renderLibrarySection();
-          })
-          .finally(() => {
-            $btn.prop('disabled', false).text('ثبت تغییرات');
-          });
-      });
-
-      $grid.append($card);
-    });
-
-    $content.empty().append($view);
+    `;
   }
 
-  // =========================================================================
-  // 4. TICKETS VIEW (تیکت)
-  // =========================================================================
-  function renderTicketsSection(): void {
-    const $view = $(`
-      <div class="space-y-6">
-        <!-- Submit New Ticket Card -->
-        <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-2xl p-5 sm:p-6 space-y-4">
-          <div>
-            <h2 class="text-base sm:text-lg font-bold text-[#382315]">ارسال تیکت جدید به دبیرخانه باشگاه</h2>
-            <p class="text-xs text-[#645140] mt-1 text-justify">
-              پرسش‌ها، درخواست‌های مربوط به حلقه‌های مطالعاتی یا پیشنهاد کتاب برای دوره‌های آینده را از طریق تیکت ثبت نمایید.
-            </p>
-          </div>
+  function renderTicketsTab(): string {
+    return `
+      <div class="space-y-8">
+        <div>
+          <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">
+            تیکت‌ها و پشتیبانی اعضا
+          </h2>
+          <p class="text-[13.5px] text-[#6B5444] mt-1 text-justify">
+            پرسش‌ها، درخواست جابه‌جایی حلقه مطالعاتی یا پیشنهاد کتاب برای دوره‌های آینده را از طریق ارسال تیکت مستقیم با دبیرخانه باشگاه در میان بگذارید.
+          </p>
+        </div>
 
-          <form class="js-ticket-form space-y-3">
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div class="sm:col-span-1">
-                <label class="block text-xs font-semibold text-[#4f3f31] mb-1">عنوان تیکت</label>
+        <!-- New Ticket Form -->
+        <div class="p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5]">
+          <h3 class="font-display text-[17px] font-bold text-[#231912] mb-4">
+            ارسال تیکت جدید به دبیرخانه
+          </h3>
+          <form class="js-create-ticket-form space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">موضوع تیکت *</label>
                 <input
                   type="text"
                   name="subject"
                   required
-                  placeholder="موضوع درخواست..."
-                  class="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d]"
+                  placeholder="عنوان درخواست یا پرسش..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
                 />
               </div>
               <div>
-                <label class="block text-xs font-semibold text-[#4f3f31] mb-1">بخش مربوطه</label>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">بخش مربوطه</label>
                 <select
                   name="department"
-                  class="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d]"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
                 >
-                  <option value="حلقه‌های مطالعاتی">حلقه‌های مطالعاتی</option>
-                  <option value="دبیرخانه باشگاه">دبیرخانه باشگاه</option>
-                  <option value="پیشنهاد کتاب">پیشنهاد کتاب</option>
-                  <option value="پشتیبانی فنی">پشتیبانی فنی</option>
+                  <option value="امور اعضا و نشست‌ها">امور اعضا و نشست‌ها</option>
+                  <option value="شورای انتخاب کتاب">شورای انتخاب کتاب</option>
+                  <option value="پشتیبانی فنی و پنل">پشتیبانی فنی و پنل</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-semibold text-[#4f3f31] mb-1">اولویت</label>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">سطح اولویت</label>
                 <select
                   name="priority"
-                  class="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d]"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
                 >
                   <option value="عادی">عادی</option>
                   <option value="مهم">مهم</option>
@@ -847,23 +1085,20 @@ export function createMemberPanelPageComponent(
                 </select>
               </div>
             </div>
-
             <div>
-              <label class="block text-xs font-semibold text-[#4f3f31] mb-1">متن پیام تیکت</label>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">متن پیام *</label>
               <textarea
                 name="message"
                 rows="3"
                 required
                 placeholder="شرح کامل پیام یا درخواست خود را بنویسید..."
-                class="w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d] text-justify"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
               ></textarea>
             </div>
-
-            <div class="flex items-center justify-between">
-              <span class="js-ticket-feedback hidden text-xs text-emerald-800">تیکت شما با موفقیت ثبت شد ✓</span>
+            <div class="flex justify-end">
               <button
                 type="submit"
-                class="js-submit-ticket mr-auto px-5 py-2 text-xs font-bold text-[#382315] border border-[#8c6f56] hover:border-[#23180f] rounded-xl cursor-pointer bg-transparent"
+                class="px-5 py-2.5 rounded-xl border border-[#7A4B2A] text-[#7A4B2A] hover:bg-[#7A4B2A] hover:text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer"
               >
                 ثبت و ارسال تیکت
               </button>
@@ -871,452 +1106,684 @@ export function createMemberPanelPageComponent(
           </form>
         </div>
 
-        <!-- Tickets History List -->
+        <!-- Tickets History -->
         <div class="space-y-4">
-          <h3 class="text-sm sm:text-base font-bold text-[#382315]">
-            تیکت‌های ثبت‌شده من (${toPersianDigits(state.tickets.length)})
-          </h3>
-          <div class="js-tickets-list space-y-4"></div>
+          ${state.tickets
+            .map(
+              (ticket) => `
+            <div class="p-5 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] space-y-4">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2.5">
+                  <span class="font-mono text-[12px] font-bold px-2.5 py-1 rounded-md bg-[#EFE3D2] text-[#4E3B2D]">
+                    #${toPersianDigits(ticket.ticket_code)}
+                  </span>
+                  <h4 class="font-display text-[16px] font-bold text-[#231912]">
+                    ${toPersianDigits(ticket.subject)}
+                  </h4>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-[11.5px] px-2.5 py-0.5 rounded-md bg-[#F3E9DA] text-[#6B5444]">
+                    ${toPersianDigits(ticket.department)}
+                  </span>
+                  <span class="text-[11.5px] px-2.5 py-0.5 rounded-md font-semibold ${
+                    ticket.status === 'پاسخ داده‌شده'
+                      ? 'bg-[#E4F2E7] text-[#235332]'
+                      : 'bg-[#FFF3CD] text-[#7A5A10]'
+                  }">
+                    ${toPersianDigits(ticket.status)}
+                  </span>
+                </div>
+              </div>
+
+              <p class="text-[13.5px] text-[#3D2E22] leading-[1.85] text-justify bg-[#F4E9DA]/45 p-3.5 rounded-xl border border-[#E8DAC6]">
+                ${toPersianDigits(ticket.message)}
+              </p>
+
+              ${
+                ticket.admin_reply
+                  ? `
+                <div class="p-4 rounded-xl bg-[#EDF5EE] border border-[#C7DFCB]">
+                  <span class="block text-[11.5px] font-bold text-[#235332] mb-1">
+                    پاسخ دبیرخانه باشگاه بوک‌میت:
+                  </span>
+                  <p class="text-[13px] text-[#2B4732] leading-[1.85] text-justify">
+                    ${toPersianDigits(ticket.admin_reply)}
+                  </p>
+                </div>
+              `
+                  : ''
+              }
+            </div>
+          `
+            )
+            .join('')}
         </div>
       </div>
-    `);
-
-    const $list = $view.find('.js-tickets-list');
-    state.tickets.forEach((ticket: MemberTicket) => {
-      const isAnswered = ticket.status === 'پاسخ داده‌شده';
-      $list.append(`
-        <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-2xl p-5 space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#e6dccb] pb-2.5">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="text-xs font-bold text-[#2c1b0e]">${toPersianDigits(ticket.subject)}</span>
-              <span class="text-[11px] px-2 py-0.5 rounded bg-[#efe7d6] text-[#5c4838]">
-                ${toPersianDigits(ticket.ticket_code)}
-              </span>
-            </div>
-            <div class="flex items-center gap-2 text-[11px]">
-              <span class="px-2.5 py-0.5 rounded-md font-semibold ${
-                isAnswered
-                  ? 'bg-emerald-900/15 text-emerald-900'
-                  : 'bg-amber-900/15 text-amber-900'
-              }">${toPersianDigits(ticket.status)}</span>
-              <span class="text-[#7a6451]">${toPersianDigits(ticket.department)} · ${toPersianDigits(ticket.created_at)}</span>
-            </div>
-          </div>
-
-          <p class="text-xs sm:text-[13px] text-[#4e3d2f] leading-6 text-justify" style="text-align: justify; text-justify: inter-word;">
-            ${toPersianDigits(ticket.message)}
-          </p>
-
-          <div class="bg-[#f2ecde] border-r-4 border-[#6b4c32] rounded-l-xl p-3.5 space-y-1">
-            <div class="text-[11px] font-bold text-[#382315]">پاسخ دبیرخانه باشگاه بوک‌میت:</div>
-            <p class="text-xs text-[#4a392b] leading-6 text-justify" style="text-align: justify; text-justify: inter-word;">
-              ${toPersianDigits(ticket.admin_reply)}
-            </p>
-          </div>
-        </div>
-      `);
-    });
-
-    $view.find('.js-ticket-form').on('submit', function (e) {
-      e.preventDefault();
-      const $f = $(this);
-      const subject = String($f.find('input[name="subject"]').val() || '').trim();
-      const department = String(
-        $f.find('select[name="department"]').val() || 'دبیرخانه باشگاه'
-      );
-      const priority = String(
-        $f.find('select[name="priority"]').val() || 'عادی'
-      ) as MemberTicket['priority'];
-      const message = String($f.find('textarea[name="message"]').val() || '').trim();
-
-      const $btn = $f.find('.js-submit-ticket');
-      $btn.prop('disabled', true).text('در حال ارسال...');
-
-      ApiService.createMemberTicket({
-        member_phone: state.member.phone,
-        subject,
-        department,
-        priority,
-        message,
-      })
-        .then((res) => {
-          state.tickets.unshift(res.ticket);
-          renderSidebar();
-          renderTicketsSection();
-        })
-        .finally(() => {
-          $btn.prop('disabled', false).text('ثبت و ارسال تیکت');
-        });
-    });
-
-    $content.empty().append($view);
+    `;
   }
 
-  // =========================================================================
-  // 5. PROFILE VIEW (پروفایل)
-  // =========================================================================
-  function renderProfileSection(): void {
-    const m = state.member;
-    const $view = $(`
-      <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-2xl p-5 sm:p-6 space-y-5">
-        <div class="border-b border-[#e6dccb] pb-3 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 class="text-base sm:text-lg font-bold text-[#382315]">اطلاعات پروفایل کاربری</h2>
-            <p class="text-xs text-[#645140] mt-0.5 text-justify">
-              مشخصات فردی، مقطع تحصیلی و معرفی کوتاه خود در باشگاه کتابخوانی بوک‌میت را ویرایش و ذخیره نمایید.
-            </p>
-          </div>
-          <span class="text-xs font-semibold text-[#6e5947] bg-[#efe7d6] px-3 py-1 rounded-lg">
-            کد عضویت: ${toPersianDigits(m.membership_code || 'BM-۱۴۰۵-۱۰۸')}
-          </span>
+  function renderProfileTab(): string {
+    return `
+      <div class="space-y-6">
+        <div>
+          <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">
+            پرونده و پروفایل کاربری
+          </h2>
+          <p class="text-[13.5px] text-[#6B5444] mt-1 text-justify">
+            اطلاعات فردی، سوابق تحصیلی و ژانرهای مورد علاقه خود را در این بخش مشاهده و ویرایش کنید.
+          </p>
         </div>
 
-        <form class="js-profile-form space-y-4">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <form class="js-profile-form p-6 sm:p-8 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] space-y-5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label class="block text-xs font-semibold text-[#4f3f31] mb-1">نام</label>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">نام *</label>
               <input
                 type="text"
                 name="first_name"
                 required
-                value="${toPersianDigits(m.first_name)}"
-                class="w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d]"
+                value="${state.member.first_name}"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
               />
             </div>
             <div>
-              <label class="block text-xs font-semibold text-[#4f3f31] mb-1">نام خانوادگی</label>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">نام خانوادگی *</label>
               <input
                 type="text"
                 name="last_name"
                 required
-                value="${toPersianDigits(m.last_name)}"
-                class="w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d]"
+                value="${state.member.last_name}"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
               />
             </div>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-semibold text-[#4f3f31] mb-1">شماره تلفن همراه</label>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">شماره همراه (شناسه کاربری)</label>
               <input
-                type="tel"
+                type="text"
                 name="phone"
-                required
-                value="${toPersianDigits(m.phone)}"
-                class="js-persian-phone w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d]"
+                readonly
+                value="${toPersianDigits(state.member.phone)}"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#EAE0D2] border border-[#D8C7B1] text-[13.5px] text-[#6B5444] cursor-not-allowed"
               />
             </div>
-
-            <!-- Custom Styled Education Dropdown in Profile -->
-            <div class="js-profile-edu-dropdown relative">
-              <label class="block text-xs font-semibold text-[#4f3f31] mb-1">تحصیلات</label>
-              <input type="hidden" name="education" value="${m.education}" />
-              <button
-                type="button"
-                class="js-profile-edu-trigger w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] flex items-center justify-between cursor-pointer"
+            <div>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">مقطع تحصیلی</label>
+              <select
+                name="education"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
               >
-                <span class="js-profile-edu-label font-medium">${toPersianDigits(m.education)}</span>
-                <svg class="w-3.5 h-3.5 text-[#7a6451]" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="5 7.5 10 12.5 15 7.5"></polyline>
-                </svg>
-              </button>
-              <div class="js-profile-edu-menu hidden absolute right-0 left-0 top-full mt-1 z-30 bg-[#faf6ec] border border-[#cfc0a9] rounded-xl shadow-lg py-1">
-                ${EDUCATION_OPTIONS.map(
-                  (opt) => `
-                  <button
-                    type="button"
-                    data-val="${opt}"
-                    class="js-profile-edu-opt w-full text-right px-3.5 py-1.5 text-xs font-medium text-[#3d2c1e] hover:bg-[#ece2cf] flex items-center justify-between cursor-pointer"
-                  >
-                    <span>${opt}</span>
-                    <span class="${m.education === opt ? 'opacity-100' : 'opacity-0'} text-[#6e492d]">✓</span>
-                  </button>
-                `
-                ).join('')}
-              </div>
+                ${['دیپلم', 'کاردانی', 'کارشناسی', 'کارشناسی ارشد', 'دکتری', 'حوزوی / پژوهشی آزاد']
+                  .map(
+                    (lvl) =>
+                      `<option value="${lvl}" ${state.member.education === lvl ? 'selected' : ''}>${lvl}</option>`
+                  )
+                  .join('')}
+              </select>
             </div>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-semibold text-[#4f3f31] mb-1">پست الکترونیک</label>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">حوزه مورد علاقه کتاب</label>
               <input
-                type="email"
-                name="email"
-                value="${m.email || 'member@bookmeet.ir'}"
-                class="w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d]"
+                type="text"
+                name="favorite_genre"
+                value="${state.member.favorite_genre || ''}"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
               />
             </div>
             <div>
-              <label class="block text-xs font-semibold text-[#4f3f31] mb-1">شهر محل سکونت</label>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">شهر محل سکونت</label>
               <input
                 type="text"
                 name="city"
-                value="${toPersianDigits(m.city || 'تهران')}"
-                class="w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d]"
+                value="${state.member.city || 'تهران'}"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
               />
+            </div>
+            <div class="sm:col-span-2 lg:col-span-3">
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">پست الکترونیک</label>
+              <input
+                type="email"
+                name="email"
+                value="${state.member.email || ''}"
+                placeholder="name@example.com"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+              />
+            </div>
+            <div class="sm:col-span-2 lg:col-span-3">
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">درباره من و دغدغه‌های مطالعاتی</label>
+              <textarea
+                name="bio"
+                rows="3"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+              >${state.member.bio || ''}</textarea>
             </div>
           </div>
 
-          <div>
-            <label class="block text-xs font-semibold text-[#4f3f31] mb-1">درباره من و دغدغه‌های مطالعاتی</label>
-            <textarea
-              name="bio"
-              rows="3"
-              class="w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-[#d5c8b2] rounded-xl text-[#2c1f14] focus:outline-none focus:border-[#6e492d] text-justify"
-            >${toPersianDigits(m.bio || '')}</textarea>
-          </div>
-
-          <div class="pt-2 border-t border-[#e8dfd0] flex items-center justify-between">
-            <span class="js-profile-saved hidden text-xs text-emerald-800 font-semibold">
-              اطلاعات پروفایل شما با موفقیت در دیتابیس بروزرسانی شد ✓
-            </span>
+          <div class="flex justify-end pt-2">
             <button
               type="submit"
-              class="js-save-profile mr-auto px-5 py-2 text-xs font-bold text-[#382315] border border-[#8c6f56] hover:border-[#23180f] rounded-xl cursor-pointer bg-transparent"
+              class="px-6 py-2.5 rounded-xl border border-[#7A4B2A] text-[#7A4B2A] hover:bg-[#7A4B2A] hover:text-[#FAF5EC] text-[13.5px] font-semibold transition-colors cursor-pointer"
             >
               ذخیره تغییرات پروفایل
             </button>
           </div>
         </form>
       </div>
-    `);
-
-    const $eduTrigger = $view.find('.js-profile-edu-trigger');
-    const $eduMenu = $view.find('.js-profile-edu-menu');
-    const $eduInput = $view.find('input[name="education"]');
-    const $eduLabel = $view.find('.js-profile-edu-label');
-
-    $eduTrigger.on('click', (e) => {
-      e.stopPropagation();
-      $eduMenu.toggleClass('hidden');
-    });
-
-    $view.find('.js-profile-edu-opt').on('click', function (e) {
-      e.stopPropagation();
-      const val = String($(this).attr('data-val') || '');
-      $eduInput.val(val);
-      $eduLabel.text(val);
-      $eduMenu.addClass('hidden');
-    });
-
-    $view.find('.js-persian-phone').on('input', function () {
-      const v = String($(this).val() || '');
-      $(this).val(toPersianDigits(v));
-    });
-
-    $view.find('.js-profile-form').on('submit', function (e) {
-      e.preventDefault();
-      const $f = $(this);
-      const first_name = String($f.find('input[name="first_name"]').val() || '').trim();
-      const last_name = String($f.find('input[name="last_name"]').val() || '').trim();
-      const phone = toPersianDigits(
-        String($f.find('input[name="phone"]').val() || '').trim()
-      );
-      const education = String($eduInput.val() || 'کارشناسی ارشد');
-      const email = String($f.find('input[name="email"]').val() || '').trim();
-      const city = String($f.find('input[name="city"]').val() || '').trim();
-      const bio = String($f.find('textarea[name="bio"]').val() || '').trim();
-
-      const $btn = $f.find('.js-save-profile');
-      $btn.prop('disabled', true).text('در حال ذخیره...');
-
-      ApiService.updateMemberProfile({
-        phone,
-        first_name,
-        last_name,
-        education,
-        favorite_genre: m.favorite_genre || 'ادبیات داستانی و رمان کلاسیک',
-        email,
-        city,
-        bio,
-      })
-        .then((res) => {
-          state.member = res.member;
-          $wrapper
-            .find('.js-header-member-name')
-            .text(
-              `پنل کاربری ${toPersianDigits(res.member.first_name)} ${toPersianDigits(res.member.last_name)}`
-            );
-          $wrapper
-            .find('.js-member-avatar')
-            .text(toPersianDigits((res.member.first_name || 'ع').charAt(0)));
-          if (props.onMemberUpdated) {
-            props.onMemberUpdated(res.member);
-          }
-          $view.find('.js-profile-saved').removeClass('hidden');
-          window.setTimeout(() => {
-            $view.find('.js-profile-saved').addClass('hidden');
-          }, 2500);
-        })
-        .finally(() => {
-          $btn.prop('disabled', false).text('ذخیره تغییرات پروفایل');
-        });
-    });
-
-    $content.empty().append($view);
+    `;
   }
 
-  // =========================================================================
-  // 6. CLUB CALENDAR VIEW (تقویم باشگاه)
-  // =========================================================================
-  function renderCalendarSection(): void {
-    const filteredEvents =
-      calendarFilter === 'all'
-        ? state.calendarEvents
-        : state.calendarEvents.filter((ev) => ev.event_type === calendarFilter);
-
-    const $view = $(`
-      <div class="space-y-5">
-        <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-2xl p-5 space-y-4">
-          <div class="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 class="text-base sm:text-lg font-bold text-[#382315]">تقویم نشست‌ها و رویدادهای باشگاه بوک‌میت</h2>
-              <p class="text-xs text-[#645140] mt-1 text-justify">
-                برنامه زمان‌بندی نشست‌های هم‌خوانی هفتگی، کارگاه‌های خوانش خلاق و جلسات نقد و بررسی در آبان و آذر ۱۴۰۵ به همراه رزرو آنلاین حضور.
-              </p>
-            </div>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-1.5 bg-[#efe7d6] p-1 rounded-xl border border-[#dfd3be] w-fit">
-            ${[
-              'all',
-              'هم‌خوانی هفتگی',
-              'نشست نقد و بررسی',
-              'کارگاه خوانش',
-              'نشست ویژه با مترجم',
-            ]
-              .map(
-                (type) => `
-              <button
-                type="button"
-                data-type="${type}"
-                class="js-cal-filter px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
-                  calendarFilter === type
-                    ? 'bg-[#382315] text-[#faf6ec]'
-                    : 'text-[#5c4838]'
-                }"
-              >
-                ${type === 'all' ? 'همه رویدادها' : type}
-              </button>
-            `
-              )
-              .join('')}
-          </div>
+  function renderCalendarTab(): string {
+    return `
+      <div class="space-y-6">
+        <div>
+          <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">
+            تقویم رویدادها و نشست‌های باشگاه بوک‌میت
+          </h2>
+          <p class="text-[13.5px] text-[#6B5444] mt-1 text-justify">
+            برنامه ماهانه نشست‌های نقد، کارگاه‌های نویسندگی و هم‌خوانی‌های گروهی باشگاه. می‌توانید صندلی خود را در هر رویداد رزرو یا لغو رزرو نمایید.
+          </p>
         </div>
 
-        <div class="js-calendar-grid space-y-4"></div>
+        <div class="space-y-4">
+          ${state.calendarEvents
+            .map(
+              (ev) => `
+            <div class="p-5 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+              <div class="flex items-start gap-4">
+                <div class="w-16 h-18 rounded-2xl bg-[#EFE1CE] border border-[#DEC9AF] flex flex-col items-center justify-center shrink-0 py-2.5 px-2 text-center">
+                  <span class="text-[11px] text-[#7A5C44] font-medium">${toPersianDigits(ev.weekday_name)}</span>
+                  <strong class="font-display text-[22px] font-bold text-[#231912] leading-tight">${toPersianDigits(ev.day_of_month)}</strong>
+                  <span class="text-[11px] text-[#6E4526] font-semibold">${toPersianDigits(ev.month_name)}</span>
+                </div>
+                <div class="space-y-1.5">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-[#F2E5D4] text-[#7A4B2A]">
+                      ${toPersianDigits(ev.event_type)}
+                    </span>
+                    <span class="text-[12px] text-[#6B5444]">
+                      ساعت ${toPersianDigits(ev.time_range)}
+                    </span>
+                  </div>
+                  <h3 class="font-display text-[17px] font-bold text-[#231912]">
+                    ${toPersianDigits(ev.title)}
+                  </h3>
+                  <p class="text-[13px] text-[#4E3B2D] leading-[1.85] text-justify">
+                    ${toPersianDigits(ev.description)}
+                  </p>
+                  <div class="flex flex-wrap items-center gap-x-5 gap-y-1 text-[12px] text-[#6B5444] pt-1">
+                    <span>میزبان: <strong class="text-[#2B1E16]">${toPersianDigits(ev.host_name)}</strong></span>
+                    <span>مکان: <strong class="text-[#2B1E16]">${toPersianDigits(ev.location_label)}</strong></span>
+                    <span>وضعیت ظرفیت: <strong class="text-[#7A4B2A]">${toPersianDigits(ev.capacity_info)}</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="shrink-0 w-full md:w-auto flex justify-end">
+                <button
+                  type="button"
+                  data-event-id="${ev.id}"
+                  class="js-toggle-calendar-reserve px-4 py-2.5 rounded-xl border text-[12.5px] font-semibold transition-colors cursor-pointer ${
+                    ev.is_reserved
+                      ? 'border-[#2E6F40] bg-[#E6F3E9] text-[#235332] hover:bg-[#D7ECD9]'
+                      : 'border-[#7A4B2A] text-[#7A4B2A] hover:bg-[#7A4B2A] hover:text-[#FAF5EC]'
+                  }"
+                >
+                  ${ev.is_reserved ? '✓ رزرو شده (لغو رزرو)' : 'رزرو حضور در رویداد'}
+                </button>
+              </div>
+            </div>
+          `
+            )
+            .join('')}
+        </div>
       </div>
-    `);
-
-    $view.find('.js-cal-filter').on('click', function () {
-      calendarFilter = String($(this).attr('data-type') || 'all');
-      renderCalendarSection();
-    });
-
-    const $grid = $view.find('.js-calendar-grid');
-    filteredEvents.forEach((ev: ClubCalendarEvent) => {
-      const reserved = ev.is_reserved === 1;
-      const $card = $(`
-        <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
-          <div class="flex items-start gap-4 flex-1">
-            <!-- Date Badge Box -->
-            <div class="w-16 h-18 rounded-2xl bg-[#382315] text-[#faf6ec] flex flex-col items-center justify-center shrink-0 p-2 text-center shadow-sm">
-              <span class="text-lg font-extrabold leading-none">${toPersianDigits(ev.day_of_month)}</span>
-              <span class="text-[10.5px] font-medium text-[#e4d8c4] mt-1">${toPersianDigits(ev.month_name)}</span>
-            </div>
-
-            <div class="space-y-1.5 flex-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-[#ebe2cf] text-[#5a422e]">
-                  ${toPersianDigits(ev.event_type)}
-                </span>
-                <span class="text-xs text-[#7a6451]">
-                  ${toPersianDigits(ev.weekday_name)} · ساعت ${toPersianDigits(ev.time_range)}
-                </span>
-                <span class="text-[11px] text-[#8a6a4a] font-medium">
-                  (${toPersianDigits(ev.capacity_info)})
-                </span>
-              </div>
-
-              <h3 class="text-sm sm:text-base font-bold text-[#2c1b0e]">
-                ${toPersianDigits(ev.title)}
-              </h3>
-
-              <p class="text-xs text-[#4e3d2f] leading-6 text-justify" style="text-align: justify; text-justify: inter-word;">
-                ${toPersianDigits(ev.description)}
-              </p>
-
-              <div class="text-[11px] text-[#6e5947] pt-0.5">
-                <strong>میزبان نشست:</strong> ${toPersianDigits(ev.host_name)} · <strong>مکان:</strong> ${toPersianDigits(ev.location_label)}
-              </div>
-            </div>
-          </div>
-
-          <div class="shrink-0 w-full sm:w-auto flex sm:flex-col items-center sm:items-end justify-between gap-2 pt-3 sm:pt-0 border-t sm:border-t-0 border-[#e6dccb]">
-            <button
-              type="button"
-              class="js-reserve-event px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                reserved
-                  ? 'bg-emerald-900/15 text-emerald-900 border border-emerald-800/30 hover:bg-emerald-900/25'
-                  : 'bg-transparent text-[#382315] border border-[#8c6f56] hover:border-[#23180f]'
-              }"
-            >
-              ${reserved ? 'رزرو شده ✓ (لغو رزرو)' : 'رزرو حضور در نشست'}
-            </button>
-          </div>
-        </div>
-      `);
-
-      $card.find('.js-reserve-event').on('click', function () {
-        const $btn = $(this);
-        $btn.prop('disabled', true);
-        ApiService.toggleCalendarReservation(ev.id).then((res) => {
-          ev.is_reserved = res.event.is_reserved;
-          renderSidebar();
-          renderCalendarSection();
-        });
-      });
-
-      $grid.append($card);
-    });
-
-    $content.empty().append($view);
+    `;
   }
 
-  function renderActiveSection(): void {
+  function getActiveTabContent(): string {
     switch (activeTab) {
       case 'dashboard':
-        renderDashboardSection();
-        break;
+        return renderDashboardTab();
       case 'sessions':
-        renderSessionsSection();
-        break;
+        return renderSessionsTab();
+      case 'classes':
+        return renderClassesTab();
       case 'library':
-        renderLibrarySection();
-        break;
+        return renderLibraryTab();
       case 'tickets':
-        renderTicketsSection();
-        break;
+        return renderTicketsTab();
       case 'profile':
-        renderProfileSection();
-        break;
+        return renderProfileTab();
       case 'calendar':
-        renderCalendarSection();
-        break;
+        return renderCalendarTab();
+      default:
+        return renderDashboardTab();
     }
   }
 
-  $wrapper.find('.js-back-to-site-btn').on('click', () => {
+  function render(): void {
+    const navItems: Array<{ key: PanelTabKey; label: string; badge?: string }> = [
+      { key: 'dashboard', label: 'داشبورد' },
+      {
+        key: 'sessions',
+        label: 'جلسات من',
+        badge: toPersianDigits(state.sessions.length),
+      },
+      {
+        key: 'classes',
+        label: 'کلاس‌های من',
+        badge: toPersianDigits(state.classes.length),
+      },
+      {
+        key: 'library',
+        label: 'کتابخانه من',
+        badge: toPersianDigits(state.library.length),
+      },
+      {
+        key: 'tickets',
+        label: 'تیکت',
+        badge: toPersianDigits(state.tickets.length),
+      },
+      { key: 'profile', label: 'پروفایل' },
+      {
+        key: 'calendar',
+        label: 'تقویم باشگاه',
+        badge: toPersianDigits(state.calendarEvents.length),
+      },
+    ];
+
+    $wrapper.html(`
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
+        <!-- Sidebar Navigation -->
+        <aside class="lg:col-span-3 p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] shadow-[0_12px_32px_rgba(61,46,34,0.05)] lg:sticky lg:top-24">
+          <div class="pb-4 mb-4 border-b border-[#E6D8C5] flex items-center gap-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-[#7A4B2A] text-[#FAF5EC] font-display text-[18px] font-bold flex items-center justify-center shrink-0">
+              ${state.member.first_name.charAt(0)}
+            </div>
+            <div class="min-w-0">
+              <h3 class="font-bold text-[15px] text-[#231912] truncate">
+                ${state.member.first_name} ${state.member.last_name}
+              </h3>
+              <span class="text-[12px] text-[#6B5444] block">
+                ${toPersianDigits(state.member.phone)}
+              </span>
+            </div>
+          </div>
+
+          <nav class="space-y-1.5" aria-label="منوی پنل کاربری">
+            ${navItems
+              .map((item) => {
+                const isActive = activeTab === item.key;
+                return `
+                  <button
+                    type="button"
+                    data-tab="${item.key}"
+                    class="js-panel-tab-btn w-full px-4 py-3 rounded-xl text-right text-[13.5px] font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-[#5A3A22] text-[#FAF5EC] shadow-sm'
+                        : 'text-[#3F2E21] hover:bg-[#EFE3D2]'
+                    }"
+                  >
+                    <span>${item.label}</span>
+                    ${
+                      item.badge
+                        ? `<span class="text-[11px] px-2 py-0.5 rounded-md ${
+                            isActive
+                              ? 'bg-[#FAF5EC]/20 text-[#FAF5EC]'
+                              : 'bg-[#E8DAC7] text-[#5C4432]'
+                          }">${item.badge}</span>`
+                        : ''
+                    }
+                  </button>
+                `;
+              })
+              .join('')}
+          </nav>
+
+          <div class="pt-4 mt-4 border-t border-[#E6D8C5] space-y-2">
+            <button
+              type="button"
+              class="js-back-to-home w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#5B4636] hover:bg-[#EFE3D2] text-right transition-colors cursor-pointer"
+            >
+              ← بازگشت به صفحه اصلی سایت
+            </button>
+            <button
+              type="button"
+              class="js-logout-panel w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#9E3329] hover:bg-[#FBEAE8] text-right transition-colors cursor-pointer"
+            >
+              خروج از حساب کاربری
+            </button>
+          </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="lg:col-span-9 min-w-0">
+          ${getActiveTabContent()}
+        </main>
+      </div>
+      ${renderSubSessionModal()}
+    `);
+  }
+
+  // Event Delegations
+  $wrapper.on('click', '.js-panel-tab-btn', function () {
+    const nextTab = $(this).data('tab') as PanelTabKey;
+    if (nextTab) {
+      activeTab = nextTab;
+      selectedSessionId = null;
+      selectedClassId = null;
+      activeSubSessionModal = null;
+      render();
+    }
+  });
+
+  $wrapper.on('click', '.js-switch-tab-btn', function () {
+    const nextTab = $(this).data('switch-tab') as PanelTabKey;
+    if (nextTab) {
+      activeTab = nextTab;
+      selectedSessionId = null;
+      selectedClassId = null;
+      activeSubSessionModal = null;
+      render();
+    }
+  });
+
+  // Open a Session card into Session Detail View (Item 6)
+  $wrapper.on('click', '.js-open-session-card', function () {
+    const sessionId = Number($(this).data('open-session-id'));
+    if (sessionId) {
+      activeTab = 'sessions';
+      selectedSessionId = sessionId;
+      activeSubSessionModal = null;
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  });
+
+  $wrapper.on('click', '.js-back-to-sessions-list', () => {
+    selectedSessionId = null;
+    activeSubSessionModal = null;
+    render();
+  });
+
+  // Open a Class card into Class Detail View (Item 3 & 6)
+  $wrapper.on('click', '.js-open-class-card', function () {
+    const classId = Number($(this).data('open-class-id'));
+    if (classId) {
+      activeTab = 'classes';
+      selectedClassId = classId;
+      activeSubSessionModal = null;
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  });
+
+  $wrapper.on('click', '.js-back-to-classes-list', () => {
+    selectedClassId = null;
+    activeSubSessionModal = null;
+    render();
+  });
+
+  // Open Held / Defined Sub-Session Modal (Items 7 & 8)
+  $wrapper.on('click', '.js-open-subsession-modal', function () {
+    const subId = Number($(this).data('subsession-id'));
+    if (activeTab === 'sessions' && selectedSessionId !== null) {
+      const parent = state.sessions.find((s) => s.id === selectedSessionId);
+      const subItem = parent?.sub_sessions?.find((sub) => sub.id === subId);
+      if (parent && subItem) {
+        activeSubSessionModal = {
+          subItem,
+          parentTitle: parent.title,
+          bookTitle: parent.book_title,
+          mentorName: parent.mentor_name,
+        };
+        render();
+      }
+    } else if (activeTab === 'classes' && selectedClassId !== null) {
+      const parent = state.classes.find((c) => c.id === selectedClassId);
+      const subItem = parent?.sub_sessions?.find((sub) => sub.id === subId);
+      if (parent && subItem) {
+        activeSubSessionModal = {
+          subItem,
+          parentTitle: parent.title,
+          bookTitle: parent.book_title,
+          mentorName: parent.instructor_name,
+        };
+        render();
+      }
+    }
+  });
+
+  // Close Sub-Session Modal on close button or backdrop click
+  $wrapper.on('click', '.js-close-subsession-modal', () => {
+    activeSubSessionModal = null;
+    render();
+  });
+
+  $wrapper.on('click', '.js-subsession-modal-backdrop', function (event) {
+    if ($(event.target).hasClass('js-subsession-modal-backdrop')) {
+      activeSubSessionModal = null;
+      render();
+    }
+  });
+
+  $wrapper.on('click', '.js-back-to-home', () => {
     props.onBackToSite();
   });
 
-  $wrapper.find('.js-logout-btn').on('click', () => {
+  $wrapper.on('click', '.js-logout-panel', () => {
     props.onLogout();
   });
 
-  renderSidebar();
-  renderActiveSection();
+  // Save session note
+  $wrapper.on('click', '.js-save-session-note', function () {
+    const sessionId = Number($(this).data('session-id'));
+    const noteVal = String(
+      $wrapper.find(`.js-session-note-input[data-session-id="${sessionId}"]`).val() || ''
+    );
+    ApiService.saveMemberSessionNote({ sessionId, member_note: noteVal })
+      .then((res) => {
+        state.sessions = state.sessions.map((s) =>
+          s.id === sessionId ? res.session : s
+        );
+        showToast('یادداشت شما برای این دوره با موفقیت ذخیره شد.');
+      })
+      .catch((err) => {
+        showToast(err.message || 'خطا در ذخیره یادداشت', true);
+      });
+  });
 
+  // Save book changes and automatically advance progress bar based on pages_read (Item 9)
+  $wrapper.on('click', '.js-save-book-btn', function () {
+    const bookId = Number($(this).data('book-id'));
+    const totalPages = Math.max(1, Number($(this).data('total-pages') || 320));
+    const $card = $wrapper.find(`[data-book-card-id="${bookId}"]`);
+
+    const rawPagesInput = String(
+      $card.find(`.js-book-pages-read-input[data-book-id="${bookId}"]`).val() || '0'
+    );
+    const clampedPagesRead = Math.min(
+      totalPages,
+      Math.max(0, parseLocalizedInt(rawPagesInput, 0))
+    );
+    const calculatedPercent = Math.min(
+      100,
+      Math.round((clampedPagesRead / totalPages) * 100)
+    );
+
+    let status = String(
+      $card.find(`.js-book-status-select[data-book-id="${bookId}"]`).val() ||
+        'در حال مطالعه'
+    ) as 'در حال مطالعه' | 'خوانده‌شده' | 'در نوبت مطالعه';
+
+    if (calculatedPercent >= 100) {
+      status = 'خوانده‌شده';
+      $card.find(`.js-book-status-select[data-book-id="${bookId}"]`).val('خوانده‌شده');
+    } else if (calculatedPercent > 0 && status === 'در نوبت مطالعه') {
+      status = 'در حال مطالعه';
+      $card.find(`.js-book-status-select[data-book-id="${bookId}"]`).val('در حال مطالعه');
+    }
+
+    const note = String(
+      $card.find(`.js-book-note-input[data-book-id="${bookId}"]`).val() || ''
+    );
+
+    // Normalize input field to Persian digits and animate progress bar immediately
+    $card
+      .find(`.js-book-pages-read-input[data-book-id="${bookId}"]`)
+      .val(toPersianDigits(clampedPagesRead));
+    $card.find('.js-book-pages-read-label').text(toPersianDigits(clampedPagesRead));
+    $card
+      .find(`.js-book-progress-label[data-book-id="${bookId}"]`)
+      .text(`${toPersianDigits(calculatedPercent)}٪`);
+    $card
+      .find(`.js-book-progress-bar[data-book-id="${bookId}"]`)
+      .css('width', `${calculatedPercent}%`);
+
+    ApiService.updateMemberLibraryBook({
+      bookId,
+      pages_read: clampedPagesRead,
+      progress_percent: calculatedPercent,
+      reading_status: status,
+      personal_note: note,
+    })
+      .then((res) => {
+        state.library = state.library.map((b) => (b.id === bookId ? res.book : b));
+        showToast(
+          `تغییرات ثبت شد؛ پیشرفت مطالعه به ${toPersianDigits(res.book.progress_percent)}٪ رسید.`
+        );
+      })
+      .catch((err) => {
+        showToast(err.message || 'خطا در بروزرسانی کتاب', true);
+      });
+  });
+
+  // Add new book
+  $wrapper.on('submit', '.js-add-book-form', function (event) {
+    event.preventDefault();
+    const $form = $(this);
+    const book_title = String($form.find('[name="book_title"]').val() || '').trim();
+    const author = String($form.find('[name="author"]').val() || '').trim();
+    const translator = String($form.find('[name="translator"]').val() || '—').trim();
+    const pages_count = Number($form.find('[name="pages_count"]').val() || 320);
+    const reading_status = String(
+      $form.find('[name="reading_status"]').val() || 'در نوبت مطالعه'
+    ) as 'در حال مطالعه' | 'خوانده‌شده' | 'در نوبت مطالعه';
+    const personal_note = String($form.find('[name="personal_note"]').val() || '').trim();
+
+    if (!book_title || !author) {
+      showToast('لطفاً عنوان کتاب و نام نویسنده را وارد کنید.', true);
+      return;
+    }
+
+    ApiService.addMemberLibraryBook({
+      book_title,
+      author,
+      translator,
+      pages_count,
+      reading_status,
+      personal_note,
+    })
+      .then((res) => {
+        state.library = [...state.library, res.book];
+        render();
+        showToast('کتاب جدید به کتابخانه شخصی شما اضافه شد.');
+      })
+      .catch((err) => {
+        showToast(err.message || 'خطا در افزودن کتاب', true);
+      });
+  });
+
+  // Create ticket
+  $wrapper.on('submit', '.js-create-ticket-form', function (event) {
+    event.preventDefault();
+    const $form = $(this);
+    const subject = String($form.find('[name="subject"]').val() || '').trim();
+    const department = String(
+      $form.find('[name="department"]').val() || 'امور اعضا و نشست‌ها'
+    );
+    const priority = String($form.find('[name="priority"]').val() || 'عادی') as
+      | 'عادی'
+      | 'مهم'
+      | 'فوری';
+    const message = String($form.find('[name="message"]').val() || '').trim();
+
+    if (!subject || !message) {
+      showToast('لطفاً موضوع و متن تیکت را تکمیل کنید.', true);
+      return;
+    }
+
+    ApiService.createMemberTicket({
+      member_phone: state.member.phone,
+      subject,
+      department,
+      priority,
+      message,
+    })
+      .then((res) => {
+        state.tickets = [res.ticket, ...state.tickets];
+        render();
+        showToast('تیکت شما با موفقیت ثبت و برای دبیرخانه ارسال شد.');
+      })
+      .catch((err) => {
+        showToast(err.message || 'خطا در ارسال تیکت', true);
+      });
+  });
+
+  // Update profile
+  $wrapper.on('submit', '.js-profile-form', function (event) {
+    event.preventDefault();
+    const $form = $(this);
+    const first_name = String($form.find('[name="first_name"]').val() || '').trim();
+    const last_name = String($form.find('[name="last_name"]').val() || '').trim();
+    const education = String($form.find('[name="education"]').val() || '').trim();
+    const favorite_genre = String(
+      $form.find('[name="favorite_genre"]').val() || ''
+    ).trim();
+    const city = String($form.find('[name="city"]').val() || 'تهران').trim();
+    const email = String($form.find('[name="email"]').val() || '').trim();
+    const bio = String($form.find('[name="bio"]').val() || '').trim();
+
+    ApiService.updateMemberProfile({
+      phone: state.member.phone,
+      first_name,
+      last_name,
+      education,
+      favorite_genre,
+      city,
+      email,
+      bio,
+    })
+      .then((res) => {
+        state.member = res.member;
+        props.onMemberUpdated(res.member);
+        render();
+        showToast('اطلاعات پروفایل شما با موفقیت بروزرسانی شد.');
+      })
+      .catch((err) => {
+        showToast(err.message || 'خطا در بروزرسانی پروفایل', true);
+      });
+  });
+
+  // Toggle calendar reservation
+  $wrapper.on('click', '.js-toggle-calendar-reserve', function () {
+    const eventId = Number($(this).data('event-id'));
+    ApiService.toggleCalendarReservation(eventId)
+      .then((res) => {
+        state.calendarEvents = state.calendarEvents.map((ev) =>
+          ev.id === eventId ? res.event : ev
+        );
+        render();
+        showToast(
+          res.event.is_reserved
+            ? 'رزرو حضور شما در این رویداد ثبت شد.'
+            : 'رزرو رویداد لغو شد.'
+        );
+      })
+      .catch((err) => {
+        showToast(err.message || 'خطا در تغییر وضعیت رزرو', true);
+      });
+  });
+
+  render();
   return $wrapper;
 }

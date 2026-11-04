@@ -5,12 +5,14 @@ export interface NavbarProps {
   navigationLinks: NavigationLink[];
   ctaText: string;
   activeHref?: string;
+  isStationaryCta?: boolean;
   onNavigate?: (href: string, label: string) => void;
   onLoginClick?: () => void;
 }
 
 export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
   const logoSrc = '/assets/Bookmate%20Persian%20Logo%20with%20Colorful%20Books.png';
+  const ctaMotionClass = props.isStationaryCta ? '' : 'club-login-btn--rocking';
 
   const $header = $(`
     <header
@@ -36,11 +38,11 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
         aria-label="منوی اصلی"
       ></nav>
 
-      <!-- Zone 3 (Left in RTL): "ورود به باشگاه" Primary Action Button with Right-Left Up-Down Motion -->
+      <!-- Zone 3 (Left in RTL): Primary Action Button (Stationary in Member Panel, Rocking on Home) -->
       <div class="flex items-center shrink-0">
         <button
           type="button"
-          class="js-club-login-btn club-login-btn club-login-btn--rocking px-4 py-2 text-[13px] font-medium whitespace-nowrap shrink-0 cursor-pointer"
+          class="js-club-login-btn club-login-btn ${ctaMotionClass} px-4 py-2 text-[13px] font-medium whitespace-nowrap shrink-0 cursor-pointer"
         >
           ${props.ctaText}
         </button>

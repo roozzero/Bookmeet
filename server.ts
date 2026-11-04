@@ -276,10 +276,13 @@ async function startServer() {
 
   app.patch('/api/panel/library', async (req, res) => {
     try {
-      const { bookId, progress_percent, reading_status, personal_note } = req.body || {};
+      const { bookId, pages_read, progress_percent, reading_status, personal_note } =
+        req.body || {};
       const updated = await mysqlDb.updateMemberLibraryItem({
         bookId: Number(bookId),
-        progress_percent: Number(progress_percent),
+        pages_read: pages_read !== undefined ? Number(pages_read) : undefined,
+        progress_percent:
+          progress_percent !== undefined ? Number(progress_percent) : undefined,
         reading_status: reading_status || 'در حال مطالعه',
         personal_note: String(personal_note || '').trim(),
       });
