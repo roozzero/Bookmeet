@@ -306,8 +306,26 @@ CREATE TABLE IF NOT EXISTS `member_tickets` (
   `attachment_name` VARCHAR(255) NOT NULL DEFAULT '',
   `admin_reply` TEXT NOT NULL,
   `admin_replies_json` LONGTEXT,
+  `messages_json` LONGTEXT,
   `created_at` VARCHAR(80) NOT NULL,
+  `updated_at` VARCHAR(80) NOT NULL DEFAULT '',
   INDEX `idx_member_tickets_phone` (`member_phone`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 18b. Support Ticket Attachments
+CREATE TABLE IF NOT EXISTS `ticket_attachments` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `ticket_id` INT NOT NULL,
+  `sender_role` ENUM('member', 'admin') NOT NULL DEFAULT 'member',
+  `file_name` VARCHAR(255) NOT NULL,
+  `mime_type` VARCHAR(120) NOT NULL,
+  `file_size` INT NOT NULL DEFAULT 0,
+  `file_data` LONGTEXT NOT NULL,
+  `created_at` VARCHAR(80) NOT NULL,
+  INDEX `idx_ticket_attachments_ticket` (`ticket_id`),
+  CONSTRAINT `fk_ticket_attachments_ticket`
+    FOREIGN KEY (`ticket_id`) REFERENCES `member_tickets` (`id`)
+    ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 19. Club Calendar Events & Reservations
@@ -338,8 +356,10 @@ CREATE TABLE IF NOT EXISTS `club_announcements` (
   `content` TEXT NOT NULL,
   `is_important` TINYINT(1) NOT NULL DEFAULT 0,
   `is_read` TINYINT(1) NOT NULL DEFAULT 0,
+  `read_by_phones_json` LONGTEXT,
   `target_user_phone` VARCHAR(60) DEFAULT NULL,
   `target_user_name` VARCHAR(150) DEFAULT NULL,
   `sort_order` INT NOT NULL DEFAULT 0,
   INDEX `idx_announcements_target` (`target_user_phone`, `sort_order`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

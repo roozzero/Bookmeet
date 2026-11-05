@@ -19,6 +19,9 @@ const ALLOWED_TAGS = new Set([
   'HR',
   'DIV',
   'SPAN',
+  'IMG',
+  'FIGURE',
+  'FIGCAPTION',
 ]);
 
 const FORBIDDEN_CONTAINER_TAGS = new Set([
@@ -58,15 +61,52 @@ function isSafeUrl(url: string): boolean {
   );
 }
 
+function isSafeImageSrc(src: string): boolean {
+  const trimmed = src.trim();
+  if (!trimmed) return false;
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith('javascript:') || lower.startsWith('vbscript:')) {
+    return false;
+  }
+  if (lower.startsWith('data:')) {
+    return /^data:image\/(png|jpeg|jpg|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(trimmed);
+  }
+  return (
+    lower.startsWith('http://') ||
+    lower.startsWith('https://') ||
+    lower.startsWith('/')
+  );
+}
+
 function extractSafeTextAlign(styleAttr: string | null): string | null {
   if (!styleAttr) return null;
   const match = styleAttr.match(/text-align\s*:\s*(right|left|center|justify)/i);
   return match ? `text-align: ${match[1].toLowerCase()};` : null;
 }
 
+function extractSafeImageWidth(el: HTMLElement): {
+  sizeKey: 'full' | 'lg' | 'md' | 'sm';
+  widthCss: string;
+} {
+  const dataSize = (el.getAttribute('data-img-size') || '').toLowerCase();
+  const styleAttr = el.getAttribute('style') || '';
+  const widthAttr = el.getAttribute('width') || '';
+
+  if (dataSize === 'sm' || /width\s*:\s*35%/i.test(styleAttr) || widthAttr === '35%') {
+    return { sizeKey: 'sm', widthCss: '35%' };
+  }
+  if (dataSize === 'md' || /width\s*:\s*50%/i.test(styleAttr) || widthAttr === '50%') {
+    return { sizeKey: 'md', widthCss: '50%' };
+  }
+  if (dataSize === 'lg' || /width\s*:\s*75%/i.test(styleAttr) || widthAttr === '75%') {
+    return { sizeKey: 'lg', widthCss: '75%' };
+  }
+  return { sizeKey: 'full', widthCss: '100%' };
+}
+
 /**
  * Sanitizes rich-text HTML content using a strict allowlist of semantic tags and attributes.
- * Prevents XSS while preserving RTL formatting, headings, lists, alignment, links, and blockquotes.
+ * Prevents XSS while preserving RTL formatting, headings, lists, alignment, links, blockquotes, and inline images.
  */
 export function sanitizeRichHtml(rawHtml: string): string {
   const input = String(rawHtml || '').trim();
@@ -98,6 +138,26 @@ export function sanitizeRichHtml(rawHtml: string): string {
 
     if (FORBIDDEN_CONTAINER_TAGS.has(tag)) {
       return null;
+    }
+
+    if (tag === 'IMG') {
+      const rawSrc = el.getAttribute('src') || '';
+      if (!isSafeImageSrc(rawSrc)) {
+        return null;
+      }
+      const cleanImg = doc.createElement('img');
+      cleanImg.setAttribute('src', rawSrc.trim());
+      const altText = (el.getAttribute('alt') || 'تصویر مقاله').trim();
+      cleanImg.setAttribute('alt', altText);
+      cleanImg.setAttribute('loading', 'lazy');
+
+      const { sizeKey, widthCss } = extractSafeImageWidth(el);
+      cleanImg.setAttribute('data-img-size', sizeKey);
+      cleanImg.setAttribute(
+        'style',
+        `width: ${widthCss}; max-width: 100%; height: auto; border-radius: 14px; display: block; margin: 16px auto;`
+      );
+      return cleanImg;
     }
 
     const fragment = doc.createDocumentFragment();
@@ -171,7 +231,7 @@ export function normalizeArticleHtml(rawContent: string): string {
   const trimmed = String(rawContent || '').trim();
   if (!trimmed) return '';
 
-  const hasHtmlTags = /<\/?(p|div|h2|h3|h4|ul|ol|li|blockquote|strong|b|em|i|u|br|a|hr|span)\b/i.test(
+  const hasHtmlTags = /<\/?(p|div|h2|h3|h4|ul|ol|li|blockquote|strong|b|em|i|u|br|a|hr|span|img|figure|figcaption)\b/i.test(
     trimmed
   );
 

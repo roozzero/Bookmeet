@@ -240,6 +240,33 @@ export interface MemberLibraryRow {
   updated_at: string;
 }
 
+export interface TicketAttachmentUploadInput {
+  file_name: string;
+  mime_type: string;
+  file_size: number;
+  data_url: string;
+}
+
+export interface TicketAttachmentMetaRow {
+  id: number;
+  ticket_id: number;
+  message_index: number;
+  uploader_role: 'member' | 'admin';
+  file_name: string;
+  mime_type: string;
+  file_size: number;
+  created_at: string;
+}
+
+export interface TicketMessageItemRow {
+  id: string;
+  sender_role: 'member' | 'admin';
+  sender_name?: string;
+  text: string;
+  created_at: string;
+  attachments?: TicketAttachmentMetaRow[];
+}
+
 export interface MemberTicketRow {
   id: number;
   member_phone: string;
@@ -252,7 +279,10 @@ export interface MemberTicketRow {
   attachment_name?: string;
   admin_reply: string;
   admin_replies?: { text: string; created_at: string }[];
+  messages?: TicketMessageItemRow[];
+  attachments?: TicketAttachmentMetaRow[];
   created_at: string;
+  updated_at?: string;
 }
 
 export interface ClubCalendarEventRow {
@@ -269,6 +299,10 @@ export interface ClubCalendarEventRow {
   description: string;
   is_reserved: number;
   sort_order: number;
+  target_type?: 'session' | 'class' | 'custom';
+  target_id?: number;
+  sub_session_id?: number;
+  enrollment_status?: 'فعال' | 'غیرفعال' | 'ثبت‌نام نشده';
 }
 
 export interface ClubAnnouncementRow {
@@ -280,6 +314,7 @@ export interface ClubAnnouncementRow {
   content: string;
   is_important: number;
   is_read: number;
+  read_by_phones_json?: string;
   target_user_phone?: string;
   target_user_name?: string;
   sort_order: number;
@@ -737,8 +772,26 @@ class MySQLDatabaseManager {
         attachment_name VARCHAR(255) NOT NULL DEFAULT '',
         admin_reply TEXT NOT NULL,
         admin_replies_json LONGTEXT,
+        messages_json LONGTEXT,
         created_at VARCHAR(80) NOT NULL,
+        updated_at VARCHAR(80) NOT NULL DEFAULT '',
         INDEX idx_member_tickets_phone (member_phone, status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS ticket_attachments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        ticket_id INT NOT NULL,
+        message_index INT NOT NULL DEFAULT 0,
+        uploader_role ENUM('member', 'admin') NOT NULL DEFAULT 'member',
+        file_name VARCHAR(255) NOT NULL,
+        mime_type VARCHAR(120) NOT NULL,
+        file_size INT NOT NULL DEFAULT 0,
+        data_url LONGTEXT NOT NULL,
+        created_at VARCHAR(80) NOT NULL,
+        INDEX idx_ticket_attachments_ticket (ticket_id),
+        CONSTRAINT fk_ticket_attachments_ticket
+          FOREIGN KEY (ticket_id) REFERENCES member_tickets (id)
+          ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
       `CREATE TABLE IF NOT EXISTS club_calendar_events (
@@ -767,6 +820,7 @@ class MySQLDatabaseManager {
         content TEXT NOT NULL,
         is_important TINYINT(1) NOT NULL DEFAULT 0,
         is_read TINYINT(1) NOT NULL DEFAULT 0,
+        read_by_phones_json LONGTEXT,
         target_user_phone VARCHAR(60) DEFAULT NULL,
         target_user_name VARCHAR(150) DEFAULT NULL,
         sort_order INT NOT NULL DEFAULT 0
@@ -844,7 +898,38 @@ class MySQLDatabaseManager {
       }
     }
 
-    // 4. Backfill exact Jalali joined_date from created_at on club_members where placeholder was stored
+    // 4. Safely add messages_json and updated_at to member_tickets if missing
+    const ticketColumnsToEnsure: Array<{ name: string; definition: string }> = [
+      { name: 'messages_json', definition: 'LONGTEXT NULL' },
+      { name: 'updated_at', definition: "VARCHAR(80) NOT NULL DEFAULT ''" },
+    ];
+
+    for (const col of ticketColumnsToEnsure) {
+      const [colRows] = await this.pool.execute<RowDataPacket[]>(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'member_tickets' AND COLUMN_NAME = ?`,
+        [dbName, col.name]
+      );
+      if (colRows.length === 0) {
+        await this.pool.execute(
+          `ALTER TABLE member_tickets ADD COLUMN \`${col.name}\` ${col.definition}`
+        );
+      }
+    }
+
+    // 5. Safely add read_by_phones_json to club_announcements if missing
+    const [annColRows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'club_announcements' AND COLUMN_NAME = 'read_by_phones_json'`,
+      [dbName]
+    );
+    if (annColRows.length === 0) {
+      await this.pool.execute(
+        'ALTER TABLE club_announcements ADD COLUMN `read_by_phones_json` LONGTEXT NULL'
+      );
+    }
+
+    // 6. Backfill exact Jalali joined_date from created_at on club_members where placeholder was stored
     const [membersToBackfill] = await this.pool.execute<RowDataPacket[]>(
       "SELECT id, created_at, joined_date FROM club_members WHERE joined_date = '' OR joined_date = '۱۴۰۵' OR joined_date = 'آبان ۱۴۰۵'"
     );
@@ -1366,6 +1451,687 @@ class MySQLDatabaseManager {
     }));
   }
 
+  // ==================== HELPERS FOR TICKETS, CALENDAR & ANNOUNCEMENTS ====================
+
+  private formatNowPersianDateTime(): string {
+    try {
+      const dateStr = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }).format(new Date());
+      const timeStr = new Intl.DateTimeFormat('fa-IR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(new Date());
+      return toPersianDigitsServer(`${dateStr} · ساعت ${timeStr}`);
+    } catch {
+      return formatPersianRegistrationDate(new Date());
+    }
+  }
+
+  private getCurrentPersianMonthYear(): string {
+    try {
+      const formatted = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+        month: 'long',
+        year: 'numeric',
+      }).format(new Date());
+      return toPersianDigitsServer(formatted);
+    } catch {
+      return 'آبان ۱۴۰۵';
+    }
+  }
+
+  private parsePersianDateParts(rawInput: string, fallbackMonth?: string): {
+    day_of_month: string;
+    month_name: string;
+    weekday_name: string;
+  } {
+    const persianMonths = [
+      'فروردین',
+      'اردیبهشت',
+      'خرداد',
+      'تیر',
+      'مرداد',
+      'شهریور',
+      'مهر',
+      'آبان',
+      'آذر',
+      'دی',
+      'بهمن',
+      'اسفند',
+    ];
+    const weekdays = [
+      'شنبه',
+      'یکشنبه',
+      'دوشنبه',
+      'سه‌شنبه',
+      'سه شنبه',
+      'چهارشنبه',
+      'پنجشنبه',
+      'پنج‌شنبه',
+      'جمعه',
+    ];
+    const defaultMonth = fallbackMonth || this.getCurrentPersianMonthYear();
+    const text = String(rawInput || '').trim();
+    if (!text) {
+      return {
+        day_of_month: '۱',
+        month_name: defaultMonth,
+        weekday_name: 'چهارشنبه',
+      };
+    }
+
+    let foundWeekday = 'چهارشنبه';
+    for (const wd of weekdays) {
+      if (text.includes(wd)) {
+        foundWeekday = wd.replace('سه شنبه', 'سه‌شنبه').replace('پنج شنبه', 'پنج‌شنبه');
+        break;
+      }
+    }
+
+    const ascii = normalizeIdentifierDigits(text);
+    // Check YYYY/MM/DD or YYYY-MM-DD Jalali format e.g. 1405/08/18
+    const slashMatch = ascii.match(/(13\d{2}|14\d{2})[/\-](\d{1,2})[/\-](\d{1,2})/);
+    if (slashMatch) {
+      const year = toPersianDigitsServer(slashMatch[1]);
+      const monthIdx = Math.max(1, Math.min(12, parseInt(slashMatch[2], 10))) - 1;
+      const day = toPersianDigitsServer(parseInt(slashMatch[3], 10));
+      return {
+        day_of_month: day,
+        month_name: `${persianMonths[monthIdx]} ${year}`,
+        weekday_name: foundWeekday,
+      };
+    }
+
+    let foundMonth = '';
+    for (const m of persianMonths) {
+      if (text.includes(m)) {
+        foundMonth = m;
+        break;
+      }
+    }
+
+    const yearMatch = ascii.match(/\b(13\d{2}|14\d{2})\b/);
+    const yearStr = yearMatch
+      ? toPersianDigitsServer(yearMatch[1])
+      : toPersianDigitsServer(
+          normalizeIdentifierDigits(defaultMonth).match(/\b(13\d{2}|14\d{2})\b/)?.[1] || '1405'
+        );
+
+    // Remove 4-digit year from string before extracting day of month
+    const withoutYear = ascii.replace(/\b(13\d{2}|14\d{2})\b/g, ' ');
+    const dayMatch = withoutYear.match(/\b([1-9]|[12]\d|3[01])\b/);
+    const dayStr = dayMatch ? toPersianDigitsServer(dayMatch[1]) : '۱';
+
+    const resolvedMonth = foundMonth ? `${foundMonth} ${yearStr}` : defaultMonth;
+
+    return {
+      day_of_month: dayStr,
+      month_name: resolvedMonth,
+      weekday_name: foundWeekday,
+    };
+  }
+
+  private buildDynamicCalendarEvents(
+    allSessions: MemberSessionRow[],
+    allClasses: MemberClassRow[],
+    rawCustomEvents: RowDataPacket[],
+    canonicalPhone: string,
+    normalizedPhone: string
+  ): ClubCalendarEventRow[] {
+    const events: ClubCalendarEventRow[] = [];
+    const defaultMonth = this.getCurrentPersianMonthYear();
+
+    // Map any stored reservations from club_calendar_events by id
+    const storedReservationsById = new Map<number, string[]>();
+    for (const ev of rawCustomEvents) {
+      const evId = Number(ev.id);
+      const list = safeJsonParse<string[]>(ev.reserved_by_phones_json, []);
+      storedReservationsById.set(evId, list);
+    }
+
+    // 1. Generate dynamic events from active reading sessions (member_sessions)
+    const activeSessions = allSessions.filter((s) => s.status !== 'غیرفعال');
+    for (const session of activeSessions) {
+      const enrollment = (session.enrolled_members || []).find(
+        (e) =>
+          e.member_phone === canonicalPhone ||
+          normalizeIdentifierDigits(e.member_phone) === normalizedPhone
+      );
+      const enrollmentStatus: 'فعال' | 'غیرفعال' | 'ثبت‌نام نشده' =
+        enrollment && enrollment.status !== 'لغو شده'
+          ? enrollment.status === 'فعال'
+            ? 'فعال'
+            : 'غیرفعال'
+          : 'ثبت‌نام نشده';
+
+      const subSessions = Array.isArray(session.sub_sessions) ? session.sub_sessions : [];
+      const subsWithDates = subSessions.filter((sub) => String(sub.session_date || '').trim() !== '');
+
+      if (subsWithDates.length > 0) {
+        subsWithDates.forEach((sub, idx) => {
+          const eventId = 100000 + session.id * 100 + (Number(sub.id) || idx + 1);
+          const parsed = this.parsePersianDateParts(
+            String(sub.session_date || session.session_date || ''),
+            defaultMonth
+          );
+          const reservedList = storedReservationsById.get(eventId) || [];
+          const isReserved =
+            enrollmentStatus === 'فعال' ||
+            reservedList.includes(canonicalPhone) ||
+            reservedList.includes(normalizedPhone);
+          const isHeld = sub.status === 'برگزار شده';
+          const capacityLabel = isHeld
+            ? 'برگزار شده'
+            : enrollmentStatus === 'فعال'
+            ? 'ثبت‌نام تایید شده'
+            : enrollmentStatus === 'غیرفعال'
+            ? 'در انتظار تایید مدیر'
+            : 'ظرفیت باز';
+
+          events.push({
+            id: eventId,
+            title: `${session.title || session.book_title} — جلسه ${toPersianDigitsServer(
+              sub.session_number || idx + 1
+            )}: ${sub.title || 'هم‌خوانی و نقد'}`,
+            event_type: 'نشست کتابخوانی',
+            day_of_month: parsed.day_of_month,
+            month_name: parsed.month_name,
+            weekday_name: parsed.weekday_name,
+            time_range: String(sub.session_time || session.session_time || '۱۸:۰۰ تا ۲۰:۰۰'),
+            host_name: String(session.translator || session.mentor_name || session.book_author || 'باشگاه بوک‌میت'),
+            location_label:
+              enrollmentStatus === 'فعال'
+                ? String(sub.meeting_link || session.meeting_link_or_room || session.location_type || 'حضوری و آنلاین')
+                : String(session.location_type || 'حضوری و آنلاین (لینک پس از تایید مدیر)'),
+            capacity_info: capacityLabel,
+            description: String(
+              sub.reviewed_topics ||
+                (sub.pages_to_read ? `سر فصل جلسه: ${sub.pages_to_read}` : '') ||
+                session.short_description ||
+                session.full_description ||
+                `نشست بررسی کتاب «${session.book_title}»`
+            ),
+            is_reserved: isReserved ? 1 : 0,
+            sort_order: session.sort_order || idx + 1,
+            target_type: 'session',
+            target_id: session.id,
+            sub_session_id: Number(sub.id || idx + 1),
+            enrollment_status: enrollmentStatus,
+          });
+        });
+      } else {
+        const eventId = 100000 + session.id * 100;
+        const parsed = this.parsePersianDateParts(String(session.session_date || ''), defaultMonth);
+        const reservedList = storedReservationsById.get(eventId) || [];
+        const isReserved =
+          enrollmentStatus === 'فعال' ||
+          reservedList.includes(canonicalPhone) ||
+          reservedList.includes(normalizedPhone);
+        const isHeld = session.status === 'برگزارشده';
+        const capacityLabel = isHeld
+          ? 'برگزار شده'
+          : enrollmentStatus === 'فعال'
+          ? 'ثبت‌نام تایید شده'
+          : enrollmentStatus === 'غیرفعال'
+          ? 'در انتظار تایید مدیر'
+          : 'ظرفیت باز';
+
+        events.push({
+          id: eventId,
+          title: session.title || `نشست کتاب «${session.book_title}»`,
+          event_type: 'نشست کتابخوانی',
+          day_of_month: parsed.day_of_month,
+          month_name: parsed.month_name,
+          weekday_name: parsed.weekday_name,
+          time_range: String(session.session_time || '۱۸:۰۰ تا ۲۰:۰۰'),
+          host_name: String(session.translator || session.mentor_name || session.book_author || 'باشگاه بوک‌میت'),
+          location_label:
+            enrollmentStatus === 'فعال'
+              ? String(session.meeting_link_or_room || session.location_type || 'حضوری و آنلاین')
+              : String(session.location_type || 'حضوری و آنلاین (لینک پس از تایید مدیر)'),
+          capacity_info: capacityLabel,
+          description: String(
+            session.short_description ||
+              session.full_description ||
+              `نشست هم‌خوانی و بررسی کتاب «${session.book_title}»`
+          ),
+          is_reserved: isReserved ? 1 : 0,
+          sort_order: session.sort_order || 1,
+          target_type: 'session',
+          target_id: session.id,
+          enrollment_status: enrollmentStatus,
+        });
+      }
+    }
+
+    // 2. Generate dynamic events from active courses (member_classes)
+    const activeClasses = allClasses.filter((c) => c.status !== 'غیرفعال');
+    for (const cls of activeClasses) {
+      const enrollment = (cls.enrolled_members || []).find(
+        (e) =>
+          e.member_phone === canonicalPhone ||
+          normalizeIdentifierDigits(e.member_phone) === normalizedPhone
+      );
+      const enrollmentStatus: 'فعال' | 'غیرفعال' | 'ثبت‌نام نشده' =
+        enrollment && enrollment.status !== 'لغو شده'
+          ? enrollment.status === 'فعال'
+            ? 'فعال'
+            : 'غیرفعال'
+          : 'ثبت‌نام نشده';
+
+      const subSessions = Array.isArray(cls.sub_sessions) ? cls.sub_sessions : [];
+      const subsWithDates = subSessions.filter((sub) => String(sub.session_date || '').trim() !== '');
+
+      if (subsWithDates.length > 0) {
+        subsWithDates.forEach((sub, idx) => {
+          const eventId = 200000 + cls.id * 100 + (Number(sub.id) || idx + 1);
+          const parsed = this.parsePersianDateParts(
+            String(sub.session_date || cls.start_date || cls.schedule_summary || ''),
+            defaultMonth
+          );
+          const reservedList = storedReservationsById.get(eventId) || [];
+          const isReserved =
+            enrollmentStatus === 'فعال' ||
+            reservedList.includes(canonicalPhone) ||
+            reservedList.includes(normalizedPhone);
+          const isHeld = sub.status === 'برگزار شده';
+          const capacityLabel = isHeld
+            ? 'برگزار شده'
+            : enrollmentStatus === 'فعال'
+            ? 'ثبت‌نام تایید شده'
+            : enrollmentStatus === 'غیرفعال'
+            ? 'در انتظار تایید مدیر'
+            : String(cls.capacity_label || 'ظرفیت باز');
+
+          events.push({
+            id: eventId,
+            title: `${cls.title} — جلسه ${toPersianDigitsServer(
+              sub.session_number || idx + 1
+            )}: ${sub.title || 'کلاس آموزشی'}`,
+            event_type: 'دوره آموزشی',
+            day_of_month: parsed.day_of_month,
+            month_name: parsed.month_name,
+            weekday_name: parsed.weekday_name,
+            time_range: String(sub.session_time || cls.schedule_summary || '۱۷:۰۰ تا ۱۹:۰۰'),
+            host_name: String(cls.instructor_name || 'مدرس دوره'),
+            location_label:
+              enrollmentStatus === 'فعال'
+                ? String(sub.meeting_link || 'کلاس آنلاین / حضوری باشگاه')
+                : 'کلاس دوره (دسترسی پس از تایید مدیر)',
+            capacity_info: capacityLabel,
+            description: String(
+              sub.reviewed_topics ||
+                (sub.pages_to_read ? `سر فصل جلسه: ${sub.pages_to_read}` : '') ||
+                cls.description ||
+                `دوره آموزشی «${cls.title}»`
+            ),
+            is_reserved: isReserved ? 1 : 0,
+            sort_order: cls.sort_order || idx + 1,
+            target_type: 'class',
+            target_id: cls.id,
+            sub_session_id: Number(sub.id || idx + 1),
+            enrollment_status: enrollmentStatus,
+          });
+        });
+      } else {
+        // Create event from course start_date / schedule_summary
+        const eventId = 200000 + cls.id * 100;
+        const parsed = this.parsePersianDateParts(
+          String(cls.start_date || cls.schedule_summary || ''),
+          defaultMonth
+        );
+        const reservedList = storedReservationsById.get(eventId) || [];
+        const isReserved =
+          enrollmentStatus === 'فعال' ||
+          reservedList.includes(canonicalPhone) ||
+          reservedList.includes(normalizedPhone);
+        const isHeld = cls.status === 'برگزارشده';
+        const capacityLabel = isHeld
+          ? 'برگزار شده'
+          : enrollmentStatus === 'فعال'
+          ? 'ثبت‌نام تایید شده'
+          : enrollmentStatus === 'غیرفعال'
+          ? 'در انتظار تایید مدیر'
+          : String(cls.capacity_label || 'ظرفیت باز');
+
+        events.push({
+          id: eventId,
+          title: cls.start_date ? `شروع دوره: ${cls.title}` : cls.title,
+          event_type: 'دوره آموزشی',
+          day_of_month: parsed.day_of_month,
+          month_name: parsed.month_name,
+          weekday_name: parsed.weekday_name,
+          time_range: String(cls.schedule_summary || cls.duration_label || 'طبق برنامه دوره'),
+          host_name: String(cls.instructor_name || 'مدرس دوره'),
+          location_label:
+            enrollmentStatus === 'فعال'
+              ? 'کلاس فعال در بخش کلاس‌های من'
+              : 'ثبت‌نام و تایید توسط مدیریت باشگاه',
+          capacity_info: capacityLabel,
+          description: String(cls.description || `دوره آموزشی «${cls.title}» (${cls.level_label})`),
+          is_reserved: isReserved ? 1 : 0,
+          sort_order: cls.sort_order || 1,
+          target_type: 'class',
+          target_id: cls.id,
+          enrollment_status: enrollmentStatus,
+        });
+
+        if (cls.end_date && String(cls.end_date).trim() !== String(cls.start_date || '').trim()) {
+          const endEventId = 200000 + cls.id * 100 + 99;
+          const endParsed = this.parsePersianDateParts(String(cls.end_date), parsed.month_name);
+          events.push({
+            id: endEventId,
+            title: `پایان دوره: ${cls.title}`,
+            event_type: 'دوره آموزشی',
+            day_of_month: endParsed.day_of_month,
+            month_name: endParsed.month_name,
+            weekday_name: endParsed.weekday_name,
+            time_range: String(cls.schedule_summary || 'جلسه پایانی'),
+            host_name: String(cls.instructor_name || 'مدرس دوره'),
+            location_label: 'ارزیابی پایانی دوره',
+            capacity_info: capacityLabel,
+            description: String(cls.description || `اختتامیه دوره «${cls.title}»`),
+            is_reserved: isReserved ? 1 : 0,
+            sort_order: (cls.sort_order || 1) + 1,
+            target_type: 'class',
+            target_id: cls.id,
+            enrollment_status: enrollmentStatus,
+          });
+        }
+      }
+    }
+
+    // 3. Also include any custom events stored directly in club_calendar_events with id < 100000
+    for (const ev of rawCustomEvents) {
+      const evId = Number(ev.id);
+      if (evId >= 100000) continue;
+      const reservedList = safeJsonParse<string[]>(ev.reserved_by_phones_json, []);
+      const isReservedByMember =
+        reservedList.includes(canonicalPhone) ||
+        reservedList.includes(normalizedPhone) ||
+        Number(ev.is_reserved) === 1;
+      events.push({
+        id: evId,
+        title: String(ev.title),
+        event_type: String(ev.event_type),
+        day_of_month: String(ev.day_of_month),
+        month_name: String(ev.month_name),
+        weekday_name: String(ev.weekday_name),
+        time_range: String(ev.time_range),
+        host_name: String(ev.host_name),
+        location_label: String(ev.location_label),
+        capacity_info: String(ev.capacity_info),
+        description: String(ev.description),
+        is_reserved: isReservedByMember ? 1 : 0,
+        sort_order: Number(ev.sort_order || 0),
+        target_type: 'custom',
+      });
+    }
+
+    return events;
+  }
+
+  private validateAndSanitizeAttachments(
+    rawAttachments?: TicketAttachmentUploadInput[]
+  ): TicketAttachmentUploadInput[] {
+    if (!Array.isArray(rawAttachments) || rawAttachments.length === 0) return [];
+    const maxFiles = 5;
+    const maxFileSizeBytes = 6 * 1024 * 1024; // 6 MB per file
+    const allowedMimePrefixes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    const allowedExactMimes = new Set([
+      ...allowedMimePrefixes,
+      'application/pdf',
+      'text/plain',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/zip',
+      'application/x-zip-compressed',
+    ]);
+
+    const validated: TicketAttachmentUploadInput[] = [];
+    for (const item of rawAttachments.slice(0, maxFiles)) {
+      if (!item || typeof item.data_url !== 'string' || !item.data_url.startsWith('data:')) {
+        continue;
+      }
+      const rawName = String(item.file_name || 'attachment')
+        .replace(/[/\\?%*:|"<>]/g, '_')
+        .trim()
+        .slice(0, 200);
+      const mimeMatch = item.data_url.match(/^data:([^;,]+);base64,/i);
+      const mimeType = String(item.mime_type || mimeMatch?.[1] || 'application/octet-stream')
+        .toLowerCase()
+        .trim();
+
+      if (!allowedExactMimes.has(mimeType)) {
+        throw new Error(
+          `فرمت فایل «${rawName}» مجاز نیست. فقط تصاویر (JPG, PNG, WEBP, GIF) و اسناد (PDF, TXT, Word, ZIP) مجاز هستند.`
+        );
+      }
+
+      const estimatedBytes =
+        Number(item.file_size) > 0
+          ? Number(item.file_size)
+          : Math.round((item.data_url.length * 3) / 4);
+
+      if (estimatedBytes > maxFileSizeBytes) {
+        throw new Error(`حجم فایل «${rawName}» بیش از حد مجاز (حداکثر ۶ مگابایت) است.`);
+      }
+
+      validated.push({
+        file_name: rawName || 'attachment',
+        mime_type: mimeType,
+        file_size: estimatedBytes,
+        data_url: item.data_url,
+      });
+    }
+
+    return validated;
+  }
+
+  private async insertTicketAttachments(
+    ticketId: number,
+    messageIndex: number,
+    uploaderRole: 'member' | 'admin',
+    attachments: TicketAttachmentUploadInput[],
+    createdAt: string
+  ): Promise<TicketAttachmentMetaRow[]> {
+    const saved: TicketAttachmentMetaRow[] = [];
+    for (const att of attachments) {
+      const [res] = await this.pool.execute<ResultSetHeader>(
+        `INSERT INTO ticket_attachments
+          (ticket_id, message_index, uploader_role, file_name, mime_type, file_size, data_url, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          ticketId,
+          messageIndex,
+          uploaderRole,
+          att.file_name,
+          att.mime_type,
+          att.file_size,
+          att.data_url,
+          createdAt,
+        ]
+      );
+      saved.push({
+        id: res.insertId,
+        ticket_id: ticketId,
+        message_index: messageIndex,
+        uploader_role: uploaderRole,
+        file_name: att.file_name,
+        mime_type: att.mime_type,
+        file_size: att.file_size,
+        created_at: createdAt,
+      });
+    }
+    return saved;
+  }
+
+  private async hydrateTicketRows(rawTickets: RowDataPacket[]): Promise<MemberTicketRow[]> {
+    if (rawTickets.length === 0) return [];
+    const ticketIds = rawTickets.map((t) => Number(t.id));
+    const placeholders = ticketIds.map(() => '?').join(',');
+
+    const [attRows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT id, ticket_id, message_index, uploader_role, file_name, mime_type, file_size, created_at
+       FROM ticket_attachments
+       WHERE ticket_id IN (${placeholders})
+       ORDER BY id ASC`,
+      ticketIds
+    );
+
+    const byTicketId = new Map<number, TicketAttachmentMetaRow[]>();
+    for (const row of attRows) {
+      const tid = Number(row.ticket_id);
+      const list = byTicketId.get(tid) || [];
+      list.push({
+        id: Number(row.id),
+        ticket_id: tid,
+        message_index: Number(row.message_index || 0),
+        uploader_role: row.uploader_role === 'admin' ? 'admin' : 'member',
+        file_name: String(row.file_name || 'پیوست'),
+        mime_type: String(row.mime_type || 'application/octet-stream'),
+        file_size: Number(row.file_size || 0),
+        created_at: String(row.created_at || ''),
+      });
+      byTicketId.set(tid, list);
+    }
+
+    return rawTickets.map((t) => {
+      const tid = Number(t.id);
+      const ticketAttachments = byTicketId.get(tid) || [];
+      const legacyAdminReplies = safeJsonParse<{ text: string; created_at: string }[]>(
+        t.admin_replies_json,
+        t.admin_reply ? [{ text: String(t.admin_reply), created_at: String(t.created_at) }] : []
+      );
+
+      let storedMessages = safeJsonParse<TicketMessageItemRow[]>(t.messages_json, []);
+      if (!Array.isArray(storedMessages) || storedMessages.length === 0) {
+        storedMessages = [
+          {
+            id: `msg-${tid}-0`,
+            sender_role: 'member',
+            text: String(t.message || ''),
+            created_at: String(t.created_at || ''),
+          },
+          ...legacyAdminReplies.map((r, idx) => ({
+            id: `msg-${tid}-admin-${idx + 1}`,
+            sender_role: 'admin' as const,
+            text: String(r.text || ''),
+            created_at: String(r.created_at || ''),
+          })),
+        ];
+      }
+
+      const hydratedMessages: TicketMessageItemRow[] = storedMessages.map((msg, idx) => ({
+        ...msg,
+        attachments: ticketAttachments.filter((a) => a.message_index === idx),
+      }));
+
+      // If any attachments had a message_index beyond storedMessages.length, attach them to the last message
+      const maxIdx = Math.max(0, hydratedMessages.length - 1);
+      for (const orphan of ticketAttachments.filter((a) => a.message_index > maxIdx)) {
+        if (hydratedMessages[maxIdx]) {
+          hydratedMessages[maxIdx].attachments = [
+            ...(hydratedMessages[maxIdx].attachments || []),
+            orphan,
+          ];
+        }
+      }
+
+      const lastMsg = hydratedMessages[hydratedMessages.length - 1];
+      const updatedAt = String(t.updated_at || lastMsg?.created_at || t.created_at || '');
+
+      return {
+        id: tid,
+        member_phone: String(t.member_phone),
+        ticket_code: String(t.ticket_code),
+        subject: String(t.subject),
+        department: String(t.department),
+        priority: (t.priority as MemberTicketRow['priority']) || 'عادی',
+        status: (t.status as MemberTicketRow['status']) || 'در انتظار بررسی',
+        message: String(t.message),
+        attachment_name:
+          String(t.attachment_name || '') ||
+          ticketAttachments.map((a) => a.file_name).join('، '),
+        admin_reply: String(t.admin_reply || ''),
+        admin_replies: legacyAdminReplies,
+        messages: hydratedMessages,
+        attachments: ticketAttachments,
+        created_at: String(t.created_at),
+        updated_at: updatedAt,
+      };
+    });
+  }
+
+  public async getTicketAttachmentById(
+    ticketId: number,
+    attachmentId: number
+  ): Promise<{
+    id: number;
+    ticket_id: number;
+    member_phone: string;
+    file_name: string;
+    mime_type: string;
+    file_size: number;
+    data_url: string;
+  } | null> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT a.*, t.member_phone
+       FROM ticket_attachments a
+       INNER JOIN member_tickets t ON t.id = a.ticket_id
+       WHERE a.id = ? AND a.ticket_id = ?
+       LIMIT 1`,
+      [attachmentId, ticketId]
+    );
+    if (rows.length === 0) return null;
+    const r = rows[0];
+    return {
+      id: Number(r.id),
+      ticket_id: Number(r.ticket_id),
+      member_phone: String(r.member_phone || ''),
+      file_name: String(r.file_name || 'attachment'),
+      mime_type: String(r.mime_type || 'application/octet-stream'),
+      file_size: Number(r.file_size || 0),
+      data_url: String(r.data_url || ''),
+    };
+  }
+
+  private mapAnnouncementRowsForMember(
+    rawAnnouncements: RowDataPacket[],
+    canonicalPhone: string,
+    normalizedPhone: string
+  ): ClubAnnouncementRow[] {
+    return rawAnnouncements.map((row) => {
+      const readByList = safeJsonParse<string[]>(row.read_by_phones_json, []);
+      const isTargetSpecific =
+        row.target_user_phone &&
+        row.target_user_phone !== 'all' &&
+        (row.target_user_phone === canonicalPhone ||
+          normalizeIdentifierDigits(String(row.target_user_phone)) === normalizedPhone);
+      const isReadByUser =
+        readByList.includes(canonicalPhone) ||
+        readByList.includes(normalizedPhone) ||
+        (Boolean(isTargetSpecific) && Number(row.is_read) === 1);
+
+      return {
+        id: Number(row.id),
+        title: String(row.title || ''),
+        category: String(row.category || ''),
+        published_date: String(row.published_date || ''),
+        summary: String(row.summary || ''),
+        content: String(row.content || ''),
+        is_important: Number(row.is_important || 0),
+        is_read: isReadByUser ? 1 : 0,
+        target_user_phone: row.target_user_phone ? String(row.target_user_phone) : undefined,
+        target_user_name: row.target_user_name ? String(row.target_user_name) : undefined,
+        sort_order: Number(row.sort_order || 0),
+      };
+    });
+  }
+
   // ==================== MEMBER PANEL QUERIES & MUTATIONS ====================
 
   public async getMemberPanelData(memberPhone: string): Promise<{
@@ -1449,13 +2215,25 @@ class MySQLDatabaseManager {
             e.member_phone === canonicalPhone ||
             normalizeIdentifierDigits(e.member_phone) === normalizedPhone
         );
-        if (rec) {
+        const isApproved = rec ? rec.status === 'فعال' : s.status === 'فعال';
+        if (!isApproved) {
+          // Strip protected session links and notes while pending admin approval
           return {
             ...s,
-            status: rec.status === 'فعال' ? ('فعال' as const) : ('غیرفعال' as const),
+            status: 'غیرفعال' as const,
+            meeting_link_or_room: '',
+            member_note: '',
+            sub_sessions: (s.sub_sessions || []).map((sub) => ({
+              ...sub,
+              meeting_link: '',
+              session_notes: '',
+            })),
           };
         }
-        return s;
+        return {
+          ...s,
+          status: 'فعال' as const,
+        };
       });
 
     const userClasses = allClasses
@@ -1479,55 +2257,38 @@ class MySQLDatabaseManager {
             e.member_phone === canonicalPhone ||
             normalizeIdentifierDigits(e.member_phone) === normalizedPhone
         );
-        if (rec) {
+        const isApproved = rec ? rec.status === 'فعال' : c.status === 'فعال';
+        if (!isApproved) {
+          // Strip protected course sub-session links and notes while pending admin approval
           return {
             ...c,
-            status: rec.status === 'فعال' ? ('فعال' as const) : ('غیرفعال' as const),
+            status: 'غیرفعال' as const,
+            sub_sessions: (c.sub_sessions || []).map((sub) => ({
+              ...sub,
+              meeting_link: '',
+              session_notes: '',
+            })),
           };
         }
-        return c;
+        return {
+          ...c,
+          status: 'فعال' as const,
+        };
       });
 
-    const tickets: MemberTicketRow[] = rawTickets[0].map((t) => ({
-      id: Number(t.id),
-      member_phone: String(t.member_phone),
-      ticket_code: String(t.ticket_code),
-      subject: String(t.subject),
-      department: String(t.department),
-      priority: (t.priority as MemberTicketRow['priority']) || 'عادی',
-      status: (t.status as MemberTicketRow['status']) || 'در انتظار بررسی',
-      message: String(t.message),
-      attachment_name: String(t.attachment_name || ''),
-      admin_reply: String(t.admin_reply || ''),
-      admin_replies: safeJsonParse<{ text: string; created_at: string }[]>(
-        t.admin_replies_json,
-        t.admin_reply ? [{ text: String(t.admin_reply), created_at: String(t.created_at) }] : []
-      ),
-      created_at: String(t.created_at),
-    }));
-
-    const calendarEvents: ClubCalendarEventRow[] = rawEvents[0].map((ev) => {
-      const reservedList = safeJsonParse<string[]>(ev.reserved_by_phones_json, []);
-      const isReservedByMember =
-        reservedList.includes(canonicalPhone) ||
-        reservedList.includes(normalizedPhone) ||
-        Number(ev.is_reserved) === 1;
-      return {
-        id: Number(ev.id),
-        title: String(ev.title),
-        event_type: String(ev.event_type),
-        day_of_month: String(ev.day_of_month),
-        month_name: String(ev.month_name),
-        weekday_name: String(ev.weekday_name),
-        time_range: String(ev.time_range),
-        host_name: String(ev.host_name),
-        location_label: String(ev.location_label),
-        capacity_info: String(ev.capacity_info),
-        description: String(ev.description),
-        is_reserved: isReservedByMember ? 1 : 0,
-        sort_order: Number(ev.sort_order || 0),
-      };
-    });
+    const tickets = await this.hydrateTicketRows(rawTickets[0]);
+    const calendarEvents = this.buildDynamicCalendarEvents(
+      allSessions,
+      allClasses,
+      rawEvents[0],
+      canonicalPhone,
+      normalizedPhone
+    );
+    const announcements = this.mapAnnouncementRowsForMember(
+      rawAnnouncements[0],
+      canonicalPhone,
+      normalizedPhone
+    );
 
     return {
       member: publicMember,
@@ -1536,7 +2297,7 @@ class MySQLDatabaseManager {
       library: rawLibrary[0] as MemberLibraryRow[],
       tickets,
       calendarEvents,
-      announcements: rawAnnouncements[0] as ClubAnnouncementRow[],
+      announcements,
     };
   }
 
@@ -1596,6 +2357,21 @@ class MySQLDatabaseManager {
       throw new Error('نشست مورد نظر یافت نشد.');
     }
 
+    const normalizedPhone = normalizeIdentifierDigits(input.member_phone);
+    const persianPhone = toPersianDigitsServer(normalizedPhone);
+    const [enrollRows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT status FROM session_enrollments
+       WHERE target_type = 'session' AND target_id = ? AND (member_phone = ? OR member_phone = ?)
+       LIMIT 1`,
+      [input.sessionId, input.member_phone, persianPhone]
+    );
+
+    if (enrollRows.length === 0 || String(enrollRows[0].status) !== 'فعال') {
+      throw new Error(
+        'دسترسی به این نشست تنها پس از تایید ثبت‌نام توسط مدیر باشگاه امکان‌پذیر است.'
+      );
+    }
+
     await this.pool.execute(
       'UPDATE member_sessions SET member_note = ? WHERE id = ?',
       [input.member_note, input.sessionId]
@@ -1604,8 +2380,8 @@ class MySQLDatabaseManager {
     await this.pool.execute(
       `UPDATE session_enrollments
        SET member_note = ?
-       WHERE target_type = 'session' AND target_id = ? AND member_phone = ?`,
-      [input.member_note, input.sessionId, input.member_phone]
+       WHERE target_type = 'session' AND target_id = ? AND (member_phone = ? OR member_phone = ?)`,
+      [input.member_note, input.sessionId, input.member_phone, persianPhone]
     );
 
     const [updatedRows] = await this.pool.execute<RowDataPacket[]>(
@@ -1613,7 +2389,7 @@ class MySQLDatabaseManager {
       [input.sessionId]
     );
     const mapped = await this.mapSessionRowsWithEnrollments(updatedRows);
-    return mapped[0];
+    return { ...mapped[0], status: 'فعال' };
   }
 
   public async updateMemberLibraryItem(input: {
@@ -1735,74 +2511,228 @@ class MySQLDatabaseManager {
     priority: 'عادی' | 'مهم' | 'فوری';
     message: string;
     attachment_name?: string;
+    attachments?: TicketAttachmentUploadInput[];
+    sender_role?: 'member' | 'admin';
   }): Promise<MemberTicketRow> {
+    const validatedAttachments = this.validateAndSanitizeAttachments(input.attachments);
     const tempCode = `TK-۱۴۰۵-${toPersianDigitsServer(Math.floor(100 + Math.random() * 900))}`;
-    const createdAt = 'امروز';
+    const createdAt = this.formatNowPersianDateTime();
+    const senderRole: 'member' | 'admin' = input.sender_role === 'admin' ? 'admin' : 'member';
+    const initialStatus: MemberTicketRow['status'] =
+      senderRole === 'admin' ? 'پاسخ داده‌شده' : 'در انتظار بررسی';
+
+    const initialMessages: TicketMessageItemRow[] = [
+      {
+        id: `msg-${Date.now()}-0`,
+        sender_role: senderRole,
+        text: String(input.message || '').trim(),
+        created_at: createdAt,
+      },
+    ];
+
+    const combinedAttachmentNames =
+      validatedAttachments.length > 0
+        ? validatedAttachments.map((a) => a.file_name).join('، ')
+        : String(input.attachment_name || '').trim();
 
     const [result] = await this.pool.execute<ResultSetHeader>(
       `INSERT INTO member_tickets
-        (member_phone, ticket_code, subject, department, priority, status, message, attachment_name, admin_reply, admin_replies_json, created_at)
-       VALUES (?, ?, ?, ?, ?, 'در انتظار بررسی', ?, ?, '', '[]', ?)`,
+        (member_phone, ticket_code, subject, department, priority, status, message, attachment_name, admin_reply, admin_replies_json, messages_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.member_phone,
         tempCode,
         input.subject,
         input.department,
         input.priority,
+        initialStatus,
         input.message,
-        input.attachment_name || '',
+        combinedAttachmentNames.slice(0, 250),
+        senderRole === 'admin' ? String(input.message || '').trim() : '',
+        senderRole === 'admin'
+          ? JSON.stringify([{ text: String(input.message || '').trim(), created_at: createdAt }])
+          : '[]',
+        JSON.stringify(initialMessages),
+        createdAt,
         createdAt,
       ]
     );
 
-    const ticketCode = `TK-۱۴۰۵-${toPersianDigitsServer(450 + result.insertId)}`;
+    const ticketId = result.insertId;
+    const ticketCode = `TK-۱۴۰۵-${toPersianDigitsServer(450 + ticketId)}`;
     await this.pool.execute(
       'UPDATE member_tickets SET ticket_code = ? WHERE id = ?',
-      [ticketCode, result.insertId]
+      [ticketCode, ticketId]
     );
+
+    if (validatedAttachments.length > 0) {
+      await this.insertTicketAttachments(
+        ticketId,
+        0,
+        senderRole,
+        validatedAttachments,
+        createdAt
+      );
+    }
 
     const [rows] = await this.pool.execute<RowDataPacket[]>(
       'SELECT * FROM member_tickets WHERE id = ? LIMIT 1',
-      [result.insertId]
+      [ticketId]
     );
-    const t = rows[0];
-    return {
-      id: Number(t.id),
-      member_phone: String(t.member_phone),
-      ticket_code: String(t.ticket_code),
-      subject: String(t.subject),
-      department: String(t.department),
-      priority: (t.priority as MemberTicketRow['priority']) || 'عادی',
-      status: (t.status as MemberTicketRow['status']) || 'در انتظار بررسی',
-      message: String(t.message),
-      attachment_name: String(t.attachment_name || ''),
-      admin_reply: String(t.admin_reply || ''),
-      admin_replies: [],
-      created_at: String(t.created_at),
-    };
+    const hydrated = await this.hydrateTicketRows(rows);
+    return hydrated[0];
+  }
+
+  public async replyMemberTicket(input: {
+    ticketId: number;
+    member_phone: string;
+    message: string;
+    attachments?: TicketAttachmentUploadInput[];
+  }): Promise<MemberTicketRow> {
+    const normalizedPhone = normalizeIdentifierDigits(input.member_phone);
+    const persianPhone = toPersianDigitsServer(normalizedPhone);
+
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_tickets WHERE id = ? AND (member_phone = ? OR member_phone = ?) LIMIT 1',
+      [Number(input.ticketId), input.member_phone, persianPhone]
+    );
+    if (rows.length === 0) {
+      throw new Error('تیکت مورد نظر یافت نشد یا متعلق به حساب کاربری شما نیست.');
+    }
+
+    const ticket = rows[0];
+    if (String(ticket.status) === 'بسته‌شده') {
+      throw new Error('این تیکت بسته شده است و امکان ارسال پاسخ جدید در آن وجود ندارد.');
+    }
+
+    const trimmedMsg = String(input.message || '').trim();
+    const validatedAttachments = this.validateAndSanitizeAttachments(input.attachments);
+    if (!trimmedMsg && validatedAttachments.length === 0) {
+      throw new Error('متن پیام یا فایل پیوست نمی‌تواند خالی باشد.');
+    }
+
+    const hydratedExisting = (await this.hydrateTicketRows([ticket]))[0];
+    const currentMessages = Array.isArray(hydratedExisting.messages)
+      ? hydratedExisting.messages.map(({ attachments: _a, ...rest }) => rest)
+      : [];
+    const newMsgIndex = currentMessages.length;
+    const nowLabel = this.formatNowPersianDateTime();
+
+    currentMessages.push({
+      id: `msg-${ticket.id}-${newMsgIndex}-${Date.now()}`,
+      sender_role: 'member',
+      text: trimmedMsg || 'فایل پیوست ارسال شد.',
+      created_at: nowLabel,
+    });
+
+    if (validatedAttachments.length > 0) {
+      await this.insertTicketAttachments(
+        Number(ticket.id),
+        newMsgIndex,
+        'member',
+        validatedAttachments,
+        nowLabel
+      );
+    }
+
+    await this.pool.execute(
+      `UPDATE member_tickets
+       SET messages_json = ?, status = 'در انتظار بررسی', updated_at = ?
+       WHERE id = ?`,
+      [JSON.stringify(currentMessages), nowLabel, Number(ticket.id)]
+    );
+
+    const [updatedRows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_tickets WHERE id = ? LIMIT 1',
+      [Number(ticket.id)]
+    );
+    const hydrated = await this.hydrateTicketRows(updatedRows);
+    return hydrated[0];
   }
 
   public async toggleCalendarReservation(
     eventId: number,
     memberPhone: string
   ): Promise<ClubCalendarEventRow> {
+    const normalizedPhone = normalizeIdentifierDigits(memberPhone);
+    const persianPhone = toPersianDigitsServer(normalizedPhone);
+
     const [rows] = await this.pool.execute<RowDataPacket[]>(
       'SELECT * FROM club_calendar_events WHERE id = ? LIMIT 1',
       [eventId]
     );
+
     if (rows.length === 0) {
-      throw new Error('رویداد مورد نظر یافت نشد.');
+      // Dynamic event generated from sessions/classes: build current dynamic events to find it
+      const [rawSessions, rawClasses, rawCustom] = await Promise.all([
+        this.pool.execute<RowDataPacket[]>(
+          'SELECT * FROM member_sessions ORDER BY sort_order ASC, id DESC'
+        ),
+        this.pool.execute<RowDataPacket[]>(
+          'SELECT * FROM member_classes ORDER BY sort_order ASC, id DESC'
+        ),
+        this.pool.execute<RowDataPacket[]>(
+          'SELECT * FROM club_calendar_events ORDER BY sort_order ASC, id DESC'
+        ),
+      ]);
+      const allSessions = await this.mapSessionRowsWithEnrollments(rawSessions[0]);
+      const allClasses = await this.mapClassRowsWithEnrollments(rawClasses[0]);
+      const dynamicEvents = this.buildDynamicCalendarEvents(
+        allSessions,
+        allClasses,
+        rawCustom[0],
+        persianPhone,
+        normalizedPhone
+      );
+      const foundDynamic = dynamicEvents.find((e) => e.id === Number(eventId));
+      if (!foundDynamic) {
+        throw new Error('رویداد مورد نظر یافت نشد.');
+      }
+
+      if (
+        String(foundDynamic.capacity_info || '').includes('برگزار شده') ||
+        String(foundDynamic.capacity_info || '').includes('گذشته')
+      ) {
+        throw new Error(
+          'مهلت رزرو یا لغو این رویداد به پایان رسیده است و رویداد برگزار شده است.'
+        );
+      }
+
+      const nextReserved = foundDynamic.is_reserved === 1 ? 0 : 1;
+      const reservedList = nextReserved === 1 ? [persianPhone] : [];
+      await this.pool.execute(
+        `INSERT INTO club_calendar_events
+          (id, title, event_type, day_of_month, month_name, weekday_name, time_range, host_name, location_label, capacity_info, description, is_reserved, reserved_by_phones_json, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE is_reserved = VALUES(is_reserved), reserved_by_phones_json = VALUES(reserved_by_phones_json)`,
+        [
+          foundDynamic.id,
+          foundDynamic.title,
+          foundDynamic.event_type,
+          foundDynamic.day_of_month,
+          foundDynamic.month_name,
+          foundDynamic.weekday_name,
+          foundDynamic.time_range,
+          foundDynamic.host_name,
+          foundDynamic.location_label,
+          foundDynamic.capacity_info,
+          foundDynamic.description,
+          nextReserved,
+          JSON.stringify(reservedList),
+          foundDynamic.sort_order,
+        ]
+      );
+
+      return {
+        ...foundDynamic,
+        is_reserved: nextReserved,
+      };
     }
 
     const ev = rows[0];
-    const dayNum = parseInt(
-      normalizeIdentifierDigits(String(ev.day_of_month || '0')).replace(/[^\d]/g, ''),
-      10
-    );
     const isPast =
       String(ev.capacity_info || '').includes('برگزار شده') ||
-      String(ev.capacity_info || '').includes('گذشته') ||
-      (ev.month_name === 'آبان ۱۴۰۵' && !Number.isNaN(dayNum) && dayNum < 14);
+      String(ev.capacity_info || '').includes('گذشته');
 
     if (isPast) {
       throw new Error(
@@ -1811,13 +2741,15 @@ class MySQLDatabaseManager {
     }
 
     const reservedPhones = safeJsonParse<string[]>(ev.reserved_by_phones_json, []);
-    const idx = reservedPhones.indexOf(memberPhone);
+    const idx = reservedPhones.findIndex(
+      (p) => p === memberPhone || p === persianPhone || normalizeIdentifierDigits(p) === normalizedPhone
+    );
     let isReservedNow = 0;
     if (idx >= 0) {
       reservedPhones.splice(idx, 1);
       isReservedNow = 0;
     } else {
-      reservedPhones.push(memberPhone);
+      reservedPhones.push(persianPhone);
       isReservedNow = 1;
     }
 
@@ -1844,7 +2776,8 @@ class MySQLDatabaseManager {
   }
 
   public async markAnnouncementRead(
-    announcementId: number
+    announcementId: number,
+    memberPhone?: string
   ): Promise<ClubAnnouncementRow> {
     const [rows] = await this.pool.execute<RowDataPacket[]>(
       'SELECT * FROM club_announcements WHERE id = ? LIMIT 1',
@@ -1854,16 +2787,68 @@ class MySQLDatabaseManager {
       throw new Error('اطلاعیه مورد نظر یافت نشد.');
     }
 
+    const row = rows[0];
+    const readByList = safeJsonParse<string[]>(row.read_by_phones_json, []);
+    if (memberPhone) {
+      const normalized = normalizeIdentifierDigits(memberPhone);
+      const persian = toPersianDigitsServer(normalized);
+      if (!readByList.includes(persian)) readByList.push(persian);
+      if (!readByList.includes(normalized)) readByList.push(normalized);
+    }
+
     await this.pool.execute(
-      'UPDATE club_announcements SET is_read = 1 WHERE id = ?',
-      [announcementId]
+      'UPDATE club_announcements SET is_read = 1, read_by_phones_json = ? WHERE id = ?',
+      [JSON.stringify(readByList), announcementId]
     );
 
     const [updated] = await this.pool.execute<RowDataPacket[]>(
       'SELECT * FROM club_announcements WHERE id = ? LIMIT 1',
       [announcementId]
     );
-    return updated[0] as ClubAnnouncementRow;
+    return {
+      ...(updated[0] as ClubAnnouncementRow),
+      is_read: 1,
+    };
+  }
+
+  public async markAllAnnouncementsRead(memberPhone: string): Promise<ClubAnnouncementRow[]> {
+    const normalizedPhone = normalizeIdentifierDigits(memberPhone);
+    const canonicalPhone = toPersianDigitsServer(normalizedPhone);
+
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT * FROM club_announcements
+       WHERE target_user_phone IS NULL OR target_user_phone = '' OR target_user_phone = 'all' OR target_user_phone = ? OR target_user_phone = ?
+       ORDER BY sort_order ASC, id DESC`,
+      [canonicalPhone, normalizedPhone]
+    );
+
+    for (const row of rows) {
+      const readByList = safeJsonParse<string[]>(row.read_by_phones_json, []);
+      let changed = false;
+      if (!readByList.includes(canonicalPhone)) {
+        readByList.push(canonicalPhone);
+        changed = true;
+      }
+      if (!readByList.includes(normalizedPhone)) {
+        readByList.push(normalizedPhone);
+        changed = true;
+      }
+      if (changed || Number(row.is_read) === 0) {
+        await this.pool.execute(
+          'UPDATE club_announcements SET is_read = 1, read_by_phones_json = ? WHERE id = ?',
+          [JSON.stringify(readByList), Number(row.id)]
+        );
+      }
+    }
+
+    const [updatedRows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT * FROM club_announcements
+       WHERE target_user_phone IS NULL OR target_user_phone = '' OR target_user_phone = 'all' OR target_user_phone = ? OR target_user_phone = ?
+       ORDER BY sort_order ASC, id DESC`,
+      [canonicalPhone, normalizedPhone]
+    );
+
+    return this.mapAnnouncementRowsForMember(updatedRows, canonicalPhone, normalizedPhone);
   }
 
   public async enrollMemberInItem(input: {
@@ -1929,7 +2914,15 @@ class MySQLDatabaseManager {
       const mapped = await this.mapClassRowsWithEnrollments(classRows);
       return {
         target_type: 'class',
-        classItem: { ...mapped[0], status: 'غیرفعال' },
+        classItem: {
+          ...mapped[0],
+          status: 'غیرفعال',
+          sub_sessions: (mapped[0].sub_sessions || []).map((sub) => ({
+            ...sub,
+            meeting_link: '',
+            session_notes: '',
+          })),
+        },
       };
     }
 
@@ -1971,7 +2964,17 @@ class MySQLDatabaseManager {
     const mapped = await this.mapSessionRowsWithEnrollments(sessionRows);
     return {
       target_type: 'session',
-      session: { ...mapped[0], status: 'غیرفعال' },
+      session: {
+        ...mapped[0],
+        status: 'غیرفعال',
+        meeting_link_or_room: '',
+        member_note: '',
+        sub_sessions: (mapped[0].sub_sessions || []).map((sub) => ({
+          ...sub,
+          meeting_link: '',
+          session_notes: '',
+        })),
+      },
     };
   }
 
@@ -2042,24 +3045,7 @@ class MySQLDatabaseManager {
     const sessions = await this.mapSessionRowsWithEnrollments(rawSessions[0]);
     const classes = await this.mapClassRowsWithEnrollments(rawClasses[0]);
     const users = rawUsers[0].map((u) => stripPassword(u as ClubMemberRow));
-
-    const tickets: MemberTicketRow[] = rawTickets[0].map((t) => ({
-      id: Number(t.id),
-      member_phone: String(t.member_phone),
-      ticket_code: String(t.ticket_code),
-      subject: String(t.subject),
-      department: String(t.department),
-      priority: (t.priority as MemberTicketRow['priority']) || 'عادی',
-      status: (t.status as MemberTicketRow['status']) || 'در انتظار بررسی',
-      message: String(t.message),
-      attachment_name: String(t.attachment_name || ''),
-      admin_reply: String(t.admin_reply || ''),
-      admin_replies: safeJsonParse<{ text: string; created_at: string }[]>(
-        t.admin_replies_json,
-        t.admin_reply ? [{ text: String(t.admin_reply), created_at: String(t.created_at) }] : []
-      ),
-      created_at: String(t.created_at),
-    }));
+    const tickets = await this.hydrateTicketRows(rawTickets[0]);
 
     return {
       admin: { ...adminMember, role: 'admin' },
@@ -2641,6 +3627,7 @@ class MySQLDatabaseManager {
     id: number;
     admin_reply: string;
     status: 'پاسخ داده‌شده' | 'در انتظار بررسی' | 'بسته‌شده';
+    attachments?: TicketAttachmentUploadInput[];
   }): Promise<MemberTicketRow> {
     const [rows] = await this.pool.execute<RowDataPacket[]>(
       'SELECT * FROM member_tickets WHERE id = ? LIMIT 1',
@@ -2652,6 +3639,9 @@ class MySQLDatabaseManager {
 
     const ticket = rows[0];
     const trimmedReply = String(input.admin_reply || '').trim();
+    const validatedAttachments = this.validateAndSanitizeAttachments(input.attachments);
+    const nowLabel = this.formatNowPersianDateTime();
+
     const replies = safeJsonParse<{ text: string; created_at: string }[]>(
       ticket.admin_replies_json,
       ticket.admin_reply
@@ -2659,39 +3649,63 @@ class MySQLDatabaseManager {
         : []
     );
 
+    const hydratedExisting = (await this.hydrateTicketRows([ticket]))[0];
+    const currentMessages = Array.isArray(hydratedExisting.messages)
+      ? hydratedExisting.messages.map(({ attachments: _a, ...rest }) => rest)
+      : [];
+
     let nextReplyText = String(ticket.admin_reply || '');
-    if (trimmedReply) {
+    if (trimmedReply || validatedAttachments.length > 0) {
+      const effectiveReplyText = trimmedReply || 'فایل پیوست توسط مدیریت ارسال شد.';
       replies.push({
-        text: trimmedReply,
-        created_at: 'هم‌اکنون',
+        text: effectiveReplyText,
+        created_at: nowLabel,
       });
-      nextReplyText = trimmedReply;
+      nextReplyText = effectiveReplyText;
+
+      const newMsgIndex = currentMessages.length;
+      currentMessages.push({
+        id: `msg-${ticket.id}-admin-${newMsgIndex}-${Date.now()}`,
+        sender_role: 'admin',
+        text: effectiveReplyText,
+        created_at: nowLabel,
+      });
+
+      if (validatedAttachments.length > 0) {
+        await this.insertTicketAttachments(
+          Number(ticket.id),
+          newMsgIndex,
+          'admin',
+          validatedAttachments,
+          nowLabel
+        );
+      }
     }
 
     await this.pool.execute(
       `UPDATE member_tickets
-       SET admin_reply = ?, admin_replies_json = ?, status = ?
+       SET admin_reply = ?, admin_replies_json = ?, messages_json = ?, status = ?, updated_at = ?
        WHERE id = ?`,
-      [nextReplyText, JSON.stringify(replies), input.status, Number(input.id)]
+      [
+        nextReplyText,
+        JSON.stringify(replies),
+        JSON.stringify(currentMessages),
+        input.status,
+        nowLabel,
+        Number(input.id),
+      ]
     );
 
-    return {
-      id: Number(ticket.id),
-      member_phone: String(ticket.member_phone),
-      ticket_code: String(ticket.ticket_code),
-      subject: String(ticket.subject),
-      department: String(ticket.department),
-      priority: (ticket.priority as MemberTicketRow['priority']) || 'عادی',
-      status: input.status,
-      message: String(ticket.message),
-      attachment_name: String(ticket.attachment_name || ''),
-      admin_reply: nextReplyText,
-      admin_replies: replies,
-      created_at: String(ticket.created_at),
-    };
+    const [updatedRows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_tickets WHERE id = ? LIMIT 1',
+      [Number(input.id)]
+    );
+    const hydrated = await this.hydrateTicketRows(updatedRows);
+    return hydrated[0];
   }
 
   public async deleteAdminTicket(id: number): Promise<void> {
+    await this.pool.execute('DELETE FROM ticket_attachments WHERE ticket_id = ?', [id]);
     await this.pool.execute('DELETE FROM member_tickets WHERE id = ?', [id]);
   }
 
@@ -2761,8 +3775,8 @@ class MySQLDatabaseManager {
 
     const [result] = await this.pool.execute<ResultSetHeader>(
       `INSERT INTO club_announcements
-        (title, category, published_date, summary, content, is_important, is_read, target_user_phone, target_user_name, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 1)`,
+        (title, category, published_date, summary, content, is_important, is_read, read_by_phones_json, target_user_phone, target_user_name, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, 0, '[]', ?, ?, 1)`,
       [title, category, publishedDate, summary, content, isImportant, targetPhone, targetName]
     );
 
@@ -2848,22 +3862,38 @@ class MySQLDatabaseManager {
         throw new Error('مقاله مورد نظر یافت نشد.');
       }
       const existing = rows[0] as BlogPostRow;
-      const nextTitle = input.title ?? existing.title;
+      const nextTitle =
+        input.title !== undefined && String(input.title).trim() !== ''
+          ? String(input.title).trim()
+          : existing.title;
       const nextSlug =
-        input.slug && String(input.slug).trim()
+        input.slug !== undefined && String(input.slug).trim() !== ''
           ? String(input.slug).trim()
           : existing.slug || autoSlug(nextTitle, existing.id);
-      const nextCategory = input.category ?? existing.category;
-      const nextAuthor = input.author ?? existing.author;
-      const nextDate = input.published_date ?? existing.published_date;
+      const nextCategory =
+        input.category !== undefined && String(input.category).trim() !== ''
+          ? String(input.category).trim()
+          : existing.category;
+      const nextAuthor =
+        input.author !== undefined ? String(input.author).trim() : existing.author;
+      const nextDate =
+        input.published_date !== undefined && String(input.published_date).trim() !== ''
+          ? String(input.published_date).trim()
+          : existing.published_date;
       const nextReadingTime =
         input.reading_time !== undefined
           ? String(input.reading_time).trim()
           : existing.reading_time;
       const nextTags =
         input.tags !== undefined ? String(input.tags).trim() : String(existing.tags || '');
-      const nextStatus = input.status ?? existing.status ?? 'منتشر شده';
-      const nextCover = input.cover_url || existing.cover_url || '/assets/blog-1.png';
+      const nextStatus =
+        input.status !== undefined && String(input.status).trim() !== ''
+          ? (String(input.status).trim() as BlogPostRow['status'])
+          : existing.status || 'منتشر شده';
+      const nextCover =
+        input.cover_url !== undefined && String(input.cover_url).trim() !== ''
+          ? String(input.cover_url).trim()
+          : existing.cover_url || '/assets/blog-1.png';
       const nextExcerpt =
         input.excerpt !== undefined ? String(input.excerpt).trim() : existing.excerpt;
       const nextContent =

@@ -245,7 +245,7 @@ function mountApplication(
 
       if (enrollmentToProcess.type === 'course') {
         const course = enrollmentToProcess.course;
-        const noticeMsg = `دوره «${course.title}» با وضعیت غیرفعال در کلاس‌های شما ثبت شد. جهت تایید ثبت‌نام تیکت بزنید یا با شماره ۰۲۱-۸۸۹۴۳۲۱۰ تماس بگیرید.`;
+        const noticeMsg = `دوره «${course.title}» با وضعیت غیرفعال در کلاس‌های شما ثبت شد.`;
         ApiService.enrollMemberInItem({
           member_phone: member.phone,
           member_name: `${member.first_name} ${member.last_name}`.trim(),
@@ -268,7 +268,7 @@ function mountApplication(
 
       if (enrollmentToProcess.type === 'event') {
         const ev = enrollmentToProcess.eventItem;
-        const noticeMsg = `نشست «${ev.title}» با وضعیت غیرفعال در جلسات شما ثبت شد. جهت تایید ثبت‌نام تیکت بزنید یا با شماره ۰۲۱-۸۸۹۴۳۲۱۰ تماس بگیرید.`;
+        const noticeMsg = `نشست «${ev.title}» با وضعیت غیرفعال در جلسات شما ثبت شد.`;
         ApiService.enrollMemberInItem({
           member_phone: member.phone,
           member_name: `${member.first_name} ${member.last_name}`.trim(),

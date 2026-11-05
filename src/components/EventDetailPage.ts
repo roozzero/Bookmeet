@@ -161,8 +161,8 @@ export function createEventDetailPage(
               <!-- CTA Register Bar -->
               <div class="pt-5 border-t border-[#E6D7C3] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <span class="text-[12.5px] text-[#6B5444] block mb-0.5">پس از ثبت نام و تایید مدیر نشست های شما فعال می شود</span>
-                  <span class="text-[13.5px] font-bold text-[#235332]">ثبت در بخش «جلسات من» و تایید توسط مدیریت باشگاه</span>
+                  <span class="text-[12.5px] text-[#6B5444] block mb-0.5">نحوه ثبت‌نام در نشست:</span>
+                  <span class="text-[13.5px] font-bold text-[#235332]">پس از ثبت نام و تایید مدیر نشست های شما فعال می شود:</span>
                 </div>
                 <button
                   type="button"
@@ -271,7 +271,7 @@ export function createEventDetailPage(
                     ${
                       sub.pagesRange
                         ? `<div class="flex items-center justify-between">
-                            <span>محدوده مطالعه:</span>
+                            <span>سر فصل جلسه:</span>
                             <strong class="text-[#7A4B2A]">${toPersianDigits(sub.pagesRange)}</strong>
                           </div>`
                         : ''

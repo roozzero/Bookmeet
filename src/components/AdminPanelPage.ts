@@ -16,6 +16,8 @@ import type {
   MemberSession,
   MemberTicket,
   SessionSubItem,
+  TicketAttachmentMeta,
+  TicketAttachmentUploadInput,
   UserComment,
 } from '../types/models.ts';
 import { toEnglishDigits, toPersianDigits } from '../utils/persianNumbers.ts';
@@ -107,6 +109,184 @@ function normalizeSubSessionStatus(status?: string): 'جلسه آتی' | 'برگ
   return 'جلسه آتی';
 }
 
+const ALLOWED_TICKET_MIME_SET = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+  'text/plain',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/zip',
+  'application/x-zip-compressed',
+]);
+
+function readSingleFileAsAttachment(file: File): Promise<TicketAttachmentUploadInput> {
+  return new Promise((resolve, reject) => {
+    const mime = (file.type || '').toLowerCase().trim();
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    const inferredMime =
+      mime ||
+      (ext === 'jpg' || ext === 'jpeg'
+        ? 'image/jpeg'
+        : ext === 'png'
+        ? 'image/png'
+        : ext === 'webp'
+        ? 'image/webp'
+        : ext === 'gif'
+        ? 'image/gif'
+        : ext === 'pdf'
+        ? 'application/pdf'
+        : ext === 'txt'
+        ? 'text/plain'
+        : ext === 'doc'
+        ? 'application/msword'
+        : ext === 'docx'
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : ext === 'zip'
+        ? 'application/zip'
+        : '');
+
+    if (!ALLOWED_TICKET_MIME_SET.has(inferredMime)) {
+      reject(
+        new Error(
+          `فرمت فایل «${file.name}» مجاز نیست. فرمت‌های مجاز: تصویر (JPG, PNG, WEBP, GIF)، PDF، Word، TXT و ZIP.`
+        )
+      );
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      reject(new Error(`حجم فایل «${file.name}» بیش از حد مجاز (۵ مگابایت) است.`));
+      return;
+    }
+
+    if (inferredMime.startsWith('image/') && inferredMime !== 'image/gif' && file.size > 600 * 1024) {
+      resizeImageToDataUrl(file, 1280)
+        .then((dataUrl) => {
+          resolve({
+            file_name: file.name,
+            mime_type: 'image/jpeg',
+            file_size: Math.round((dataUrl.length * 3) / 4),
+            data_url: dataUrl,
+          });
+        })
+        .catch(() => {
+          const reader = new FileReader();
+          reader.onload = () =>
+            resolve({
+              file_name: file.name,
+              mime_type: inferredMime,
+              file_size: file.size,
+              data_url: String(reader.result || ''),
+            });
+          reader.onerror = () => reject(new Error(`خطا در خواندن فایل «${file.name}»`));
+          reader.readAsDataURL(file);
+        });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve({
+        file_name: file.name,
+        mime_type: inferredMime,
+        file_size: file.size,
+        data_url: String(reader.result || ''),
+      });
+    };
+    reader.onerror = () => reject(new Error(`خطا در خواندن فایل «${file.name}»`));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function readFilesForTicketAttachments(
+  fileList: FileList | null | undefined
+): Promise<TicketAttachmentUploadInput[]> {
+  if (!fileList || fileList.length === 0) return [];
+  const files = Array.from(fileList).slice(0, 5);
+  const results: TicketAttachmentUploadInput[] = [];
+  for (const f of files) {
+    const item = await readSingleFileAsAttachment(f);
+    results.push(item);
+  }
+  return results;
+}
+
+function formatFileSizeFa(bytes: number): string {
+  if (!bytes || bytes <= 0) return '';
+  if (bytes < 1024) return `${toPersianDigits(bytes)} بایت`;
+  if (bytes < 1024 * 1024) return `${toPersianDigits(Math.round(bytes / 1024))} کیلوبایت`;
+  return `${toPersianDigits((bytes / (1024 * 1024)).toFixed(1))} مگابایت`;
+}
+
+function renderTicketAttachmentsHtml(
+  ticketId: number,
+  attachments?: TicketAttachmentMeta[],
+  legacyAttachmentName?: string
+): string {
+  const list = Array.isArray(attachments) ? attachments : [];
+  if (list.length === 0 && !legacyAttachmentName) return '';
+
+  if (list.length === 0 && legacyAttachmentName) {
+    return `
+      <div class="pt-1.5 flex flex-wrap gap-2">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F2E6D5] border border-[#DFCEB9] text-[11.5px] text-[#4E3B2D]">
+          <span>📎 پیوست:</span>
+          <strong>${toPersianDigits(legacyAttachmentName)}</strong>
+        </span>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="pt-2 space-y-2">
+      <div class="flex flex-wrap items-center gap-2">
+        ${list
+          .map((att) => {
+            const url = ApiService.getTicketAttachmentUrl(ticketId, att.id);
+            const isImage = (att.mime_type || '').startsWith('image/');
+            const sizeLabel = formatFileSizeFa(att.file_size);
+            return `
+              <div class="inline-flex flex-col gap-1.5 p-2 rounded-xl bg-[#FAF5EC] border border-[#D8C4AA] max-w-full">
+                ${
+                  isImage
+                    ? `
+                      <a href="${url}" target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded-lg border border-[#E5D7C5] bg-[#F4E9DA]">
+                        <img src="${url}" alt="${att.file_name}" class="max-h-36 w-auto object-contain mx-auto" loading="lazy" />
+                      </a>
+                    `
+                    : ''
+                }
+                <div class="flex items-center justify-between gap-2 text-[11.5px]">
+                  <a
+                    href="${url}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center gap-1.5 font-semibold text-[#5A3A22] hover:text-[#231912] underline truncate max-w-[220px]"
+                  >
+                    <span>${isImage ? '🖼️' : '📎'}</span>
+                    <span class="truncate">${toPersianDigits(att.file_name)}</span>
+                  </a>
+                  ${sizeLabel ? `<span class="text-[10.5px] text-[#7A6352] shrink-0">(${sizeLabel})</span>` : ''}
+                  <a
+                    href="${url}${url.includes('?') ? '&' : '?'}download=1"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="px-2 py-0.5 rounded-md bg-[#EFE3D2] hover:bg-[#E2D0B7] text-[#3F2E21] text-[10.5px] font-semibold shrink-0"
+                  >
+                    دانلود
+                  </a>
+                </div>
+              </div>
+            `;
+          })
+          .join('')}
+      </div>
+    </div>
+  `;
+}
+
 export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuery {
   let state: AdminPanelPayload = {
     admin: { ...props.initialData.admin },
@@ -131,7 +311,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   let gallerySearch = '';
   let galleryCategoryFilter = 'all';
   let newGalleryImageUrl = '';
-  let galleryPickerTarget: null | 'session' | 'class' | 'blog' = null;
+  let galleryPickerTarget: null | 'session' | 'class' | 'blog' | 'blog_inline' = null;
+  let blogInlineImageSize: 'full' | 'lg' | 'md' | 'sm' = 'lg';
 
   // Universal action confirmation modal state (used for Delete, Approve Enrollment, Cancel Enrollment)
   let pendingDeleteConfirm: {
@@ -717,6 +898,15 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   placeholder="متن پیام یا راهنمایی جهت تکمیل و تایید ثبت‌نام را بنویسید..."
                   class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] leading-[1.8]"
                 >هم‌خوان گرامی، درخواست ثبت‌نام شما در «${toPersianDigits(ticketTargetEnrollment.course_or_session_title)}» بررسی شد. لطفاً جهت هماهنگی نهایی پاسخ خود را در همین تیکت ثبت فرمایید.</textarea>
+              </div>
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">پیوست فایل یا تصویر (اختیاری - حداکثر ۵ فایل تا ۵ مگابایت)</label>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,.doc,.docx,.txt,.zip"
+                  class="js-admin-member-ticket-files w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12px] text-[#4E3B2D] file:ml-3 file:px-3 file:py-1 file:rounded-lg file:border-0 file:bg-[#5A3A22] file:text-[#FAF5EC] file:text-[11.5px] file:font-semibold file:cursor-pointer"
+                />
               </div>
             </div>
 
@@ -1561,12 +1751,12 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               />
             </div>
             <div>
-              <label class="block text-[11.5px] font-semibold text-[#4E3B2D] mb-1">صفحات مطالعه</label>
+              <label class="block text-[11.5px] font-semibold text-[#4E3B2D] mb-1">سر فصل جلسه</label>
               <input
                 type="text"
                 name="pages_to_read"
                 value="${toPersianDigits(subBeingEdited?.pages_to_read || '')}"
-                placeholder="صفحات ۱ تا ۹۰"
+                placeholder="مثلاً: فصل اول و دوم (صفحات ۱ تا ۹۰)"
                 class="js-persian-digits-input w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
               />
             </div>
@@ -1649,7 +1839,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   </span>
                 </div>
                 <h4 class="font-display text-[15.5px] font-bold text-[#231912]">${toPersianDigits(sub.title)}</h4>
-                <p class="text-[12px] text-[#5B4739]">محدوده مطالعه: ${toPersianDigits(sub.pages_to_read || String(sub.pages_read || '—'))}</p>
+                <p class="text-[12px] text-[#5B4739]">سر فصل جلسه: ${toPersianDigits(sub.pages_to_read || String(sub.pages_read || '—'))}</p>
               </div>
               <div class="pt-2 border-t border-[#E6D8C5] flex justify-end gap-2">
                 <button
@@ -2340,70 +2530,106 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         <div class="space-y-4">
           ${filteredTickets
             .map((ticket) => {
-              const repliesList =
-                Array.isArray(ticket.admin_replies) && ticket.admin_replies.length > 0
-                  ? ticket.admin_replies
-                  : ticket.admin_reply
-                  ? [{ text: ticket.admin_reply, created_at: ticket.created_at || 'ثبت‌شده' }]
-                  : [];
+              const messagesList =
+                Array.isArray(ticket.messages) && ticket.messages.length > 0
+                  ? ticket.messages
+                  : [
+                      {
+                        id: `init-${ticket.id}`,
+                        sender_role: 'member' as const,
+                        sender_name: ticket.member_phone || 'کاربر باشگاه',
+                        text: ticket.message || '',
+                        created_at: ticket.created_at || 'ثبت‌شده',
+                        attachments: (ticket.attachments || []).filter((a) => a.uploader_role === 'member'),
+                      },
+                      ...(Array.isArray(ticket.admin_replies) && ticket.admin_replies.length > 0
+                        ? ticket.admin_replies.map((rep, idx) => ({
+                            id: `adm-${ticket.id}-${idx}`,
+                            sender_role: 'admin' as const,
+                            sender_name: 'مدیر باشگاه',
+                            text: rep.text,
+                            created_at: rep.created_at || ticket.created_at || 'ثبت‌شده',
+                            attachments: (rep as { attachments?: TicketAttachmentMeta[] }).attachments || [],
+                          }))
+                        : ticket.admin_reply
+                        ? [
+                            {
+                              id: `adm-single-${ticket.id}`,
+                              sender_role: 'admin' as const,
+                              sender_name: 'مدیر باشگاه',
+                              text: ticket.admin_reply,
+                              created_at: ticket.updated_at || ticket.created_at || 'ثبت‌شده',
+                              attachments: (ticket.attachments || []).filter((a) => a.uploader_role === 'admin'),
+                            },
+                          ]
+                        : []),
+                    ];
+
+              const statusBadgeClass =
+                ticket.status === 'پاسخ داده‌شده'
+                  ? 'bg-[#E4F2E7] text-[#235332] border-[#BBD9C2]'
+                  : ticket.status === 'بسته‌شده'
+                  ? 'bg-[#EAE0D2] text-[#5B4739] border-[#D5C3AE]'
+                  : 'bg-[#FFF3CD] text-[#7A5A10] border-[#E5C77B]';
 
               return `
             <div data-admin-ticket-card="${ticket.id}" class="p-5 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] space-y-4">
               <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="flex items-center gap-2.5">
+                <div class="flex items-center gap-2.5 flex-wrap">
                   <span class="font-mono text-[12px] font-bold px-2.5 py-1 rounded-md bg-[#EFE3D2] text-[#4E3B2D]">
                     #${toPersianDigits(ticket.ticket_code)}
                   </span>
                   <h3 class="font-display text-[16.5px] font-bold text-[#231912]">${toPersianDigits(ticket.subject)}</h3>
+                  <span class="px-2.5 py-0.5 rounded-md border text-[11px] font-semibold ${statusBadgeClass}">
+                    ${toPersianDigits(ticket.status)}
+                  </span>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                   <span class="text-[11.5px] px-2.5 py-0.5 rounded-md bg-[#F3E9DA] text-[#6B5444]">
                     بخش: ${toPersianDigits(ticket.department)}
                   </span>
                   <span class="text-[11.5px] px-2.5 py-0.5 rounded-md bg-[#EFE3D2] text-[#4E3B2D]">
                     فرستنده: ${toPersianDigits(ticket.member_phone)}
                   </span>
+                  <span class="text-[11px] text-[#7A6352]">
+                    ایجاد: ${toPersianDigits(ticket.created_at)}
+                  </span>
                 </div>
               </div>
 
-              <p class="text-[13.5px] text-[#3D2E22] leading-[1.85] text-justify bg-[#F4E9DA]/50 p-3.5 rounded-xl border border-[#E8DAC6]">
-                ${toPersianDigits(ticket.message)}
-              </p>
-
-              ${
-                ticket.attachment_name
-                  ? `
-                <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#F2E6D5] border border-[#DFCEB9] text-[12px] text-[#4E3B2D]">
-                  <span>📎 فایل پیوست کاربر:</span>
-                  <strong>${toPersianDigits(ticket.attachment_name)}</strong>
-                </div>
-              `
-                  : ''
-              }
-
-              <!-- Existing Replies List -->
-              ${
-                repliesList.length > 0
-                  ? `
-                <div class="space-y-2 pt-2">
-                  <div class="text-[12px] font-bold text-[#235332]">پاسخ‌های ثبت‌شده دبیرخانه:</div>
-                  ${repliesList
-                    .map(
-                      (rep) => `
-                    <div class="p-3.5 rounded-xl bg-[#EEF6F0] border border-[#C5DFCC] text-[13px] text-[#1E3F29] space-y-1">
-                      <div class="flex items-center justify-between text-[11px] text-[#3B6E4C]">
-                        <span class="font-bold">پاسخ مدیر باشگاه</span>
-                        <span>${toPersianDigits(rep.created_at)}</span>
+              <!-- Full Conversation Thread -->
+              <div class="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                ${messagesList
+                  .map((msg, msgIdx) => {
+                    const isAdmin = msg.sender_role === 'admin';
+                    const msgAttachments = Array.isArray(msg.attachments) ? msg.attachments : [];
+                    const legacyName =
+                      msgIdx === 0 && msgAttachments.length === 0 ? ticket.attachment_name : undefined;
+                    return `
+                      <div class="p-3.5 rounded-xl border ${
+                        isAdmin
+                          ? 'bg-[#EEF6F0] border-[#C5DFCC] text-[#1E3F29]'
+                          : 'bg-[#F4E9DA]/55 border-[#E8DAC6] text-[#3D2E22]'
+                      } space-y-1.5">
+                        <div class="flex items-center justify-between gap-2 text-[11px] ${
+                          isAdmin ? 'text-[#235332]' : 'text-[#6B5444]'
+                        }">
+                          <span class="font-bold">
+                            ${isAdmin ? 'پاسخ مدیر باشگاه / دبیرخانه' : `پیام کاربر (${toPersianDigits(ticket.member_phone)})`}
+                          </span>
+                          <span>${toPersianDigits(msg.created_at || ticket.created_at)}</span>
+                        </div>
+                        ${
+                          msg.text
+                            ? `<p class="text-[13px] leading-[1.85] text-justify whitespace-pre-line">${toPersianDigits(msg.text)}</p>`
+                            : ''
+                        }
+                        ${renderTicketAttachmentsHtml(ticket.id, msgAttachments, legacyName)}
                       </div>
-                      <p class="leading-[1.8] text-justify">${toPersianDigits(rep.text)}</p>
-                    </div>
-                  `
-                    )
-                    .join('')}
-                </div>
-              `
-                  : ''
-              }
+                    `;
+                  })
+                  .join('')}
+              </div>
 
               <div class="pt-3 border-t border-[#E6D8C5] space-y-3">
                 <div>
@@ -2413,6 +2639,18 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     placeholder="متن پاسخ جدید خود را اینجا بنویسید..."
                     class="js-admin-ticket-reply-input w-full px-3.5 py-2.5 rounded-xl bg-[#FDFBF7] border border-[#DFCEB9] text-[13px] text-[#231912]"
                   ></textarea>
+                </div>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-[#F4E9DA]/50 border border-[#E2D2BE]">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <label class="text-[11.5px] font-semibold text-[#4E3B2D]">📎 پیوست فایل یا تصویر به پاسخ (اختیاری):</label>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,.pdf,.doc,.docx,.txt,.zip"
+                      class="js-admin-ticket-reply-files text-[11.5px] text-[#4E3B2D] file:ml-2 file:px-3 file:py-1 file:rounded-lg file:border-0 file:bg-[#5A3A22] file:text-[#FAF5EC] file:text-[11px] file:font-semibold file:cursor-pointer"
+                    />
+                  </div>
+                  <span class="text-[10.5px] text-[#7A6352]">فرمت‌های مجاز: تصویر، PDF، Word، ZIP (حداکثر ۵ مگابایت)</span>
                 </div>
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div class="flex items-center gap-2">
@@ -2436,7 +2674,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                       data-save-ticket="${ticket.id}"
                       class="js-admin-save-ticket px-5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer"
                     >
-                      ثبت پاسخ
+                      ثبت پاسخ / ذخیره وضعیت
                     </button>
                   </div>
                 </div>
@@ -2769,10 +3007,11 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 />
               </div>
 
-              <!-- Cover Picker from Gallery -->
+              <!-- Cover Picker from Gallery or Direct Upload -->
               <div class="sm:col-span-3">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">تصویر کاور مقاله *</label>
                 <input type="hidden" name="cover_url" value="${editingBlogPost.cover_url || '/assets/blog-1.png'}" />
+                <input type="file" accept="image/*" class="js-admin-blog-cover-file-input hidden" />
                 <div class="flex flex-wrap items-center justify-between gap-4 p-3.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9]">
                   <div class="flex items-center gap-3.5">
                     <img
@@ -2782,16 +3021,28 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     />
                     <div>
                       <div class="text-[13px] font-bold text-[#231912]">تصویر شاخص مقاله</div>
-                      <div dir="ltr" class="text-[11.5px] text-[#6B5444] text-left">${editingBlogPost.cover_url || '/assets/blog-1.png'}</div>
+                      <div dir="ltr" class="text-[11.5px] text-[#6B5444] text-left max-w-[260px] truncate">${
+                        (editingBlogPost.cover_url || '').startsWith('data:image/')
+                          ? 'تصویر آپلود شده اختصاصی'
+                          : editingBlogPost.cover_url || '/assets/blog-1.png'
+                      }</div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    data-gallery-target="blog"
-                    class="js-admin-open-gallery-picker px-4 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer"
-                  >
-                    انتخاب تصویر کاور از گالری تصاویر
-                  </button>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      class="js-admin-trigger-blog-cover-upload px-3.5 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] text-[12px] font-semibold cursor-pointer"
+                    >
+                      + آپلود تصویر از دستگاه
+                    </button>
+                    <button
+                      type="button"
+                      data-gallery-target="blog"
+                      class="js-admin-open-gallery-picker px-4 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer"
+                    >
+                      انتخاب تصویر کاور از گالری تصاویر
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2928,6 +3179,14 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     </button>
                     <button
                       type="button"
+                      data-editor-cmd="image"
+                      title="درج تصویر در متن مقاله"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#5A3A22] hover:bg-[#432A18] text-[12px] font-semibold text-[#FAF5EC] cursor-pointer"
+                    >
+                      🖼️ درج تصویر در متن
+                    </button>
+                    <button
+                      type="button"
                       data-editor-cmd="undo"
                       title="بازگشت به قبل (Undo)"
                       class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
@@ -2975,12 +3234,80 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     </button>
                   </div>
 
+                  <!-- Inline Image Inserter & Size Bar (Hidden by default) -->
+                  <div class="js-blog-image-bar hidden px-3.5 py-3 bg-[#F4E9DA] border-b border-[#DFCEB9] space-y-2.5">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-[12px] font-bold text-[#231912]">درج تصویر در محل مکان‌نما:</span>
+                        <input type="file" accept="image/*" class="js-blog-inline-image-file hidden" />
+                        <button
+                          type="button"
+                          class="js-blog-trigger-inline-upload px-3 py-1.5 rounded-lg bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[11.5px] font-semibold cursor-pointer"
+                        >
+                          + آپلود تصویر از دستگاه
+                        </button>
+                        <button
+                          type="button"
+                          data-gallery-target="blog_inline"
+                          class="js-admin-open-gallery-picker px-3 py-1.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#C5B198] text-[#3F2E21] text-[11.5px] font-semibold cursor-pointer"
+                        >
+                          انتخاب از گالری باشگاه
+                        </button>
+                      </div>
+                      <div class="flex items-center gap-1.5">
+                        <span class="text-[11.5px] font-semibold text-[#4E3B2D]">اندازه نمایش تصویر:</span>
+                        <select class="js-blog-inline-image-size px-2.5 py-1 rounded-lg bg-[#FAF5EC] border border-[#C5B198] text-[11.5px] text-[#231912]">
+                          <option value="full" ${blogInlineImageSize === 'full' ? 'selected' : ''}>تمام‌عرض (۱۰۰٪)</option>
+                          <option value="lg" ${blogInlineImageSize === 'lg' ? 'selected' : ''}>بزرگ (۷۵٪)</option>
+                          <option value="md" ${blogInlineImageSize === 'md' ? 'selected' : ''}>متوسط (۵۰٪)</option>
+                          <option value="sm" ${blogInlineImageSize === 'sm' ? 'selected' : ''}>کوچک (۳۵٪)</option>
+                        </select>
+                        <button
+                          type="button"
+                          class="js-blog-close-image-bar px-2.5 py-1 rounded-lg border border-[#C5B198] text-[11.5px] font-semibold text-[#4E3B2D] cursor-pointer"
+                        >
+                          بستن
+                        </button>
+                      </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="text-[11.5px] text-[#6B5444]">یا درج با لینک مستقیم تصویر:</span>
+                      <input
+                        type="text"
+                        dir="ltr"
+                        placeholder="https://example.com/photo.jpg یا /assets/blog-1.png"
+                        class="js-blog-inline-image-url flex-1 min-w-[200px] px-3 py-1.5 rounded-lg bg-[#FAF5EC] border border-[#D8C4AA] text-[12px] text-[#231912] text-left"
+                      />
+                      <button
+                        type="button"
+                        class="js-blog-insert-url-image px-3.5 py-1.5 rounded-lg bg-[#3F2E21] hover:bg-[#231912] text-[#FAF5EC] text-[11.5px] font-semibold cursor-pointer"
+                      >
+                        درج تصویر از لینک
+                      </button>
+                    </div>
+                    <p class="text-[11px] text-[#6B5444]">
+                      نکته: با کلیک روی هر تصویر داخل متن نیز می‌توانید اندازه آن را بین تمام‌عرض، بزرگ، متوسط یا کوچک تغییر دهید.
+                    </p>
+                  </div>
+
+                  <!-- Selected Image Quick Resize Bar (Shown when clicking an image inside editor) -->
+                  <div class="js-blog-selected-img-toolbar hidden px-3.5 py-2 bg-[#EFE3D2] border-b border-[#DFCEB9] flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[11.5px] font-bold text-[#231912]">تنظیم اندازه تصویر انتخاب‌شده در متن:</span>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <button type="button" data-set-img-size="full" class="js-blog-resize-selected-img px-2.5 py-1 rounded-lg bg-[#FAF5EC] hover:bg-[#5A3A22] hover:text-[#FAF5EC] border border-[#C5B198] text-[11px] font-semibold cursor-pointer">تمام‌عرض (۱۰۰٪)</button>
+                      <button type="button" data-set-img-size="lg" class="js-blog-resize-selected-img px-2.5 py-1 rounded-lg bg-[#FAF5EC] hover:bg-[#5A3A22] hover:text-[#FAF5EC] border border-[#C5B198] text-[11px] font-semibold cursor-pointer">بزرگ (۷۵٪)</button>
+                      <button type="button" data-set-img-size="md" class="js-blog-resize-selected-img px-2.5 py-1 rounded-lg bg-[#FAF5EC] hover:bg-[#5A3A22] hover:text-[#FAF5EC] border border-[#C5B198] text-[11px] font-semibold cursor-pointer">متوسط (۵۰٪)</button>
+                      <button type="button" data-set-img-size="sm" class="js-blog-resize-selected-img px-2.5 py-1 rounded-lg bg-[#FAF5EC] hover:bg-[#5A3A22] hover:text-[#FAF5EC] border border-[#C5B198] text-[11px] font-semibold cursor-pointer">کوچک (۳۵٪)</button>
+                      <button type="button" class="js-blog-remove-selected-img px-2.5 py-1 rounded-lg bg-[#FBEAE8] hover:bg-[#F5D5D1] border border-[#E6B8B3] text-[#9E3329] text-[11px] font-semibold cursor-pointer">حذف تصویر</button>
+                    </div>
+                  </div>
+
                   <!-- RTL ContentEditable Rich Text Surface -->
                   <div
                     dir="rtl"
                     contenteditable="true"
-                    data-placeholder="متن کامل مقاله، تیترها، لیست‌ها و تحلیل‌های ادبی را در این بخش بنویسید..."
-                    class="js-admin-blog-wysiwyg min-h-[280px] w-full px-4 py-3.5 bg-[#FAF5EC] text-[14px] text-[#231912] leading-[2] focus:outline-none [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-[#2d1c10] [&_h2]:my-2.5 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-[#382315] [&_h3]:my-2 [&_ul]:list-disc [&_ul]:pr-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pr-6 [&_ol]:my-2 [&_blockquote]:my-3 [&_blockquote]:p-4 [&_blockquote]:bg-[#f2ecde] [&_blockquote]:border-r-4 [&_blockquote]:border-[#6b4c32] [&_blockquote]:rounded-l-xl [&_a]:text-[#7a4b2a] [&_a]:underline empty:before:content-[attr(data-placeholder)] empty:before:text-[#8C7662]"
+                    data-placeholder="متن کامل مقاله، تیترها، لیست‌ها، تصاویر و تحلیل‌های ادبی را در این بخش بنویسید..."
+                    class="js-admin-blog-wysiwyg min-h-[280px] w-full px-4 py-3.5 bg-[#FAF5EC] text-[14px] text-[#231912] leading-[2] focus:outline-none [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-[#2d1c10] [&_h2]:my-2.5 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-[#382315] [&_h3]:my-2 [&_ul]:list-disc [&_ul]:pr-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pr-6 [&_ol]:my-2 [&_blockquote]:my-3 [&_blockquote]:p-4 [&_blockquote]:bg-[#f2ecde] [&_blockquote]:border-r-4 [&_blockquote]:border-[#6b4c32] [&_blockquote]:rounded-l-xl [&_a]:text-[#7a4b2a] [&_a]:underline [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-2xl [&_img]:my-4 [&_img]:mx-auto [&_img]:block [&_img]:border [&_img]:border-[#DFCEB9] [&_img]:cursor-pointer [&_img[data-img-size='full']]:w-full [&_img[data-img-size='lg']]:w-full [&_img[data-img-size='lg']]:sm:w-3/4 [&_img[data-img-size='md']]:w-full [&_img[data-img-size='md']]:sm:w-1/2 [&_img[data-img-size='sm']]:w-2/3 [&_img[data-img-size='sm']]:sm:w-1/3 empty:before:content-[attr(data-placeholder)] empty:before:text-[#8C7662]"
                   >${normalizeArticleHtml(editingBlogPost.full_content || '')}</div>
 
                   <textarea
@@ -3013,7 +3340,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     const q = blogSearch.trim().toLowerCase();
     const filteredPosts = state.blogPosts.filter((p) => {
       if (!q) return true;
-      return `${p.title} ${p.category} ${p.author}`.toLowerCase().includes(q);
+      return `${p.title} ${p.category} ${p.author} ${p.tags || ''}`.toLowerCase().includes(q);
     });
 
     return `
@@ -3052,6 +3379,13 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   <img src="${post.cover_url || '/assets/blog-1.png'}" alt="${post.title}" class="w-full h-full object-cover" />
                   <div class="absolute bottom-3 right-3 px-2.5 py-1 rounded-lg bg-[#5A3A22]/90 text-[#FAF5EC] text-[11px] font-semibold">
                     ${toPersianDigits(post.category)}
+                  </div>
+                  <div class="absolute top-3 left-3 px-2.5 py-0.5 rounded-lg text-[11px] font-bold ${
+                    post.status === 'پیش‌نویس'
+                      ? 'bg-[#FFF3CD] text-[#7A5A10] border border-[#E5C77B]'
+                      : 'bg-[#E4F2E7] text-[#235332] border border-[#BBD9C2]'
+                  }">
+                    ${toPersianDigits(post.status || 'منتشر شده')}
                   </div>
                 </div>
                 <div class="p-5 space-y-2.5">
@@ -3629,7 +3963,15 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   // --- Gallery Picker Modal Handlers ---
   $wrapper.on('click', '.js-admin-open-gallery-picker', function () {
     syncOpenFormsFromDom();
-    const target = $(this).data('gallery-target') as 'session' | 'class' | 'blog';
+    const target = $(this).data('gallery-target') as
+      | 'session'
+      | 'class'
+      | 'blog'
+      | 'blog_inline';
+    const sizeSelectVal = String($wrapper.find('.js-blog-inline-image-size').val() || '');
+    if (sizeSelectVal === 'full' || sizeSelectVal === 'lg' || sizeSelectVal === 'md' || sizeSelectVal === 'sm') {
+      blogInlineImageSize = sizeSelectVal;
+    }
     galleryPickerTarget = target;
     render();
   });
@@ -3652,16 +3994,26 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     syncOpenFormsFromDom();
     const url = String($(this).data('pick-image-url') || '');
     if (!url) return;
-    if (galleryPickerTarget === 'session' && editingSession) {
+    const pickedTarget = galleryPickerTarget;
+    if (pickedTarget === 'session' && editingSession) {
       editingSession.cover_url = url;
-    } else if (galleryPickerTarget === 'class' && editingClass) {
+    } else if (pickedTarget === 'class' && editingClass) {
       editingClass.cover_url = url;
-    } else if (galleryPickerTarget === 'blog' && editingBlogPost) {
+    } else if (pickedTarget === 'blog' && editingBlogPost) {
       editingBlogPost.cover_url = url;
+    } else if (pickedTarget === 'blog_inline' && editingBlogPost) {
+      const imgHtml = `<p><img src="${url}" alt="تصویر مقاله" data-img-size="${blogInlineImageSize}" /></p>`;
+      editingBlogPost.full_content = sanitizeRichHtml(
+        `${editingBlogPost.full_content || ''}${imgHtml}`
+      );
     }
     galleryPickerTarget = null;
     render();
-    showToast('تصویر کاور از گالری تصاویر انتخاب شد.');
+    showToast(
+      pickedTarget === 'blog_inline'
+        ? 'تصویر انتخاب‌شده به متن مقاله اضافه شد.'
+        : 'تصویر کاور از گالری تصاویر انتخاب شد.'
+    );
   });
 
   // --- Gallery Tab Handlers ---
@@ -4304,15 +4656,21 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       | 'مهم'
       | 'فوری';
     const message = String($f.find('[name="ticket_message"]').val() || '').trim();
+    const fileInput = $f.find('.js-admin-member-ticket-files')[0] as HTMLInputElement | undefined;
     if (!subject || !message) return;
 
-    ApiService.createMemberTicket({
-      member_phone: targetInfo.member_phone,
-      subject,
-      department,
-      priority,
-      message,
-    })
+    readFilesForTicketAttachments(fileInput?.files)
+      .then((attachments) =>
+        ApiService.createMemberTicket({
+          member_phone: targetInfo.member_phone,
+          subject,
+          department,
+          priority,
+          message,
+          attachment_name: attachments[0]?.file_name,
+          attachments,
+        })
+      )
       .then((res) => {
         state.tickets = [res.ticket, ...state.tickets];
         ticketTargetEnrollment = null;
@@ -4515,24 +4873,32 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
 
   $wrapper.on('click', '.js-admin-save-ticket', function () {
     const id = Number($(this).data('save-ticket'));
+    const existingTicket = state.tickets.find((t) => Number(t.id) === id);
     const $card = $wrapper.find(`[data-admin-ticket-card="${id}"]`);
     const $textarea = $card.find('.js-admin-ticket-reply-input');
     const admin_reply = String($textarea.val() || '').trim();
     const status = String(
       $card.find('.js-admin-ticket-status-select').val() || 'پاسخ داده‌شده'
     ) as MemberTicket['status'];
+    const fileInput = $card.find('.js-admin-ticket-reply-files')[0] as HTMLInputElement | undefined;
+    const hasFiles = Boolean(fileInput?.files && fileInput.files.length > 0);
+    const statusChanged = existingTicket && existingTicket.status !== status;
 
-    if (!admin_reply) {
-      showToast('لطفاً متن پاسخ را وارد نمایید.', true);
+    if (!admin_reply && !hasFiles && !statusChanged) {
+      showToast('لطفاً متن پاسخ را وارد کنید، فایل پیوست انتخاب نمایید یا وضعیت تیکت را تغییر دهید.', true);
       return;
     }
 
-    ApiService.replyAdminTicket({ id, admin_reply, status })
+    readFilesForTicketAttachments(fileInput?.files)
+      .then((attachments) =>
+        ApiService.replyAdminTicket({ id, admin_reply, status, attachments })
+      )
       .then((res) => {
-        state.tickets = state.tickets.map((t) => (t.id === id ? res.ticket : t));
+        state.tickets = state.tickets.map((t) => (Number(t.id) === id ? res.ticket : t));
         $textarea.val('');
+        if (fileInput) fileInput.value = '';
         render();
-        showToast('پاسخ شما به تیکت اضافه شد.');
+        showToast('پاسخ و وضعیت تیکت با موفقیت ذخیره شد.');
       })
       .catch((err) => showToast(err.message || 'خطا در ثبت پاسخ تیکت', true));
   });
@@ -4773,6 +5139,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
 
   // Rich Text WYSIWYG Editor Toolbar & Sync Handlers for Blog Content
   let savedLinkSelectionRange: Range | null = null;
+  let savedImageSelectionRange: Range | null = null;
+  let selectedInlineImgEl: HTMLImageElement | null = null;
 
   function syncBlogWysiwygToHiddenInput(): void {
     const editorEl = $wrapper.find('.js-admin-blog-wysiwyg')[0] as HTMLElement | undefined;
@@ -4785,8 +5153,147 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     }
   }
 
+  function insertInlineImageIntoBlogEditor(src: string, size: 'full' | 'lg' | 'md' | 'sm'): void {
+    const cleanSrc = String(src || '').trim();
+    if (!cleanSrc) return;
+    const editorEl = $wrapper.find('.js-admin-blog-wysiwyg')[0] as HTMLElement | undefined;
+    const imgMarkup = `<p><img src="${cleanSrc}" alt="تصویر مقاله" data-img-size="${size}" /></p>`;
+    if (!editorEl) {
+      if (editingBlogPost) {
+        editingBlogPost.full_content = sanitizeRichHtml(
+          `${editingBlogPost.full_content || ''}${imgMarkup}`
+        );
+      }
+      render();
+      return;
+    }
+
+    editorEl.focus();
+    if (savedImageSelectionRange) {
+      const sel = window.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(savedImageSelectionRange);
+      }
+    }
+    const inserted = document.execCommand('insertHTML', false, imgMarkup);
+    if (!inserted) {
+      $(editorEl).append(imgMarkup);
+    }
+    savedImageSelectionRange = null;
+    syncBlogWysiwygToHiddenInput();
+  }
+
+  $wrapper.on('click', '.js-admin-trigger-blog-cover-upload', () => {
+    $wrapper.find('.js-admin-blog-cover-file-input').trigger('click');
+  });
+
+  $wrapper.on('change', '.js-admin-blog-cover-file-input', function (event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    syncOpenFormsFromDom();
+    resizeImageToDataUrl(file, 960)
+      .then((dataUrl) => {
+        if (editingBlogPost) {
+          editingBlogPost.cover_url = dataUrl;
+        }
+        render();
+        showToast('تصویر کاور مقاله بارگذاری شد.');
+      })
+      .catch((err) => showToast(err.message || 'خطا در بارگذاری تصویر کاور', true));
+  });
+
   $wrapper.on('input keyup paste', '.js-admin-blog-wysiwyg', () => {
     syncBlogWysiwygToHiddenInput();
+  });
+
+  $wrapper.on('click', '.js-admin-blog-wysiwyg', function (e) {
+    const target = e.target as HTMLElement;
+    if (target && target.tagName === 'IMG') {
+      selectedInlineImgEl = target as HTMLImageElement;
+      $wrapper.find('.js-blog-selected-img-toolbar').removeClass('hidden');
+    } else {
+      selectedInlineImgEl = null;
+      $wrapper.find('.js-blog-selected-img-toolbar').addClass('hidden');
+    }
+  });
+
+  $wrapper.on('click', '.js-blog-resize-selected-img', function () {
+    const size = String($(this).data('set-img-size') || 'lg') as 'full' | 'lg' | 'md' | 'sm';
+    if (selectedInlineImgEl) {
+      selectedInlineImgEl.setAttribute('data-img-size', size);
+      syncBlogWysiwygToHiddenInput();
+      showToast('اندازه تصویر داخل متن بروزرسانی شد.');
+    }
+  });
+
+  $wrapper.on('click', '.js-blog-remove-selected-img', () => {
+    if (selectedInlineImgEl) {
+      const parentP = selectedInlineImgEl.closest('p, figure');
+      selectedInlineImgEl.remove();
+      if (parentP && !parentP.textContent?.trim() && parentP.querySelectorAll('img').length === 0) {
+        parentP.remove();
+      }
+      selectedInlineImgEl = null;
+      $wrapper.find('.js-blog-selected-img-toolbar').addClass('hidden');
+      syncBlogWysiwygToHiddenInput();
+      showToast('تصویر از متن مقاله حذف شد.');
+    }
+  });
+
+  $wrapper.on('change', '.js-blog-inline-image-size', function () {
+    const val = String($(this).val() || 'lg');
+    if (val === 'full' || val === 'lg' || val === 'md' || val === 'sm') {
+      blogInlineImageSize = val;
+    }
+  });
+
+  $wrapper.on('click', '.js-blog-trigger-inline-upload', () => {
+    $wrapper.find('.js-blog-inline-image-file').trigger('click');
+  });
+
+  $wrapper.on('change', '.js-blog-inline-image-file', function (event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const sizeVal = String($wrapper.find('.js-blog-inline-image-size').val() || blogInlineImageSize) as
+      | 'full'
+      | 'lg'
+      | 'md'
+      | 'sm';
+    blogInlineImageSize = sizeVal;
+    resizeImageToDataUrl(file, 1080)
+      .then((dataUrl) => {
+        insertInlineImageIntoBlogEditor(dataUrl, blogInlineImageSize);
+        input.value = '';
+        $wrapper.find('.js-blog-image-bar').addClass('hidden');
+        showToast('تصویر در متن مقاله درج شد.');
+      })
+      .catch((err) => showToast(err.message || 'خطا در درج تصویر', true));
+  });
+
+  $wrapper.on('click', '.js-blog-insert-url-image', () => {
+    const rawUrl = String($wrapper.find('.js-blog-inline-image-url').val() || '').trim();
+    if (!rawUrl) {
+      showToast('لطفاً لینک تصویر را وارد نمایید.', true);
+      return;
+    }
+    const sizeVal = String($wrapper.find('.js-blog-inline-image-size').val() || blogInlineImageSize) as
+      | 'full'
+      | 'lg'
+      | 'md'
+      | 'sm';
+    blogInlineImageSize = sizeVal;
+    insertInlineImageIntoBlogEditor(rawUrl, blogInlineImageSize);
+    $wrapper.find('.js-blog-inline-image-url').val('');
+    $wrapper.find('.js-blog-image-bar').addClass('hidden');
+    showToast('تصویر از لینک در متن مقاله درج شد.');
+  });
+
+  $wrapper.on('click', '.js-blog-close-image-bar', () => {
+    $wrapper.find('.js-blog-image-bar').addClass('hidden');
+    savedImageSelectionRange = null;
   });
 
   $wrapper.on('click', '.js-blog-editor-tool', function (e) {
@@ -4852,11 +5359,22 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         if (sel && sel.rangeCount > 0) {
           savedLinkSelectionRange = sel.getRangeAt(0).cloneRange();
         }
+        $wrapper.find('.js-blog-image-bar').addClass('hidden');
         const $bar = $wrapper.find('.js-blog-link-bar');
         $bar.toggleClass('hidden');
         if (!$bar.hasClass('hidden')) {
           $bar.find('.js-blog-link-url-input').val('https://').trigger('focus');
         }
+        return;
+      }
+      case 'image': {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          savedImageSelectionRange = sel.getRangeAt(0).cloneRange();
+        }
+        $wrapper.find('.js-blog-link-bar').addClass('hidden');
+        const $imgBar = $wrapper.find('.js-blog-image-bar');
+        $imgBar.toggleClass('hidden');
         return;
       }
       default:
@@ -4921,11 +5439,21 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       ? editorEl.innerHTML
       : String($f.find('[name="full_content"]').val() || '');
     const sanitizedContent = sanitizeRichHtml(rawEditorHtml);
+    const hasPlainText = Boolean((editorEl?.textContent || '').trim());
+    const hasEmbeddedImage = /<img\b/i.test(sanitizedContent);
 
-    if (!sanitizedContent || !(editorEl?.textContent || '').trim()) {
+    if (!sanitizedContent || (!hasPlainText && !hasEmbeddedImage)) {
       showToast('لطفاً متن کامل مقاله را وارد نمایید.', true);
       return;
     }
+
+    const rawExcerpt = String($f.find('[name="excerpt"]').val() || '').trim();
+    const fallbackExcerpt =
+      rawExcerpt ||
+      (editorEl?.textContent || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 180);
 
     const payload: Partial<BlogPost> & { id?: number } = {
       id,
@@ -4940,37 +5468,44 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         | 'منتشر شده'
         | 'پیش‌نویس',
       cover_url: String($f.find('[name="cover_url"]').val() || '/assets/blog-1.png').trim(),
-      excerpt: String($f.find('[name="excerpt"]').val() || '').trim(),
+      excerpt: fallbackExcerpt,
       full_content: sanitizedContent,
     };
     ApiService.saveAdminBlogPost(payload)
       .then((res) => {
+        const savedPost = res.post;
         if (id) {
-          state.blogPosts = state.blogPosts.map((p) => (p.id === id ? res.post : p));
+          const existsInList = state.blogPosts.some((p) => Number(p.id) === Number(id));
+          state.blogPosts = existsInList
+            ? state.blogPosts.map((p) => (Number(p.id) === Number(id) ? { ...savedPost } : p))
+            : [{ ...savedPost }, ...state.blogPosts];
         } else {
-          state.blogPosts = [res.post, ...state.blogPosts];
+          state.blogPosts = [{ ...savedPost }, ...state.blogPosts];
+        }
+        if (savedPost.category && !blogCategories.includes(savedPost.category)) {
+          blogCategories = [...blogCategories, savedPost.category];
         }
         blogPageMode = 'list';
         editingBlogPost = null;
-        props.onSiteDataUpdated({ blogPosts: state.blogPosts });
+        props.onSiteDataUpdated({ blogPosts: [...state.blogPosts] });
         notifyRoute();
         render();
-        showToast('مقاله وبلاگ با موفقیت در دیتابیس ذخیره شد.');
+        showToast('مقاله وبلاگ با موفقیت ذخیره و کارت مقاله بروزرسانی شد.');
       })
       .catch((err) => showToast(err.message || 'خطا در ذخیره مقاله', true));
   });
 
   $wrapper.on('click', '.js-admin-delete-blog', function () {
     const id = Number($(this).data('delete-blog'));
-    const target = state.blogPosts.find((p) => p.id === id);
+    const target = state.blogPosts.find((p) => Number(p.id) === id);
     askDeleteConfirmation(
       'حذف مقاله وبلاگ',
       `آیا از حذف مقاله «${target?.title || ''}» از وبلاگ اطمینان دارید؟`,
       () => {
         ApiService.deleteAdminBlogPost(id)
           .then(() => {
-            state.blogPosts = state.blogPosts.filter((p) => p.id !== id);
-            props.onSiteDataUpdated({ blogPosts: state.blogPosts });
+            state.blogPosts = state.blogPosts.filter((p) => Number(p.id) !== id);
+            props.onSiteDataUpdated({ blogPosts: [...state.blogPosts] });
             render();
             showToast('مقاله از وبلاگ حذف شد.');
           })

@@ -2,7 +2,11 @@ import 'dotenv/config';
 import express, { NextFunction, Request, Response } from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { mysqlDb, PublicClubMember } from './server/db/mysql.ts';
+import {
+  mysqlDb,
+  normalizeIdentifierDigits,
+  PublicClubMember,
+} from './server/db/mysql.ts';
 
 declare global {
   namespace Express {
@@ -35,6 +39,9 @@ function extractToken(req: Request): string | null {
   const cookies = parseCookies(req.headers.cookie);
   if (cookies.bookmeet_token) {
     return cookies.bookmeet_token;
+  }
+  if (typeof req.query?.token === 'string' && req.query.token.trim()) {
+    return req.query.token.trim();
   }
   return null;
 }
@@ -109,7 +116,7 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT || 3000);
 
-  app.use(express.json({ limit: '10mb' }));
+  app.use(express.json({ limit: '25mb' }));
 
   // ==================== PUBLIC WEBSITE API ROUTES ====================
 
@@ -532,23 +539,28 @@ async function startServer() {
         priority,
         message,
         attachment_name,
+        attachments,
       } = req.body || {};
-      if (!subject || !message) {
+      const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+      if (!subject || (!message && !hasAttachments)) {
         res.status(400).json({ error: 'عنوان تیکت و متن پیام الزامی است.' });
         return;
       }
-      const targetPhone =
-        req.authUser!.role === 'admin' && member_phone
-          ? String(member_phone).trim()
-          : req.authUser!.phone;
+      const isAdminCreatingForMember =
+        req.authUser!.role === 'admin' && Boolean(member_phone);
+      const targetPhone = isAdminCreatingForMember
+        ? String(member_phone).trim()
+        : req.authUser!.phone;
 
       const created = await mysqlDb.createMemberTicket({
         member_phone: targetPhone,
         subject: String(subject).trim(),
         department: String(department || 'پشتیبانی اعضا').trim(),
         priority: priority || 'عادی',
-        message: String(message).trim(),
+        message: String(message || 'فایل پیوست ارسال شد.').trim(),
         attachment_name: String(attachment_name || '').trim(),
+        attachments: Array.isArray(attachments) ? attachments : undefined,
+        sender_role: isAdminCreatingForMember ? 'admin' : 'member',
       });
       res.status(201).json({ success: true, ticket: created });
     } catch (error) {
@@ -557,6 +569,78 @@ async function startServer() {
       res.status(400).json({ error: message });
     }
   });
+
+  app.post('/api/panel/tickets/:id/reply', requireAuth, async (req, res) => {
+    try {
+      const ticketId = Number(req.params.id);
+      const { message, attachments } = req.body || {};
+      const updated = await mysqlDb.replyMemberTicket({
+        ticketId,
+        member_phone: req.authUser!.phone,
+        message: String(message || '').trim(),
+        attachments: Array.isArray(attachments) ? attachments : undefined,
+      });
+      res.json({ success: true, ticket: updated });
+    } catch (error) {
+      const errMessage =
+        error instanceof Error ? error.message : 'خطا در ثبت پاسخ تیکت';
+      res.status(400).json({ error: errMessage });
+    }
+  });
+
+  app.get(
+    '/api/tickets/:ticketId/attachments/:attachmentId',
+    requireAuth,
+    async (req, res) => {
+      try {
+        const ticketId = Number(req.params.ticketId);
+        const attachmentId = Number(req.params.attachmentId);
+        const attachment = await mysqlDb.getTicketAttachmentById(ticketId, attachmentId);
+        if (!attachment) {
+          res.status(404).json({ error: 'فایل پیوست یافت نشد.' });
+          return;
+        }
+
+        const user = req.authUser!;
+        const isOwner =
+          user.phone === attachment.member_phone ||
+          normalizeIdentifierDigits(user.phone) ===
+            normalizeIdentifierDigits(attachment.member_phone);
+
+        if (user.role !== 'admin' && !isOwner) {
+          res.status(403).json({
+            error: 'دسترسی غیرمجاز: شما اجازه مشاهده این فایل پیوست را ندارید.',
+          });
+          return;
+        }
+
+        const dataUrl = String(attachment.data_url || '');
+        const match = dataUrl.match(/^data:([^;,]+);base64,(.+)$/s);
+        if (!match) {
+          res.status(400).json({ error: 'فرمت فایل ذخیره شده معتبر نیست.' });
+          return;
+        }
+
+        const mimeType = attachment.mime_type || match[1] || 'application/octet-stream';
+        const buffer = Buffer.from(match[2], 'base64');
+        const forceDownload = req.query.download === '1';
+        const encodedFilename = encodeURIComponent(attachment.file_name || 'attachment');
+
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Length', String(buffer.length));
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader(
+          'Content-Disposition',
+          `${forceDownload ? 'attachment' : 'inline'}; filename*=UTF-8''${encodedFilename}`
+        );
+        res.send(buffer);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'خطا در دریافت فایل پیوست';
+        res.status(400).json({ error: message });
+      }
+    }
+  );
 
   app.post('/api/panel/calendar/reserve', requireAuth, async (req, res) => {
     try {
@@ -576,11 +660,25 @@ async function startServer() {
   app.post('/api/panel/announcements/read', requireAuth, async (req, res) => {
     try {
       const { announcementId } = req.body || {};
-      const updated = await mysqlDb.markAnnouncementRead(Number(announcementId));
+      const updated = await mysqlDb.markAnnouncementRead(
+        Number(announcementId),
+        req.authUser!.phone
+      );
       res.json({ success: true, announcement: updated });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'خطا در بروزرسانی وضعیت اطلاعیه';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/panel/announcements/read-all', requireAuth, async (req, res) => {
+    try {
+      const announcements = await mysqlDb.markAllAnnouncementsRead(req.authUser!.phone);
+      res.json({ success: true, announcements });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در بروزرسانی وضعیت اطلاعیه‌ها';
       res.status(400).json({ error: message });
     }
   });
@@ -681,11 +779,12 @@ async function startServer() {
 
   app.post('/api/admin/tickets/reply', requireAdmin, async (req, res) => {
     try {
-      const { id, admin_reply, status } = req.body || {};
+      const { id, admin_reply, status, attachments } = req.body || {};
       const updated = await mysqlDb.replyAdminTicket({
         id: Number(id),
         admin_reply: String(admin_reply || '').trim(),
         status: status || 'پاسخ داده‌شده',
+        attachments: Array.isArray(attachments) ? attachments : undefined,
       });
       res.json({ success: true, ticket: updated });
     } catch (error) {

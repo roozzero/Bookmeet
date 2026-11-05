@@ -21,6 +21,7 @@ import type {
   MemberPanelPayload,
   MemberSession,
   MemberTicket,
+  TicketAttachmentUploadInput,
   UserComment,
 } from '../types/models.ts';
 
@@ -329,6 +330,7 @@ export const ApiService = {
     priority: 'عادی' | 'مهم' | 'فوری';
     message: string;
     attachment_name?: string;
+    attachments?: TicketAttachmentUploadInput[];
   }): Promise<{ success: boolean; ticket: MemberTicket }> {
     return new Promise((resolve, reject) => {
       $.ajax({
@@ -344,6 +346,43 @@ export const ApiService = {
           ),
       });
     });
+  },
+
+  replyMemberTicket(payload: {
+    ticketId: number;
+    message: string;
+    attachments?: TicketAttachmentUploadInput[];
+  }): Promise<{ success: boolean; ticket: MemberTicket }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/panel/tickets/${payload.ticketId}/reply`,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+          message: payload.message,
+          attachments: payload.attachments,
+        }),
+        dataType: 'json',
+        success: (data: { success: boolean; ticket: MemberTicket }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا در ارسال پاسخ')
+          ),
+      });
+    });
+  },
+
+  getTicketAttachmentUrl(
+    ticketId: number,
+    attachmentId: number,
+    download = false
+  ): string {
+    const token = getStoredAuthToken();
+    const params = new URLSearchParams();
+    if (download) params.set('download', '1');
+    if (token) params.set('token', token);
+    const qs = params.toString();
+    return `/api/tickets/${ticketId}/attachments/${attachmentId}${qs ? `?${qs}` : ''}`;
   },
 
   toggleCalendarReservation(
@@ -376,6 +415,27 @@ export const ApiService = {
         data: JSON.stringify({ announcementId }),
         dataType: 'json',
         success: (data: { success: boolean; announcement: ClubAnnouncement }) =>
+          resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  markAllAnnouncementsRead(): Promise<{
+    success: boolean;
+    announcements: ClubAnnouncement[];
+  }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/panel/announcements/read-all',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({}),
+        dataType: 'json',
+        success: (data: { success: boolean; announcements: ClubAnnouncement[] }) =>
           resolve(data),
         error: (jqXHR, textStatus, errorThrown) =>
           reject(
@@ -506,6 +566,7 @@ export const ApiService = {
     id: number;
     admin_reply: string;
     status: 'پاسخ داده‌شده' | 'در انتظار بررسی' | 'بسته‌شده';
+    attachments?: TicketAttachmentUploadInput[];
   }): Promise<{ success: boolean; ticket: MemberTicket }> {
     return new Promise((resolve, reject) => {
       $.ajax({

@@ -10,6 +10,8 @@ import type {
   MemberSession,
   MemberTicket,
   SessionSubItem,
+  TicketAttachmentMeta,
+  TicketAttachmentUploadInput,
 } from '../types/models.ts';
 import { toPersianDigits } from '../utils/persianNumbers.ts';
 
@@ -79,8 +81,196 @@ function resizeImageToDataUrl(file: File, maxDim = 320): Promise<string> {
       img.src = resultStr;
     };
     reader.onerror = () => reject(new Error('خطا در بارگذاری تصویر'));
+    return reader.readAsDataURL(file);
+  });
+}
+
+const ALLOWED_TICKET_MIME_SET = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+  'text/plain',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/zip',
+  'application/x-zip-compressed',
+]);
+
+function readSingleFileAsAttachment(file: File): Promise<TicketAttachmentUploadInput> {
+  return new Promise((resolve, reject) => {
+    const mime = (file.type || '').toLowerCase().trim();
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    const inferredMime =
+      mime ||
+      (ext === 'jpg' || ext === 'jpeg'
+        ? 'image/jpeg'
+        : ext === 'png'
+        ? 'image/png'
+        : ext === 'webp'
+        ? 'image/webp'
+        : ext === 'gif'
+        ? 'image/gif'
+        : ext === 'pdf'
+        ? 'application/pdf'
+        : ext === 'txt'
+        ? 'text/plain'
+        : ext === 'doc'
+        ? 'application/msword'
+        : ext === 'docx'
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : ext === 'zip'
+        ? 'application/zip'
+        : '');
+
+    if (!ALLOWED_TICKET_MIME_SET.has(inferredMime)) {
+      reject(
+        new Error(
+          `فرمت فایل «${file.name}» مجاز نیست. فرمت‌های مجاز: تصویر (JPG, PNG, WEBP, GIF)، PDF، Word، TXT و ZIP.`
+        )
+      );
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      reject(new Error(`حجم فایل «${file.name}» بیش از حد مجاز (۵ مگابایت) است.`));
+      return;
+    }
+
+    if (inferredMime.startsWith('image/') && inferredMime !== 'image/gif' && file.size > 600 * 1024) {
+      resizeImageToDataUrl(file, 1280)
+        .then((dataUrl) => {
+          resolve({
+            file_name: file.name,
+            mime_type: 'image/jpeg',
+            file_size: Math.round((dataUrl.length * 3) / 4),
+            data_url: dataUrl,
+          });
+        })
+        .catch(() => {
+          const reader = new FileReader();
+          reader.onload = () =>
+            resolve({
+              file_name: file.name,
+              mime_type: inferredMime,
+              file_size: file.size,
+              data_url: String(reader.result || ''),
+            });
+          reader.onerror = () => reject(new Error(`خطا در خواندن فایل «${file.name}»`));
+          reader.readAsDataURL(file);
+        });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve({
+        file_name: file.name,
+        mime_type: inferredMime,
+        file_size: file.size,
+        data_url: String(reader.result || ''),
+      });
+    };
+    reader.onerror = () => reject(new Error(`خطا در خواندن فایل «${file.name}»`));
     reader.readAsDataURL(file);
   });
+}
+
+async function readFilesForTicketAttachments(
+  fileList: FileList | null | undefined
+): Promise<TicketAttachmentUploadInput[]> {
+  if (!fileList || fileList.length === 0) return [];
+  const files = Array.from(fileList).slice(0, 5);
+  const results: TicketAttachmentUploadInput[] = [];
+  for (const f of files) {
+    const item = await readSingleFileAsAttachment(f);
+    results.push(item);
+  }
+  return results;
+}
+
+function formatFileSizeFa(bytes: number): string {
+  if (!bytes || bytes <= 0) return '';
+  if (bytes < 1024) return `${toPersianDigits(bytes)} بایت`;
+  if (bytes < 1024 * 1024) return `${toPersianDigits(Math.round(bytes / 1024))} کیلوبایت`;
+  return `${toPersianDigits((bytes / (1024 * 1024)).toFixed(1))} مگابایت`;
+}
+
+function renderTicketAttachmentsHtml(
+  ticketId: number,
+  attachments?: TicketAttachmentMeta[],
+  legacyAttachmentName?: string
+): string {
+  const list = Array.isArray(attachments) ? attachments : [];
+  if (list.length === 0 && !legacyAttachmentName) return '';
+
+  if (list.length === 0 && legacyAttachmentName) {
+    return `
+      <div class="pt-1.5 flex flex-wrap gap-2">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F2E6D5] border border-[#DFCEB9] text-[11.5px] text-[#4E3B2D]">
+          <span>📎 فایل پیوست:</span>
+          <strong>${toPersianDigits(legacyAttachmentName)}</strong>
+        </span>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="pt-2 space-y-2">
+      <div class="flex flex-wrap items-center gap-2">
+        ${list
+          .map((att) => {
+            const url = ApiService.getTicketAttachmentUrl(ticketId, att.id);
+            const isImage = (att.mime_type || '').startsWith('image/');
+            const sizeLabel = formatFileSizeFa(att.file_size);
+            return `
+              <div class="inline-flex flex-col gap-1.5 p-2.5 rounded-xl bg-[#FAF5EC] border border-[#D8C4AA] max-w-full">
+                ${
+                  isImage
+                    ? `
+                      <a href="${url}" target="_blank" rel="noopener noreferrer" class="block overflow-hidden rounded-lg border border-[#E5D7C5] bg-[#F4E9DA]">
+                        <img src="${url}" alt="${att.file_name}" class="max-h-40 w-auto object-contain mx-auto" loading="lazy" />
+                      </a>
+                    `
+                    : ''
+                }
+                <div class="flex items-center justify-between gap-2 text-[11.5px]">
+                  <a
+                    href="${url}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center gap-1.5 font-semibold text-[#5A3A22] hover:text-[#231912] underline truncate max-w-[220px]"
+                  >
+                    <span>${isImage ? '🖼️' : '📎'}</span>
+                    <span class="truncate">${toPersianDigits(att.file_name)}</span>
+                  </a>
+                  ${sizeLabel ? `<span class="text-[10.5px] text-[#7A6352] shrink-0">(${sizeLabel})</span>` : ''}
+                  <a
+                    href="${url}${url.includes('?') ? '&' : '?'}download=1"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="px-2 py-0.5 rounded-md bg-[#EFE3D2] hover:bg-[#E2D0B7] text-[#3F2E21] text-[10.5px] font-semibold shrink-0"
+                  >
+                    دانلود
+                  </a>
+                </div>
+              </div>
+            `;
+          })
+          .join('')}
+      </div>
+    </div>
+  `;
+}
+
+function isSessionApprovedForAccess(session?: MemberSession): boolean {
+  if (!session) return false;
+  return session.status !== 'غیرفعال';
+}
+
+function isClassApprovedForAccess(cls?: MemberClassItem): boolean {
+  if (!cls) return false;
+  return cls.status !== 'غیرفعال';
 }
 
 export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQuery {
@@ -97,12 +287,29 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
   let activeTab: PanelTabKey = props.initialTab || 'dashboard';
   let selectedSessionId: number | null = null;
   let selectedClassId: number | null = null;
+  let selectedTicketId: number | null = null;
 
   if (props.initialSubPath) {
     const subId = Number(props.initialSubPath.split('/').filter(Boolean)[0]);
     if (!Number.isNaN(subId)) {
-      if (activeTab === 'sessions') selectedSessionId = subId;
-      if (activeTab === 'classes') selectedClassId = subId;
+      if (activeTab === 'sessions') {
+        const targetSession = state.sessions.find((s) => Number(s.id) === subId);
+        if (isSessionApprovedForAccess(targetSession)) {
+          selectedSessionId = subId;
+        }
+      }
+      if (activeTab === 'classes') {
+        const targetClass = state.classes.find((c) => Number(c.id) === subId);
+        if (isClassApprovedForAccess(targetClass)) {
+          selectedClassId = subId;
+        }
+      }
+      if (activeTab === 'tickets') {
+        const targetTicket = state.tickets.find((t) => Number(t.id) === subId);
+        if (targetTicket) {
+          selectedTicketId = subId;
+        }
+      }
     }
   }
 
@@ -116,6 +323,10 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       props.onRouteChange(`/panel/classes/${selectedClassId}`);
       return;
     }
+    if (activeTab === 'tickets' && selectedTicketId !== null) {
+      props.onRouteChange(`/panel/tickets/${selectedTicketId}`);
+      return;
+    }
     props.onRouteChange(`/panel/${activeTab}`);
   }
 
@@ -127,7 +338,9 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
   let classesListFilter: 'all' | 'مبتدی' | 'پیشرفته' | 'تخصصی' = 'all';
   let classesListSearchQuery = '';
 
-  let enrollmentNoticeBanner: string = props.initialEnrollmentNotice || '';
+  let enrollmentNoticeBanner: string = String(props.initialEnrollmentNotice || '')
+    .replace(/جهت تایید ثبت[‌\s]*نام تیکت بزنید یا با شماره[^.]*\.?/g, '')
+    .trim();
 
   // Sub-session filter & search state (inside a Session or Class detail page)
   let subSessionFilter: 'all' | 'تعریف شده' | 'برگزار شده' = 'all';
@@ -145,9 +358,11 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
 
   // Ticket attachment state
   let selectedTicketFileName = '';
+  let selectedReplyFileNames = '';
 
   // Calendar month & selected event modal state
-  let activeCalendarMonth: 'آبان ۱۴۰۵' | 'آذر ۱۴۰۵' = 'آبان ۱۴۰۵';
+  let activeCalendarMonth: string =
+    state.calendarEvents[0]?.month_name || 'آبان ۱۴۰۵';
   let activeCalendarEventModal: ClubCalendarEvent | null = null;
 
   let activeSubSessionModal: {
@@ -345,10 +560,10 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
             <div class="p-4 rounded-xl bg-[#FDFBF7] border border-[#E6D7C3]">
               <h5 class="text-[13px] font-bold text-[#6E4526] mb-1.5 flex items-center gap-2">
                 <span class="w-1.5 h-1.5 rounded-full bg-[#7A4B2A]"></span>
-                <span>صفحاتی که باید خوانده شود</span>
+                <span>سر فصل جلسه</span>
               </h5>
               <p class="text-[13.5px] font-semibold text-[#231912] leading-[1.85]">
-                ${toPersianDigits(subItem.pages_to_read || 'طبق برنامه اعلام‌شده در سرفصل جلسه')}
+                ${toPersianDigits(subItem.pages_to_read || 'طبق برنامه اعلام‌شده در سر فصل جلسه')}
               </p>
             </div>
 
@@ -401,6 +616,13 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     if (!activeCalendarEventModal) return '';
     const ev = activeCalendarEventModal;
     const isPast = isCalendarEventPast(ev);
+    const hasLinkedTarget = Boolean(ev.target_type && ev.target_id);
+    const targetBadgeText =
+      ev.target_type === 'class'
+        ? 'کلاس آموزشی باشگاه'
+        : ev.target_type === 'session'
+        ? 'نشست کتاب‌خوانی'
+        : 'رویداد باشگاه';
 
     return `
       <div
@@ -410,12 +632,15 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       >
         <div class="w-full max-w-[540px] rounded-2xl bg-[#FAF5EC] border border-[#DECBB3] shadow-[0_24px_64px_rgba(28,18,12,0.32)] overflow-hidden">
           <div class="px-6 py-4 bg-[#F2E6D5] border-b border-[#E2D2BC] flex items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <span class="px-2.5 py-1 rounded-md text-[11.5px] font-semibold bg-[#EFE0CC] text-[#7A4B2A]">
                 ${toPersianDigits(ev.weekday_name)} ${toPersianDigits(ev.day_of_month)} ${toPersianDigits(ev.month_name)}
               </span>
               <span class="text-[12px] text-[#6B5444] font-semibold">
                 ساعت ${toPersianDigits(ev.time_range)}
+              </span>
+              <span class="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-[#5A3A22]/15 text-[#5A3A22]">
+                ${targetBadgeText}
               </span>
             </div>
             <button
@@ -434,32 +659,59 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               ${toPersianDigits(ev.description)}
             </p>
             <div class="p-3.5 rounded-xl bg-[#F4E9DA]/70 border border-[#E5D6C3] space-y-1.5 text-[12.5px] text-[#5B4739]">
-              <div>میزبان رویداد: <strong class="text-[#231912]">${toPersianDigits(ev.host_name)}</strong></div>
-              <div>مکان برگزاری: <strong class="text-[#231912]">${toPersianDigits(ev.location_label)}</strong></div>
-              <div>وضعیت ظرفیت: <strong class="${isPast ? 'text-[#6B5444]' : 'text-[#7A4B2A]'}">${toPersianDigits(ev.capacity_info)}</strong></div>
-            </div>
-            <div class="pt-2 flex items-center justify-between gap-3">
+              <div>میزبان / مدرس: <strong class="text-[#231912]">${toPersianDigits(ev.host_name)}</strong></div>
+              <div>مکان / نحوه برگزاری: <strong class="text-[#231912]">${toPersianDigits(ev.location_label)}</strong></div>
+              <div>وضعیت برگزاری: <strong class="${isPast ? 'text-[#6B5444]' : 'text-[#7A4B2A]'}">${toPersianDigits(ev.capacity_info)}</strong></div>
               ${
-                isPast
-                  ? `
-                <span class="px-4 py-2.5 rounded-xl bg-[#EAE0D2] border border-[#D5C4AE] text-[#6B5444] text-[12px] font-semibold select-none">
-                  این رویداد برگزار شده است (امکان رزرو یا لغو وجود ندارد)
-                </span>
-              `
-                  : `
-                <button
-                  type="button"
-                  data-event-id="${ev.id}"
-                  class="js-toggle-calendar-reserve px-5 py-2.5 rounded-xl border text-[13px] font-semibold transition-colors cursor-pointer ${
-                    ev.is_reserved
-                      ? 'border-[#2E6F40] bg-[#E6F3E9] text-[#235332] hover:bg-[#D7ECD9]'
-                      : 'border-[#5A3A22] bg-[#5A3A22] text-[#FAF5EC] hover:bg-[#432A18]'
-                  }"
-                >
-                  ${ev.is_reserved ? '✓ رزرو شده (لغو رزرو)' : 'رزرو حضور در این رویداد'}
-                </button>
-              `
+                ev.enrollment_status && ev.enrollment_status !== 'ثبت‌نام نشده'
+                  ? `<div>وضعیت ثبت‌نام شما: <strong class="${
+                      ev.enrollment_status === 'فعال' ? 'text-[#235332]' : 'text-[#8A5A10]'
+                    }">${
+                      ev.enrollment_status === 'غیرفعال'
+                        ? 'غیرفعال (در انتظار تایید مدیر)'
+                        : toPersianDigits(ev.enrollment_status)
+                    }</strong></div>`
+                  : ''
               }
+            </div>
+            <div class="pt-2 flex flex-wrap items-center justify-between gap-2.5">
+              <div class="flex flex-wrap items-center gap-2">
+                ${
+                  isPast
+                    ? `
+                  <span class="px-4 py-2.5 rounded-xl bg-[#EAE0D2] border border-[#D5C4AE] text-[#6B5444] text-[12px] font-semibold select-none">
+                    این رویداد برگزار شده است
+                  </span>
+                `
+                    : `
+                  <button
+                    type="button"
+                    data-event-id="${ev.id}"
+                    class="js-toggle-calendar-reserve px-4 py-2.5 rounded-xl border text-[12.5px] font-semibold transition-colors cursor-pointer ${
+                      ev.is_reserved
+                        ? 'border-[#2E6F40] bg-[#E6F3E9] text-[#235332] hover:bg-[#D7ECD9]'
+                        : 'border-[#5A3A22] bg-[#5A3A22] text-[#FAF5EC] hover:bg-[#432A18]'
+                    }"
+                  >
+                    ${ev.is_reserved ? '✓ رزرو شده (لغو رزرو)' : 'رزرو یادآوری حضور'}
+                  </button>
+                `
+                }
+                ${
+                  hasLinkedTarget
+                    ? `
+                  <button
+                    type="button"
+                    data-cal-target-type="${ev.target_type}"
+                    data-cal-target-id="${ev.target_id}"
+                    class="js-calendar-open-target px-4 py-2.5 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] text-[12.5px] font-semibold cursor-pointer"
+                  >
+                    ${ev.target_type === 'class' ? 'مشاهده در کلاس‌های من ←' : 'مشاهده در جلسات من ←'}
+                  </button>
+                `
+                    : ''
+                }
+              </div>
               <button
                 type="button"
                 class="js-close-calendar-modal px-4 py-2.5 rounded-xl border border-[#C5B198] text-[12.5px] font-semibold text-[#3D2E22] hover:bg-[#EFE2CE] cursor-pointer"
@@ -717,7 +969,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
 
               <div class="pt-2.5 border-t border-[#E6D8C5] flex items-center justify-between gap-2 text-[12px] text-[#5B4739]">
                 <span class="text-[#7A6352] shrink-0">
-                  ${isHeld ? 'صفحات خوانده‌شده:' : 'محدوده مطالعه:'}
+                  ${isHeld ? 'صفحات خوانده‌شده:' : 'سر فصل جلسه:'}
                 </span>
                 <strong class="font-bold ${
                   isHeld ? 'text-[#235332]' : 'text-[#231912]'
@@ -725,7 +977,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                   ${
                     isHeld
                       ? `${toPersianDigits(pagesReadNum)} صفحه`
-                      : toPersianDigits(sub.pages_to_read || 'طبق سرفصل جلسه')
+                      : toPersianDigits(sub.pages_to_read || 'طبق سر فصل جلسه')
                   }
                 </strong>
               </div>
@@ -827,7 +1079,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                 <span>جلسات تعریف شده (پیشِ رو)</span>
               </h3>
               <span class="text-[11.5px] text-[#6B5444]">
-                برای مشاهده صفحات مطالعه و لینک ورود روی کارت جلسه کلیک کنید
+                برای مشاهده سر فصل جلسه و لینک ورود روی کارت جلسه کلیک کنید
               </span>
             </div>
 
@@ -877,8 +1129,8 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
 
   function renderSessionsTab(): string {
     if (selectedSessionId !== null) {
-      const session = state.sessions.find((s) => s.id === selectedSessionId);
-      if (session) {
+      const session = state.sessions.find((s) => Number(s.id) === Number(selectedSessionId));
+      if (session && isSessionApprovedForAccess(session)) {
         const noteSectionHtml = `
           <div class="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5]">
             <label class="block text-[13px] font-bold text-[#231912] mb-2">
@@ -916,6 +1168,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
           extraFooterHtml: noteSectionHtml,
         });
       }
+      selectedSessionId = null;
     }
 
     // Item 1:
@@ -1088,8 +1341,16 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                   </div>
 
                   <div class="px-5 pb-5">
-                    <div class="w-full py-2.5 rounded-xl bg-[#F3E7D6] group-hover:bg-[#5A3A22] text-[#3F2E21] group-hover:text-[#FAF5EC] text-[12.5px] font-semibold text-center transition-colors">
-                      ورود به صفحه جلسه و مشاهده جزئیات ←
+                    <div class="w-full py-2.5 rounded-xl ${
+                      isInactive
+                        ? 'bg-[#EFE5D4] text-[#7A5A10] border border-[#DFBA6F]'
+                        : 'bg-[#F3E7D6] group-hover:bg-[#5A3A22] text-[#3F2E21] group-hover:text-[#FAF5EC]'
+                    } text-[12.5px] font-semibold text-center transition-colors">
+                      ${
+                        isInactive
+                          ? '🔒 در انتظار تایید مدیر (دسترسی پس از تایید فعال می‌شود)'
+                          : 'ورود به صفحه جلسه و مشاهده جزئیات ←'
+                      }
                     </div>
                   </div>
                 </article>
@@ -1109,8 +1370,8 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     // - جستجو و فیلتر را قرار بده
     // - صفحه هر کلاس هم باید بصورت کارت باشد
     if (selectedClassId !== null) {
-      const cls = state.classes.find((c) => c.id === selectedClassId);
-      if (cls) {
+      const cls = state.classes.find((c) => Number(c.id) === Number(selectedClassId));
+      if (cls && isClassApprovedForAccess(cls)) {
         return renderSubSessionsDetailSection({
           parentTitle: cls.title,
           bookTitle: cls.book_title,
@@ -1123,6 +1384,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
           backButtonLabel: 'بازگشت به لیست کلاس‌های من',
         });
       }
+      selectedClassId = null;
     }
 
     const query = classesListSearchQuery.trim().toLowerCase();
@@ -1295,8 +1557,16 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                   </div>
 
                   <div class="px-5 pb-5">
-                    <div class="w-full py-2.5 rounded-xl bg-[#F3E7D6] group-hover:bg-[#5A3A22] text-[#3F2E21] group-hover:text-[#FAF5EC] text-[12.5px] font-semibold text-center transition-colors">
-                      ورود به صفحه کلاس و مشاهده جلسات ←
+                    <div class="w-full py-2.5 rounded-xl ${
+                      isInactive
+                        ? 'bg-[#EFE5D4] text-[#7A5A10] border border-[#DFBA6F]'
+                        : 'bg-[#F3E7D6] group-hover:bg-[#5A3A22] text-[#3F2E21] group-hover:text-[#FAF5EC]'
+                    } text-[12.5px] font-semibold text-center transition-colors">
+                      ${
+                        isInactive
+                          ? '🔒 در انتظار تایید مدیر (دسترسی پس از تایید فعال می‌شود)'
+                          : 'ورود به صفحه کلاس و مشاهده جلسات ←'
+                      }
                     </div>
                   </div>
                 </article>
@@ -1604,15 +1874,35 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
   }
 
   function renderAnnouncementsTab(): string {
+    const unreadCount = state.announcements.filter((a) => a.is_read === 0).length;
+
     return `
       <div class="space-y-6">
-        <div>
-          <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">
-            اطلاعیه‌های باشگاه کتابخوانی بوک‌میت
-          </h2>
-          <p class="text-[13.5px] text-[#6B5444] mt-1 text-justify">
-            آخرین اخبار، فراخوان‌های رأی‌گیری کتاب ماه، منابع آموزشی بارگذاری‌شده و اطلاعیه‌های دبیرخانه باشگاه را در این بخش دنبال کنید.
-          </p>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">
+              اطلاعیه‌های باشگاه کتابخوانی بوک‌میت
+            </h2>
+            <p class="text-[13.5px] text-[#6B5444] mt-1 text-justify">
+              آخرین اخبار، فراخوان‌های رأی‌گیری کتاب ماه، منابع آموزشی بارگذاری‌شده و اطلاعیه‌های دبیرخانه باشگاه را در این بخش دنبال کنید.
+            </p>
+          </div>
+          ${
+            unreadCount > 0
+              ? `
+            <button
+              type="button"
+              class="js-mark-all-announcements-read px-4 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+            >
+              ✓ ثبت همه اطلاعیه‌ها به عنوان خوانده‌شده (${toPersianDigits(unreadCount)})
+            </button>
+          `
+              : `
+            <span class="px-3.5 py-2 rounded-xl bg-[#E4F2E7] border border-[#BBD9C2] text-[#235332] text-[12px] font-semibold shrink-0 self-start sm:self-auto">
+              ✓ تمامی اطلاعیه‌ها مطالعه شده‌اند
+            </span>
+          `
+          }
         </div>
 
         <div class="space-y-4">
@@ -1672,7 +1962,203 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     `;
   }
 
+  function getTicketMessagesForDisplay(ticket: MemberTicket) {
+    if (Array.isArray(ticket.messages) && ticket.messages.length > 0) {
+      return ticket.messages;
+    }
+    return [
+      {
+        id: `init-${ticket.id}`,
+        sender_role: 'member' as const,
+        sender_name: `${state.member.first_name} ${state.member.last_name}`.trim() || 'کاربر باشگاه',
+        text: ticket.message || '',
+        created_at: ticket.created_at || 'ثبت‌شده',
+        attachments: (ticket.attachments || []).filter((a) => a.uploader_role === 'member'),
+      },
+      ...(Array.isArray(ticket.admin_replies) && ticket.admin_replies.length > 0
+        ? ticket.admin_replies.map((rep, idx) => ({
+            id: `adm-${ticket.id}-${idx}`,
+            sender_role: 'admin' as const,
+            sender_name: 'مدیر باشگاه',
+            text: rep.text,
+            created_at: rep.created_at || ticket.created_at || 'ثبت‌شده',
+            attachments: (rep as { attachments?: TicketAttachmentMeta[] }).attachments || [],
+          }))
+        : ticket.admin_reply
+        ? [
+            {
+              id: `adm-single-${ticket.id}`,
+              sender_role: 'admin' as const,
+              sender_name: 'مدیر باشگاه',
+              text: ticket.admin_reply,
+              created_at: ticket.updated_at || ticket.created_at || 'ثبت‌شده',
+              attachments: (ticket.attachments || []).filter((a) => a.uploader_role === 'admin'),
+            },
+          ]
+        : []),
+    ];
+  }
+
+  function getTicketLatestReplyDate(ticket: MemberTicket): string {
+    const msgs = getTicketMessagesForDisplay(ticket);
+    if (msgs.length > 1) {
+      return msgs[msgs.length - 1].created_at || ticket.updated_at || ticket.created_at || '—';
+    }
+    if (ticket.updated_at && ticket.updated_at !== ticket.created_at) {
+      return ticket.updated_at;
+    }
+    return 'بدون پاسخ جدید';
+  }
+
   function renderTicketsTab(): string {
+    if (selectedTicketId !== null) {
+      const ticket = state.tickets.find((t) => Number(t.id) === Number(selectedTicketId));
+      if (ticket) {
+        const messagesList = getTicketMessagesForDisplay(ticket);
+        const latestReplyDate = getTicketLatestReplyDate(ticket);
+        const isClosed = ticket.status === 'بسته‌شده';
+        const statusBadgeClass =
+          ticket.status === 'پاسخ داده‌شده'
+            ? 'bg-[#E4F2E7] text-[#235332] border-[#BBD9C2]'
+            : isClosed
+            ? 'bg-[#EAE0D2] text-[#5B4739] border-[#D5C3AE]'
+            : 'bg-[#FFF3CD] text-[#7A5A10] border-[#E5C77B]';
+
+        return `
+          <div class="space-y-6">
+            <!-- Ticket Detail Header -->
+            <div class="p-5 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] space-y-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <button
+                  type="button"
+                  class="js-back-to-tickets-list inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] text-[#3F2E21] text-[12.5px] font-semibold cursor-pointer transition-colors"
+                >
+                  <span>→</span>
+                  <span>بازگشت به لیست تیکت‌ها</span>
+                </button>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-mono text-[12px] font-bold px-2.5 py-1 rounded-md bg-[#EFE3D2] text-[#4E3B2D]">
+                    #${toPersianDigits(ticket.ticket_code)}
+                  </span>
+                  <span class="px-3 py-1 rounded-lg border text-[12px] font-bold ${statusBadgeClass}">
+                    ${toPersianDigits(ticket.status)}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h2 class="font-display text-[19px] sm:text-[22px] font-bold text-[#231912]">
+                  ${toPersianDigits(ticket.subject)}
+                </h2>
+                <div class="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12px] text-[#6B5444]">
+                  <span>بخش: <strong class="text-[#231912]">${toPersianDigits(ticket.department)}</strong></span>
+                  <span>اولویت: <strong class="text-[#231912]">${toPersianDigits(ticket.priority)}</strong></span>
+                  <span>تاریخ ایجاد: <strong class="text-[#231912]">${toPersianDigits(ticket.created_at)}</strong></span>
+                  <span>آخرین پاسخ: <strong class="text-[#231912]">${toPersianDigits(latestReplyDate)}</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Conversation Thread -->
+            <div class="p-5 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] space-y-4">
+              <h3 class="font-display text-[16.5px] font-bold text-[#231912] border-b border-[#E6D8C5] pb-3">
+                گفتگوها و فایل‌های پیوست تیکت
+              </h3>
+              <div class="space-y-3.5">
+                ${messagesList
+                  .map((msg, idx) => {
+                    const isAdmin = msg.sender_role === 'admin';
+                    const msgAttachments = Array.isArray(msg.attachments) ? msg.attachments : [];
+                    const legacyName =
+                      idx === 0 && msgAttachments.length === 0 ? ticket.attachment_name : undefined;
+                    return `
+                      <div class="p-4 rounded-2xl border ${
+                        isAdmin
+                          ? 'bg-[#EEF6F0] border-[#C5DFCC] text-[#1E3F29]'
+                          : 'bg-[#F4E9DA]/60 border-[#E2D2BC] text-[#231912]'
+                      } space-y-2">
+                        <div class="flex items-center justify-between gap-2 text-[11.5px] ${
+                          isAdmin ? 'text-[#235332]' : 'text-[#6B5444]'
+                        }">
+                          <span class="font-bold flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full ${isAdmin ? 'bg-[#235332]' : 'bg-[#7A4B2A]'}"></span>
+                            <span>${isAdmin ? 'پاسخ دبیرخانه / مدیر باشگاه بوک‌میت' : 'پیام شما'}</span>
+                          </span>
+                          <span>${toPersianDigits(msg.created_at || ticket.created_at)}</span>
+                        </div>
+                        ${
+                          msg.text
+                            ? `<p class="text-[13.5px] leading-[1.9] text-justify whitespace-pre-line">${toPersianDigits(msg.text)}</p>`
+                            : ''
+                        }
+                        ${renderTicketAttachmentsHtml(ticket.id, msgAttachments, legacyName)}
+                      </div>
+                    `;
+                  })
+                  .join('')}
+              </div>
+            </div>
+
+            <!-- Reply Form or Closed Notice -->
+            ${
+              isClosed
+                ? `
+              <div class="p-5 rounded-2xl bg-[#EAE0D2]/80 border border-[#D5C3AE] text-center space-y-1">
+                <div class="text-[14px] font-bold text-[#4E3B2D]">این تیکت توسط مدیریت باشگاه بسته شده است</div>
+                <p class="text-[12.5px] text-[#6B5444]">
+                  امکان ارسال پیام جدید در تیکت بسته‌شده وجود ندارد. در صورت نیاز می‌توانید تیکت جدیدی ثبت نمایید.
+                </p>
+              </div>
+            `
+                : `
+              <form data-ticket-id="${ticket.id}" class="js-member-reply-ticket-form p-5 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] space-y-4">
+                <h3 class="font-display text-[16.5px] font-bold text-[#231912]">
+                  ارسال پاسخ یا فایل پیوست جدید در این تیکت
+                </h3>
+                <div>
+                  <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">متن پیام شما *</label>
+                  <textarea
+                    name="reply_message"
+                    rows="3"
+                    placeholder="پاسخ یا توضیحات تکمیلی خود را بنویسید..."
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] leading-[1.85] focus:outline-none focus:border-[#8B5A36]"
+                  ></textarea>
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+                  <div class="flex items-center gap-3 flex-wrap">
+                    <input
+                      type="file"
+                      multiple
+                      class="js-member-reply-ticket-files hidden"
+                      accept="image/*,.pdf,.doc,.docx,.txt,.zip"
+                    />
+                    <button
+                      type="button"
+                      class="js-trigger-reply-ticket-file px-4 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#3F2E21] inline-flex items-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <span>📎</span>
+                      <span>افزودن فایل یا تصویر پیوست</span>
+                    </button>
+                    <span class="js-reply-ticket-file-label text-[12px] text-[#6B5444]">
+                      ${selectedReplyFileNames ? `فایل انتخاب‌شده: ${toPersianDigits(selectedReplyFileNames)}` : 'فایلی انتخاب نشده است'}
+                    </span>
+                  </div>
+                  <button
+                    type="submit"
+                    class="px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer"
+                  >
+                    ارسال پاسخ
+                  </button>
+                </div>
+              </form>
+            `
+            }
+          </div>
+        `;
+      }
+      selectedTicketId = null;
+    }
+
     return `
       <div class="space-y-8">
         <div>
@@ -1680,7 +2166,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
             تیکت‌ها و پشتیبانی اعضا
           </h2>
           <p class="text-[13.5px] text-[#6B5444] mt-1 text-justify">
-            پیشنهاد کتاب برای دوره‌های آینده یا درخواست‌های پشتیبانی فنی خود را به همراه فایل پیوست برای دبیرخانه باشگاه ارسال نمایید.
+            پیشنهاد کتاب برای دوره‌های آینده یا درخواست‌های پشتیبانی و تایید ثبت‌نام خود را به همراه فایل پیوست برای دبیرخانه باشگاه ارسال نمایید.
           </p>
         </div>
 
@@ -1707,6 +2193,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                   name="department"
                   class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
                 >
+                  <option value="امور ثبت‌نام و دوره‌ها">امور ثبت‌نام و دوره‌ها</option>
                   <option value="پیشنهاد کتاب">پیشنهاد کتاب</option>
                   <option value="پشتیبانی فنی">پشتیبانی فنی</option>
                 </select>
@@ -1736,11 +2223,12 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
 
             <!-- File Attachment Button & Submit -->
             <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-3 flex-wrap">
                 <input
                   type="file"
+                  multiple
                   class="js-ticket-file-input hidden"
-                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
+                  accept="image/*,.pdf,.doc,.docx,.txt,.zip"
                 />
                 <button
                   type="button"
@@ -1750,7 +2238,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                   <span>افزودن فایل پیوست</span>
                 </button>
                 <span class="js-ticket-file-label text-[12px] text-[#6B5444]">
-                  ${selectedTicketFileName ? `فایل انتخاب‌شده: ${toPersianDigits(selectedTicketFileName)}` : 'فایلی انتخاب نشده است'}
+                  ${selectedTicketFileName ? `فایل انتخاب‌شده: ${toPersianDigits(selectedTicketFileName)}` : 'فایلی انتخاب نشده است (حداکثر ۵ مگابایت)'}
                 </span>
               </div>
 
@@ -1764,68 +2252,88 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
           </form>
         </div>
 
-        <!-- Tickets History -->
+        <!-- Tickets Cards List -->
         <div class="space-y-4">
-          ${state.tickets
-            .map(
-              (ticket) => `
-            <div class="p-5 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] space-y-4">
-              <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="flex items-center gap-2.5">
-                  <span class="font-mono text-[12px] font-bold px-2.5 py-1 rounded-md bg-[#EFE3D2] text-[#4E3B2D]">
-                    #${toPersianDigits(ticket.ticket_code)}
-                  </span>
-                  <h4 class="font-display text-[16px] font-bold text-[#231912]">
-                    ${toPersianDigits(ticket.subject)}
-                  </h4>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="text-[11.5px] px-2.5 py-0.5 rounded-md bg-[#F3E9DA] text-[#6B5444]">
-                    ${toPersianDigits(ticket.department)}
-                  </span>
-                  <span class="text-[11.5px] px-2.5 py-0.5 rounded-md font-semibold ${
-                    ticket.status === 'پاسخ داده‌شده'
-                      ? 'bg-[#E4F2E7] text-[#235332]'
-                      : 'bg-[#FFF3CD] text-[#7A5A10]'
-                  }">
-                    ${toPersianDigits(ticket.status)}
-                  </span>
-                </div>
-              </div>
-
-              <p class="text-[13.5px] text-[#3D2E22] leading-[1.85] text-justify bg-[#F4E9DA]/45 p-3.5 rounded-xl border border-[#E8DAC6]">
-                ${toPersianDigits(ticket.message)}
-              </p>
-
-              ${
-                ticket.attachment_name
-                  ? `
-                <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#F2E6D5] border border-[#DFCEB9] text-[12px] text-[#4E3B2D]">
-                  <span>📎 فایل پیوست:</span>
-                  <strong class="font-semibold">${toPersianDigits(ticket.attachment_name)}</strong>
-                </div>
-              `
-                  : ''
-              }
-
-              ${
-                ticket.admin_reply
-                  ? `
-                <div class="p-4 rounded-xl bg-[#EDF5EE] border border-[#C7DFCB]">
-                  <span class="block text-[11.5px] font-bold text-[#235332] mb-1">
-                    پاسخ دبیرخانه باشگاه بوک‌میت:
-                  </span>
-                  <p class="text-[13px] text-[#2B4732] leading-[1.85] text-justify">
-                    ${toPersianDigits(ticket.admin_reply)}
-                  </p>
-                </div>
-              `
-                  : ''
-              }
+          <h3 class="font-display text-[18px] font-bold text-[#231912]">
+            لیست تیکت‌های ثبت‌شده شما (${toPersianDigits(state.tickets.length)})
+          </h3>
+          ${
+            state.tickets.length === 0
+              ? `
+            <div class="p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] text-center text-[13.5px] text-[#6B5444]">
+              هنوز تیکتی ثبت نکرده‌اید.
             </div>
           `
-            )
-            .join('')}
+              : `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              ${state.tickets
+                .map((ticket) => {
+                  const latestReplyDate = getTicketLatestReplyDate(ticket);
+                  const msgsCount = getTicketMessagesForDisplay(ticket).length;
+                  const attachmentsCount = (ticket.attachments || []).length || (ticket.attachment_name ? 1 : 0);
+                  const statusBadgeClass =
+                    ticket.status === 'پاسخ داده‌شده'
+                      ? 'bg-[#E4F2E7] text-[#235332] border-[#BBD9C2]'
+                      : ticket.status === 'بسته‌شده'
+                      ? 'bg-[#EAE0D2] text-[#5B4739] border-[#D5C3AE]'
+                      : 'bg-[#FFF3CD] text-[#7A5A10] border-[#E5C77B]';
+
+                  return `
+                    <article class="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] hover:border-[#8B5A36] transition-all flex flex-col justify-between gap-4 shadow-[0_6px_20px_rgba(61,46,34,0.04)]">
+                      <div class="space-y-3">
+                        <div class="flex items-center justify-between gap-2 flex-wrap">
+                          <span class="font-mono text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-[#EFE3D2] text-[#4E3B2D]">
+                            #${toPersianDigits(ticket.ticket_code)}
+                          </span>
+                          <span class="px-2.5 py-0.5 rounded-md border text-[11.5px] font-semibold ${statusBadgeClass}">
+                            ${toPersianDigits(ticket.status)}
+                          </span>
+                        </div>
+
+                        <h4 class="font-display text-[16.5px] font-bold text-[#231912] leading-[1.6] truncate" title="${toPersianDigits(ticket.subject)}">
+                          ${toPersianDigits(ticket.subject)}
+                        </h4>
+
+                        <div class="pt-2.5 border-t border-[#E6D8C5] space-y-1.5 text-[12px] text-[#5B4739]">
+                          <div class="flex items-center justify-between gap-2">
+                            <span class="text-[#7A6352]">تاریخ ایجاد تیکت:</span>
+                            <strong class="text-[#231912]">${toPersianDigits(ticket.created_at)}</strong>
+                          </div>
+                          <div class="flex items-center justify-between gap-2">
+                            <span class="text-[#7A6352]">تاریخ آخرین پاسخ:</span>
+                            <strong class="text-[#231912]">${toPersianDigits(latestReplyDate)}</strong>
+                          </div>
+                          <div class="flex items-center justify-between gap-2">
+                            <span class="text-[#7A6352]">بخش مربوطه:</span>
+                            <strong class="text-[#231912]">${toPersianDigits(ticket.department)}</strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="pt-3 border-t border-[#E6D8C5] flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 text-[11px] text-[#6B5444]">
+                          <span>💬 ${toPersianDigits(msgsCount)} پیام</span>
+                          ${
+                            attachmentsCount > 0
+                              ? `<span>· 📎 ${toPersianDigits(attachmentsCount)} پیوست</span>`
+                              : ''
+                          }
+                        </div>
+                        <button
+                          type="button"
+                          data-ticket-id="${ticket.id}"
+                          class="js-open-ticket-detail px-4 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold transition-colors cursor-pointer"
+                        >
+                          جزئیات ←
+                        </button>
+                      </div>
+                    </article>
+                  `;
+                })
+                .join('')}
+            </div>
+          `
+          }
         </div>
       </div>
     `;
@@ -1983,6 +2491,35 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     `;
   }
 
+  function getAvailableCalendarMonths(): string[] {
+    const baseMonths = [
+      'فروردین ۱۴۰۵',
+      'اردیبهشت ۱۴۰۵',
+      'خرداد ۱۴۰۵',
+      'تیر ۱۴۰۵',
+      'مرداد ۱۴۰۵',
+      'شهریور ۱۴۰۵',
+      'مهر ۱۴۰۵',
+      'آبان ۱۴۰۵',
+      'آذر ۱۴۰۵',
+      'دی ۱۴۰۵',
+      'بهمن ۱۴۰۵',
+      'اسفند ۱۴۰۵',
+    ];
+    const eventMonths = state.calendarEvents
+      .map((ev) => String(ev.month_name || '').trim())
+      .filter(Boolean);
+    const merged = Array.from(new Set([...eventMonths, 'آبان ۱۴۰۵', 'آذر ۱۴۰۵']));
+    return merged.sort((a, b) => {
+      const idxA = baseMonths.indexOf(a);
+      const idxB = baseMonths.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b, 'fa');
+    });
+  }
+
   function renderCalendarTab(): string {
     const weekdays = [
       'شنبه',
@@ -1994,8 +2531,33 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       'جمعه',
     ];
 
-    const startOffset = activeCalendarMonth === 'آبان ۱۴۰۵' ? 3 : 5;
-    const totalDays = 30;
+    const availableMonths = getAvailableCalendarMonths();
+    if (!availableMonths.includes(activeCalendarMonth)) {
+      activeCalendarMonth = availableMonths[0] || 'آبان ۱۴۰۵';
+    }
+
+    const monthOffsets: Record<string, number> = {
+      'فروردین ۱۴۰۵': 0,
+      'اردیبهشت ۱۴۰۵': 3,
+      'خرداد ۱۴۰۵': 6,
+      'تیر ۱۴۰۵': 2,
+      'مرداد ۱۴۰۵': 5,
+      'شهریور ۱۴۰۵': 1,
+      'مهر ۱۴۰۵': 4,
+      'آبان ۱۴۰۵': 3,
+      'آذر ۱۴۰۵': 5,
+      'دی ۱۴۰۵': 0,
+      'بهمن ۱۴۰۵': 2,
+      'اسفند ۱۴۰۵': 4,
+    };
+    const startOffset =
+      monthOffsets[activeCalendarMonth] !== undefined
+        ? monthOffsets[activeCalendarMonth]
+        : 3;
+    const isFirstSixMonths = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور'].some((m) =>
+      activeCalendarMonth.startsWith(m)
+    );
+    const totalDays = isFirstSixMonths ? 31 : 30;
 
     const monthEvents = state.calendarEvents.filter(
       (ev) => ev.month_name === activeCalendarMonth
@@ -2071,22 +2633,22 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">
-              تقویم ماهانه رویدادها و نشست‌های باشگاه
+              تقویم ماهانه رویدادها، نشست‌ها و دوره‌های باشگاه
             </h2>
             <p class="text-[13.5px] text-[#6B5444] mt-1 text-justify">
-              رویدادهای باشگاه داخل روزهای تقویم درج شده‌اند. برای مشاهده جزئیات کامل یا رزرو حضور، روی رویداد داخل روز مورد نظر کلیک کنید.
+              تمامی نشست‌های کتاب‌خوانی و کلاس‌های آموزشی تعریف‌شده در باشگاه به‌صورت پویا در روزهای تقویم درج شده‌اند. برای مشاهده جزئیات یا ورود به دوره روی رویداد کلیک کنید.
             </p>
           </div>
 
-          <!-- Month Switcher -->
-          <div class="inline-flex items-center gap-2 bg-[#FAF5EC] p-1.5 rounded-xl border border-[#E5D7C5] shrink-0 self-start sm:self-auto">
-            ${(['آبان ۱۴۰۵', 'آذر ۱۴۰۵'] as const)
+          <!-- Dynamic Month Switcher -->
+          <div class="inline-flex flex-wrap items-center gap-1.5 bg-[#FAF5EC] p-1.5 rounded-xl border border-[#E5D7C5] shrink-0 self-start sm:self-auto">
+            ${availableMonths
               .map(
                 (m) => `
               <button
                 type="button"
                 data-cal-month="${m}"
-                class="js-switch-cal-month px-4 py-2 rounded-lg text-[12.5px] font-bold transition-colors cursor-pointer ${
+                class="js-switch-cal-month px-3.5 py-2 rounded-lg text-[12px] font-bold transition-colors cursor-pointer ${
                   activeCalendarMonth === m
                     ? 'bg-[#5A3A22] text-[#FAF5EC]'
                     : 'text-[#4E3B2D] hover:bg-[#EFE3D2]'
@@ -2174,11 +2736,10 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       {
         key: 'announcements',
         label: 'اطلاعیه‌ها',
-        badge: toPersianDigits(
+        badge:
           unreadAnnouncementsCount > 0
-            ? unreadAnnouncementsCount
-            : state.announcements.length
-        ),
+            ? toPersianDigits(unreadAnnouncementsCount)
+            : undefined,
       },
       {
         key: 'tickets',
@@ -2280,6 +2841,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       activeTab = nextTab;
       selectedSessionId = null;
       selectedClassId = null;
+      selectedTicketId = null;
       activeSubSessionModal = null;
       activeCalendarEventModal = null;
       subSessionFilter = 'all';
@@ -2296,6 +2858,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       activeTab = nextTab;
       selectedSessionId = null;
       selectedClassId = null;
+      selectedTicketId = null;
       activeSubSessionModal = null;
       activeCalendarEventModal = null;
       profileSavedBannerMessage = '';
@@ -2349,10 +2912,18 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     }
   });
 
-  // Open a Session card into Session Detail View
+  // Open a Session card into Session Detail View (enforcing admin approval)
   $wrapper.on('click', '.js-open-session-card', function () {
     const sessionId = Number($(this).data('open-session-id'));
     if (sessionId) {
+      const targetSession = state.sessions.find((s) => Number(s.id) === sessionId);
+      if (!targetSession || !isSessionApprovedForAccess(targetSession)) {
+        showToast(
+          'این نشست در وضعیت «غیرفعال» (در انتظار تایید مدیر باشگاه) است. پس از تایید ثبت‌نام، دسترسی به جزئیات و لینک جلسات فعال می‌شود.',
+          true
+        );
+        return;
+      }
       activeTab = 'sessions';
       selectedSessionId = sessionId;
       activeSubSessionModal = null;
@@ -2373,10 +2944,18 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     render();
   });
 
-  // Open a Class card into Class Detail View
+  // Open a Class card into Class Detail View (enforcing admin approval)
   $wrapper.on('click', '.js-open-class-card', function () {
     const classId = Number($(this).data('open-class-id'));
     if (classId) {
+      const targetClass = state.classes.find((c) => Number(c.id) === classId);
+      if (!targetClass || !isClassApprovedForAccess(targetClass)) {
+        showToast(
+          'این دوره آموزشی در وضعیت «غیرفعال» (در انتظار تایید مدیر باشگاه) است. پس از تایید ثبت‌نام، دسترسی به محتوای کلاس و جلسات فعال می‌شود.',
+          true
+        );
+        return;
+      }
       activeTab = 'classes';
       selectedClassId = classId;
       activeSubSessionModal = null;
@@ -2492,7 +3071,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
 
   // Calendar month switch & event modal handlers
   $wrapper.on('click', '.js-switch-cal-month', function () {
-    const month = $(this).data('cal-month') as 'آبان ۱۴۰۵' | 'آذر ۱۴۰۵';
+    const month = String($(this).data('cal-month') || '').trim();
     if (month) {
       activeCalendarMonth = month;
       render();
@@ -2501,10 +3080,55 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
 
   $wrapper.on('click', '.js-open-calendar-event', function () {
     const evId = Number($(this).data('cal-event-id'));
-    const found = state.calendarEvents.find((e) => e.id === evId);
+    const found = state.calendarEvents.find((e) => Number(e.id) === evId);
     if (found) {
       activeCalendarEventModal = found;
       render();
+    }
+  });
+
+  $wrapper.on('click', '.js-calendar-open-target', function () {
+    const targetType = String($(this).data('cal-target-type') || '');
+    const targetId = Number($(this).data('cal-target-id') || 0);
+    activeCalendarEventModal = null;
+
+    if (targetType === 'session') {
+      const targetSession = state.sessions.find((s) => Number(s.id) === targetId);
+      activeTab = 'sessions';
+      if (targetSession && isSessionApprovedForAccess(targetSession)) {
+        selectedSessionId = targetSession.id;
+      } else {
+        selectedSessionId = null;
+        if (targetSession && !isSessionApprovedForAccess(targetSession)) {
+          showToast(
+            'این نشست در انتظار تایید مدیر باشگاه است. پس از تایید ثبت‌نام، دسترسی به جلسات فعال می‌شود.',
+            true
+          );
+        }
+      }
+      notifyRoute();
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (targetType === 'class') {
+      const targetClass = state.classes.find((c) => Number(c.id) === targetId);
+      activeTab = 'classes';
+      if (targetClass && isClassApprovedForAccess(targetClass)) {
+        selectedClassId = targetClass.id;
+      } else {
+        selectedClassId = null;
+        if (targetClass && !isClassApprovedForAccess(targetClass)) {
+          showToast(
+            'این دوره آموزشی در انتظار تایید مدیر باشگاه است. پس از تایید ثبت‌نام، دسترسی به جلسات فعال می‌شود.',
+            true
+          );
+        }
+      }
+      notifyRoute();
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   });
 
@@ -2527,13 +3151,25 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     ApiService.markAnnouncementRead(announcementId)
       .then((res) => {
         state.announcements = state.announcements.map((a) =>
-          a.id === announcementId ? res.announcement : a
+          Number(a.id) === announcementId ? { ...res.announcement, is_read: 1 } : a
         );
         render();
-        showToast('اطلاعیه به عنوان خوانده‌شده در دیتابیس ثبت گردید.');
+        showToast('اطلاعیه به عنوان خوانده‌شده ثبت گردید.');
       })
       .catch((err) => {
         showToast(err.message || 'خطا در بروزرسانی اطلاعیه', true);
+      });
+  });
+
+  $wrapper.on('click', '.js-mark-all-announcements-read', () => {
+    ApiService.markAllAnnouncementsRead()
+      .then(() => {
+        state.announcements = state.announcements.map((a) => ({ ...a, is_read: 1 }));
+        render();
+        showToast('تمامی اطلاعیه‌ها به عنوان خوانده‌شده ثبت شدند.');
+      })
+      .catch((err) => {
+        showToast(err.message || 'خطا در بروزرسانی اطلاعیه‌ها', true);
       });
   });
 
@@ -2565,19 +3201,59 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     render();
   });
 
-  // Ticket file attachment handlers
+  // Ticket file attachment & detail view handlers
   $wrapper.on('click', '.js-trigger-ticket-file', () => {
     $wrapper.find('.js-ticket-file-input').trigger('click');
   });
 
   $wrapper.on('change', '.js-ticket-file-input', function (event) {
     const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (file) {
-      selectedTicketFileName = file.name;
+    const files = input.files ? Array.from(input.files) : [];
+    if (files.length > 0) {
+      selectedTicketFileName = files.map((f) => f.name).join('، ');
       $wrapper
         .find('.js-ticket-file-label')
         .text(`فایل انتخاب‌شده: ${toPersianDigits(selectedTicketFileName)}`);
+    } else {
+      selectedTicketFileName = '';
+      $wrapper
+        .find('.js-ticket-file-label')
+        .text('فایلی انتخاب نشده است (حداکثر ۵ مگابایت)');
+    }
+  });
+
+  $wrapper.on('click', '.js-open-ticket-detail', function () {
+    const ticketId = Number($(this).data('ticket-id'));
+    if (!ticketId) return;
+    selectedTicketId = ticketId;
+    selectedReplyFileNames = '';
+    notifyRoute();
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  $wrapper.on('click', '.js-back-to-tickets-list', () => {
+    selectedTicketId = null;
+    selectedReplyFileNames = '';
+    notifyRoute();
+    render();
+  });
+
+  $wrapper.on('click', '.js-trigger-reply-ticket-file', () => {
+    $wrapper.find('.js-member-reply-ticket-files').trigger('click');
+  });
+
+  $wrapper.on('change', '.js-member-reply-ticket-files', function (event) {
+    const input = event.target as HTMLInputElement;
+    const files = input.files ? Array.from(input.files) : [];
+    if (files.length > 0) {
+      selectedReplyFileNames = files.map((f) => f.name).join('، ');
+      $wrapper
+        .find('.js-reply-ticket-file-label')
+        .text(`فایل انتخاب‌شده: ${toPersianDigits(selectedReplyFileNames)}`);
+    } else {
+      selectedReplyFileNames = '';
+      $wrapper.find('.js-reply-ticket-file-label').text('فایلی انتخاب نشده است');
     }
   });
 
@@ -2714,35 +3390,87 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     const $form = $(this);
     const subject = String($form.find('[name="subject"]').val() || '').trim();
     const department = String(
-      $form.find('[name="department"]').val() || 'پیشنهاد کتاب'
+      $form.find('[name="department"]').val() || 'امور ثبت‌نام و دوره‌ها'
     );
     const priority = String($form.find('[name="priority"]').val() || 'عادی') as
       | 'عادی'
       | 'مهم'
       | 'فوری';
     const message = String($form.find('[name="message"]').val() || '').trim();
+    const fileInput = $form.find('.js-ticket-file-input')[0] as HTMLInputElement | undefined;
 
     if (!subject || !message) {
       showToast('لطفاً موضوع و متن تیکت را تکمیل کنید.', true);
       return;
     }
 
-    ApiService.createMemberTicket({
-      member_phone: state.member.phone,
-      subject,
-      department,
-      priority,
-      message,
-      attachment_name: selectedTicketFileName,
-    })
+    readFilesForTicketAttachments(fileInput?.files)
+      .then((attachments) =>
+        ApiService.createMemberTicket({
+          member_phone: state.member.phone,
+          subject,
+          department,
+          priority,
+          message,
+          attachment_name: attachments[0]?.file_name || selectedTicketFileName || undefined,
+          attachments,
+        })
+      )
       .then((res) => {
         state.tickets = [res.ticket, ...state.tickets];
         selectedTicketFileName = '';
+        if (fileInput) fileInput.value = '';
         render();
-        showToast('تیکت شما به همراه اطلاعات پیوست در دیتابیس ثبت و ارسال شد.');
+        showToast('تیکت شما به همراه فایل پیوست در دیتابیس ثبت و ارسال شد.');
       })
       .catch((err) => {
         showToast(err.message || 'خطا در ارسال تیکت', true);
+      });
+  });
+
+  // Member reply to an open ticket
+  $wrapper.on('submit', '.js-member-reply-ticket-form', function (event) {
+    event.preventDefault();
+    const $form = $(this);
+    const ticketId = Number($form.data('ticket-id') || selectedTicketId || 0);
+    if (!ticketId) return;
+
+    const currentTicket = state.tickets.find((t) => Number(t.id) === ticketId);
+    if (currentTicket && currentTicket.status === 'بسته‌شده') {
+      showToast('این تیکت بسته شده است و امکان ارسال پیام جدید وجود ندارد.', true);
+      return;
+    }
+
+    const message = String($form.find('[name="reply_message"]').val() || '').trim();
+    const fileInput = $form.find('.js-member-reply-ticket-files')[0] as
+      | HTMLInputElement
+      | undefined;
+    const hasFiles = Boolean(fileInput?.files && fileInput.files.length > 0);
+
+    if (!message && !hasFiles) {
+      showToast('لطفاً متن پاسخ را وارد نمایید یا فایل پیوست انتخاب کنید.', true);
+      return;
+    }
+
+    readFilesForTicketAttachments(fileInput?.files)
+      .then((attachments) =>
+        ApiService.replyMemberTicket({
+          ticketId,
+          message,
+          attachments,
+        })
+      )
+      .then((res) => {
+        state.tickets = state.tickets.map((t) =>
+          Number(t.id) === ticketId ? res.ticket : t
+        );
+        selectedReplyFileNames = '';
+        if (fileInput) fileInput.value = '';
+        render();
+        showToast('پاسخ شما در تیکت ثبت شد.');
+      })
+      .catch((err) => {
+        showToast(err.message || 'خطا در ثبت پاسخ تیکت', true);
       });
   });
 

@@ -239,6 +239,35 @@ export interface MemberLibraryItem {
   updated_at: string;
 }
 
+export interface TicketAttachmentUploadInput {
+  file_name: string;
+  mime_type: string;
+  file_size?: number;
+  data_url: string;
+}
+
+export interface TicketAttachmentMeta {
+  id: number;
+  ticket_id: number;
+  sender_role: 'member' | 'admin';
+  uploader_role?: 'member' | 'admin';
+  file_name: string;
+  mime_type: string;
+  file_size: number;
+  url: string;
+  is_image: boolean;
+  created_at: string;
+}
+
+export interface TicketMessageItem {
+  id: string;
+  sender_role: 'member' | 'admin';
+  sender_name: string;
+  text: string;
+  created_at: string;
+  attachments: TicketAttachmentMeta[];
+}
+
 export interface MemberTicket {
   id: number;
   member_phone: string;
@@ -250,8 +279,16 @@ export interface MemberTicket {
   message: string;
   attachment_name?: string;
   admin_reply: string;
-  admin_replies?: Array<{ text: string; created_at?: string; date?: string }>;
+  admin_replies?: Array<{
+    text: string;
+    created_at?: string;
+    date?: string;
+    attachments?: TicketAttachmentMeta[];
+  }>;
+  messages?: TicketMessageItem[];
+  attachments?: TicketAttachmentMeta[];
   created_at: string;
+  updated_at?: string;
 }
 
 export interface ClubCalendarEvent {
@@ -267,6 +304,10 @@ export interface ClubCalendarEvent {
   capacity_info: string;
   description: string;
   is_reserved: number;
+  target_type?: 'session' | 'class';
+  target_id?: number;
+  sub_session_id?: number;
+  enrollment_status?: 'فعال' | 'غیرفعال' | 'ثبت‌نام‌نشده' | 'ثبت‌نام نشده';
   sort_order: number;
 }
 
