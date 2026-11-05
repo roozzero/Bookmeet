@@ -44,21 +44,32 @@ export function mapClassToCourseCard(
   approvedComments: UserComment[] = []
 ): RussianCourseCard {
   const subs = classItem.sub_sessions || [];
-  const firstSubDate = subs[0]?.session_date || classItem.schedule_summary || '—';
-  const lastSubDate =
-    subs.length > 1 ? subs[subs.length - 1]?.session_date || '—' : firstSubDate;
+  const rawSyllabus = Array.isArray(classItem.syllabus) ? classItem.syllabus : [];
 
-  const syllabus: CourseSyllabusModule[] = subs.map((sub, idx) => ({
-    moduleNumber: String(sub.session_number || `جلسه ${toPersianDigits(idx + 1)}`),
-    title: String(sub.title || ''),
-    sessionsRange: [sub.session_date, sub.session_time].filter(Boolean).join(' · ') || '—',
-    topics: sub.pages_to_read
-      ? String(sub.pages_to_read)
-          .split(/\n|،|-/)
-          .map((t) => t.trim())
-          .filter(Boolean)
-      : [],
-  }));
+  const syllabus: CourseSyllabusModule[] =
+    rawSyllabus.length > 0
+      ? rawSyllabus.map((item, idx) => ({
+          moduleNumber: String(item.session_number || `جلسه ${toPersianDigits(idx + 1)}`),
+          title: String(item.title || ''),
+          sessionsRange: '',
+          topics: item.description
+            ? String(item.description)
+                .split(/\n+/)
+                .map((t) => t.trim())
+                .filter(Boolean)
+            : [],
+        }))
+      : subs.map((sub, idx) => ({
+          moduleNumber: String(sub.session_number || `جلسه ${toPersianDigits(idx + 1)}`),
+          title: String(sub.title || ''),
+          sessionsRange: [sub.session_date, sub.session_time].filter(Boolean).join(' · '),
+          topics: sub.pages_to_read
+            ? String(sub.pages_to_read)
+                .split(/\n|،|-/)
+                .map((t) => t.trim())
+                .filter(Boolean)
+            : [],
+        }));
 
   const matchingComments: CourseAudienceComment[] = approvedComments
     .filter((c) => c.status === 'تایید شده' && c.target_title === classItem.title)
@@ -79,17 +90,17 @@ export function mapClassToCourseCard(
 
   return {
     id: classItem.id,
-    levelBadge: `سطح ${classItem.level_label || 'مبتدی'}`,
-    level: classItem.level_label || 'مبتدی',
+    levelBadge: classItem.level_label ? `سطح ${classItem.level_label}` : '',
+    level: classItem.level_label || '',
     title: classItem.title || '',
     subtitle: classItem.book_title || '',
     instructor: classItem.instructor_name || '',
     schedule: classItem.schedule_summary || '',
-    startDate: firstSubDate,
-    endDate: lastSubDate,
-    durationLabel: `${toPersianDigits(subs.length)} جلسه آموزشی`,
-    sessionsCount: `${toPersianDigits(subs.length)} جلسه آموزشی`,
-    capacityLabel: classItem.status === 'فعال' ? 'ظرفیت باز' : classItem.status,
+    startDate: String(classItem.start_date || '').trim(),
+    endDate: String(classItem.end_date || '').trim(),
+    durationLabel: String(classItem.duration_label || '').trim(),
+    sessionsCount: String(classItem.sessions_count || '').trim(),
+    capacityLabel: String(classItem.capacity_label || '').trim(),
     coverUrl: classItem.cover_url || '/assets/blog-1.png',
     description: classItem.description || '',
     fullDescription: descParagraphs,
@@ -177,12 +188,20 @@ export function createCoursesSection(
                     />
                     <div class="absolute inset-0 bg-gradient-to-t from-[#1E140E]/85 via-[#1E140E]/25 to-transparent"></div>
                     <div class="absolute top-3.5 right-3.5 left-3.5 flex items-center justify-between gap-2">
-                      <span class="px-3 py-1 rounded-lg bg-[#1E140E]/85 backdrop-blur-xs text-[#F7E9D7] text-[11.5px] font-bold border border-[#C69B6D]/35">
-                        ${toPersianDigits(course.levelBadge)}
-                      </span>
-                      <span class="px-2.5 py-1 rounded-lg bg-[#5A3A22]/90 text-[#FAF5EC] text-[11px] font-semibold">
-                        ${toPersianDigits(course.sessionsCount)}
-                      </span>
+                      ${
+                        course.levelBadge
+                          ? `<span class="px-3 py-1 rounded-lg bg-[#1E140E]/85 backdrop-blur-xs text-[#F7E9D7] text-[11.5px] font-bold border border-[#C69B6D]/35">
+                              ${toPersianDigits(course.levelBadge)}
+                            </span>`
+                          : '<span></span>'
+                      }
+                      ${
+                        course.sessionsCount
+                          ? `<span class="px-2.5 py-1 rounded-lg bg-[#5A3A22]/90 text-[#FAF5EC] text-[11px] font-semibold">
+                              ${toPersianDigits(course.sessionsCount)}
+                            </span>`
+                          : ''
+                      }
                     </div>
                     ${
                       course.subtitle

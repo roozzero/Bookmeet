@@ -193,6 +193,13 @@ export interface MemberSession {
   sort_order: number;
 }
 
+export interface CourseSyllabusItem {
+  id: number;
+  session_number: string | number;
+  title: string;
+  description?: string;
+}
+
 export interface MemberClassItem {
   id: number;
   member_phone: string;
@@ -201,6 +208,12 @@ export interface MemberClassItem {
   instructor_name: string;
   schedule_summary: string;
   level_label: 'مبتدی' | 'پیشرفته' | 'تخصصی' | string;
+  start_date?: string;
+  end_date?: string;
+  duration_label?: string;
+  sessions_count?: string;
+  capacity_label?: string;
+  syllabus?: CourseSyllabusItem[];
   cover_url?: string;
   total_sessions?: number;
   held_sessions?: number;

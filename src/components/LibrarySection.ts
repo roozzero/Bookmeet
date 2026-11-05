@@ -295,12 +295,10 @@ export function createLibrarySection(
 
               <!-- Book Details & Progress -->
               <div class="lg:col-span-8 xl:col-span-9 space-y-5">
-                <div class="flex flex-wrap items-center gap-2.5 text-[12.5px] text-[#7A5130] font-semibold">
+                <div class="flex flex-wrap items-center gap-2.5 text-[13px] text-[#7A5130] font-semibold">
                   ${
                     currentBookDisplay.category
-                      ? `<span class="px-3 py-1 rounded-lg bg-[#F8F2E8] border border-[#DFCBB0]">
-                          ${toPersianDigits(currentBookDisplay.category)}
-                        </span>`
+                      ? `<span class="text-[#7A5130] font-bold">${toPersianDigits(currentBookDisplay.category)}</span>`
                       : ''
                   }
                   ${
@@ -409,11 +407,11 @@ export function createLibrarySection(
                 .map(
                   (ev) => `
                 <article class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 flex flex-col justify-between shadow-[0_10px_28px_rgba(45,30,18,0.05)] hover:border-[#C5A480] transition-all duration-300">
-                  <div class="space-y-4">
+                  <div class="space-y-3.5">
                     <div class="flex items-center justify-between gap-2">
                       ${
                         ev.badge
-                          ? `<span class="px-3 py-1 rounded-lg bg-[#EFE2CE] text-[#5A3A22] text-[11.5px] font-bold">
+                          ? `<span class="text-[12.5px] font-bold text-[#7A4B2A]">
                               ${toPersianDigits(ev.badge)}
                             </span>`
                           : '<span></span>'
@@ -519,17 +517,17 @@ export function createLibrarySection(
                       class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       loading="lazy"
                     />
-                    ${
-                      book.category
-                        ? `<div class="absolute top-3 right-3 px-2.5 py-1 rounded-md bg-[#1F150E]/80 backdrop-blur-xs text-[#F5E9DA] text-[11px] font-medium">
-                            ${toPersianDigits(book.category)}
-                          </div>`
-                        : ''
-                    }
                   </div>
 
                   <!-- Content -->
                   <div class="p-5">
+                    ${
+                      book.category
+                        ? `<div class="text-[12px] font-bold text-[#7A4B2A] mb-1">
+                            ${toPersianDigits(book.category)}
+                          </div>`
+                        : ''
+                    }
                     <h4 class="font-display text-[19px] font-bold text-[#1F1610] leading-snug text-justify">
                       ${toPersianDigits(book.title)}
                     </h4>

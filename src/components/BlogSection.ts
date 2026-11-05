@@ -69,28 +69,37 @@ export function createBlogSectionComponent(
               class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
               loading="lazy"
             />
-            <div class="absolute top-3.5 right-3.5 bg-[#2d1c10]/85 backdrop-blur-xs text-[#f6f1e5] text-[11px] font-medium px-3 py-1 rounded-md">
-              ${toPersianDigits(post.category)}
-            </div>
           </div>
 
           <!-- Post Meta & Excerpt -->
           <div class="p-6">
             <div class="flex items-center justify-between text-[11px] text-[#7a6451] mb-3 pb-2.5 border-b border-[#e8dfd0]">
-              <span>نویسنده: <strong class="font-semibold text-[#473425]">${toPersianDigits(post.author)}</strong></span>
-              <span>${toPersianDigits(post.published_date)} · ${toPersianDigits(post.reading_time)}</span>
+              <span>${post.author ? `نویسنده: <strong class="font-semibold text-[#473425]">${toPersianDigits(post.author)}</strong>` : ''}</span>
+              <span>${toPersianDigits(post.published_date)}${post.reading_time ? ` · ${toPersianDigits(post.reading_time)}` : ''}</span>
             </div>
+
+            ${
+              post.category
+                ? `<div class="text-[12px] font-bold text-[#7a5230] mb-1">
+                    ${toPersianDigits(post.category)}
+                  </div>`
+                : ''
+            }
 
             <h3 class="js-open-post-trigger text-base md:text-[17px] font-bold text-[#382315] leading-[1.6] mb-3 group-hover:text-[#7a5230] transition-colors cursor-pointer">
               ${toPersianDigits(post.title)}
             </h3>
 
-            <p
-              class="text-xs md:text-[13.5px] text-[#4e3d2f] leading-[2.05] text-justify font-normal"
-              style="text-align: justify; text-justify: inter-word;"
-            >
-              ${toPersianDigits(post.excerpt)}
-            </p>
+            ${
+              post.excerpt && post.excerpt.trim()
+                ? `<p
+                    class="text-xs md:text-[13.5px] text-[#4e3d2f] leading-[2.05] text-justify font-normal"
+                    style="text-align: justify; text-justify: inter-word;"
+                  >
+                    ${toPersianDigits(post.excerpt)}
+                  </p>`
+                : ''
+            }
           </div>
         </div>
 

@@ -79,14 +79,7 @@ export function createEventDetailPage(
                 class="w-full h-full object-cover"
               />
               <div class="absolute inset-0 bg-gradient-to-t from-[#1E140E]/85 via-[#1E140E]/20 to-transparent"></div>
-              <div class="absolute top-4 right-4 left-4 flex items-center justify-between gap-2">
-                ${
-                  ev.badge
-                    ? `<span class="px-3.5 py-1.5 rounded-xl bg-[#1E140E]/80 backdrop-blur-md text-[#FAF5EC] text-[12px] font-bold border border-[#C69B6D]/40">
-                        ${toPersianDigits(ev.badge)}
-                      </span>`
-                    : '<span></span>'
-                }
+              <div class="absolute top-4 right-4 left-4 flex items-center justify-end gap-2">
                 <span class="px-3 py-1 rounded-xl bg-[#235332]/90 text-[#FAF5EC] text-[12px] font-bold">
                   ${toPersianDigits(ev.capacityText)}
                 </span>
@@ -104,10 +97,10 @@ export function createEventDetailPage(
             <!-- Event & Book Specs Column -->
             <div class="lg:col-span-7 p-6 sm:p-8 lg:p-10 flex flex-col justify-between space-y-6">
               <div class="space-y-4">
-                <div class="flex flex-wrap items-center gap-2 text-[12.5px] text-[#7A4B2A] font-semibold">
+                <div class="flex flex-wrap items-center gap-2 text-[13px] text-[#7A4B2A] font-semibold">
                   ${
                     ev.category
-                      ? `<span class="px-3 py-1 rounded-lg bg-[#EFE2CE]">${toPersianDigits(ev.category)}</span>`
+                      ? `<span class="text-[#7A4B2A] font-bold">${toPersianDigits(ev.category)}</span>`
                       : ''
                   }
                   ${
@@ -168,7 +161,7 @@ export function createEventDetailPage(
               <!-- CTA Register Bar -->
               <div class="pt-5 border-t border-[#E6D7C3] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <span class="text-[12px] text-[#6B5444] block">نحوه ثبت‌نام در نشست:</span>
+                  <span class="text-[12.5px] text-[#6B5444] block mb-0.5">پس از ثبت نام و تایید مدیر نشست های شما فعال می شود</span>
                   <span class="text-[13.5px] font-bold text-[#235332]">ثبت در بخش «جلسات من» و تایید توسط مدیریت باشگاه</span>
                 </div>
                 <button
@@ -182,34 +175,38 @@ export function createEventDetailPage(
           </div>
         </div>
 
-        <!-- Book Introduction & Event Description -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          <div class="lg:col-span-7 p-6 sm:p-8 rounded-3xl bg-[#FAF5EC] border border-[#E2D3BF] space-y-4">
-            <h2 class="font-display text-[21px] sm:text-[24px] font-bold text-[#1E150F]">
-              درباره این نشست و محورهای گفت‌وگو
-            </h2>
-            ${
-              ev.fullDescription.length > 0
-                ? `<div class="space-y-3.5 text-[14.5px] leading-[2] text-[#3F2F23] text-justify">
-                    ${ev.fullDescription
-                      .map((p) => `<p>${toPersianDigits(p)}</p>`)
-                      .join('')}
-                  </div>`
-                : `<p class="text-[14px] text-[#6B5444]">توضیحات تکمیلی برای این دوره ثبت نشده است.</p>`
-            }
+        <!-- Book Introduction & Event Description (Equal Height Side-by-Side Cards) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+          <div class="lg:col-span-7 h-full flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-[#FAF5EC] border border-[#E2D3BF] space-y-4">
+            <div class="space-y-4">
+              <h2 class="font-display text-[21px] sm:text-[24px] font-bold text-[#1E150F]">
+                درباره این نشست و محورهای گفت‌وگو
+              </h2>
+              ${
+                ev.fullDescription.length > 0
+                  ? `<div class="space-y-3.5 text-[14.5px] leading-[2] text-[#3F2F23] text-justify">
+                      ${ev.fullDescription
+                        .map((p) => `<p>${toPersianDigits(p)}</p>`)
+                        .join('')}
+                    </div>`
+                  : `<p class="text-[14px] text-[#6B5444]">توضیحات تکمیلی برای این دوره ثبت نشده است.</p>`
+              }
+            </div>
           </div>
 
-          <div class="lg:col-span-5 p-6 sm:p-8 rounded-3xl bg-[#EFE4D3] border border-[#DECBB2] space-y-4">
-            <h2 class="font-display text-[20px] sm:text-[22px] font-bold text-[#1E150F]">
-              معرفی کتاب «${toPersianDigits(ev.bookTitle)}»
-            </h2>
-            ${
-              ev.bookIntroduction
-                ? `<p class="text-[14px] leading-[1.95] text-[#3B2C22] text-justify">
-                    ${toPersianDigits(ev.bookIntroduction)}
-                  </p>`
-                : `<p class="text-[13.5px] text-[#6B5444]">معرفی کتاب برای این نشست ثبت نشده است.</p>`
-            }
+          <div class="lg:col-span-5 h-full flex flex-col justify-between p-6 sm:p-8 rounded-3xl bg-[#EFE4D3] border border-[#DECBB2] space-y-4">
+            <div class="space-y-4">
+              <h2 class="font-display text-[20px] sm:text-[22px] font-bold text-[#1E150F]">
+                معرفی کتاب «${toPersianDigits(ev.bookTitle)}»
+              </h2>
+              ${
+                ev.bookIntroduction
+                  ? `<p class="text-[14px] leading-[1.95] text-[#3B2C22] text-justify">
+                      ${toPersianDigits(ev.bookIntroduction)}
+                    </p>`
+                  : `<p class="text-[13.5px] text-[#6B5444]">معرفی کتاب برای این نشست ثبت نشده است.</p>`
+              }
+            </div>
             <div class="pt-3 border-t border-[#D8C2A6] text-[12.5px] text-[#5A4535] space-y-1.5">
               <div>• ژانر و دسته‌بندی: <strong>${toPersianDigits(ev.category || '—')}</strong></div>
               <div>• سال انتشار: <strong>${ev.publicationYear ? toPersianDigits(ev.publicationYear) : '—'}</strong></div>

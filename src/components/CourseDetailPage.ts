@@ -80,12 +80,20 @@ export function createCourseDetailPage(
               />
               <div class="absolute inset-0 bg-gradient-to-t from-[#1E140E]/85 via-[#1E140E]/20 to-transparent"></div>
               <div class="absolute top-4 right-4 left-4 flex items-center justify-between gap-2">
-                <span class="px-3.5 py-1.5 rounded-xl bg-[#1E140E]/80 backdrop-blur-md text-[#FAF5EC] text-[12px] font-bold border border-[#C69B6D]/40">
-                  ${toPersianDigits(course.levelBadge)}
-                </span>
-                <span class="px-3 py-1 rounded-xl bg-[#5A3A22]/90 text-[#FAF5EC] text-[12px] font-bold">
-                  ${toPersianDigits(course.sessionsCount)}
-                </span>
+                ${
+                  course.levelBadge
+                    ? `<span class="px-3.5 py-1.5 rounded-xl bg-[#1E140E]/80 backdrop-blur-md text-[#FAF5EC] text-[12px] font-bold border border-[#C69B6D]/40">
+                        ${toPersianDigits(course.levelBadge)}
+                      </span>`
+                    : '<span></span>'
+                }
+                ${
+                  course.sessionsCount
+                    ? `<span class="px-3 py-1 rounded-xl bg-[#5A3A22]/90 text-[#FAF5EC] text-[12px] font-bold">
+                        ${toPersianDigits(course.sessionsCount)}
+                      </span>`
+                    : ''
+                }
               </div>
               <div class="absolute bottom-4 right-4 left-4 text-[#FAF5EC]">
                 <span class="text-[12px] text-[#E6D3B8] block">مدرس دوره:</span>
@@ -98,7 +106,7 @@ export function createCourseDetailPage(
               <div class="space-y-4">
                 ${
                   course.subtitle
-                    ? `<span class="inline-block text-[12.5px] font-bold text-[#7A4B2A] px-3 py-1 rounded-lg bg-[#EFE2CE]">
+                    ? `<span class="inline-block text-[13px] font-bold text-[#7A4B2A]">
                         ${toPersianDigits(course.subtitle)}
                       </span>`
                     : ''
@@ -125,20 +133,20 @@ export function createCourseDetailPage(
                     <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(course.endDate || '—')}</strong>
                   </div>
                   <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
-                    <span class="block text-[11.5px] text-[#786150]">مدت و تعداد جلسات</span>
-                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(course.durationLabel)}</strong>
+                    <span class="block text-[11.5px] text-[#786150]">مدت دوره</span>
+                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(course.durationLabel || '—')}</strong>
+                  </div>
+                  <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
+                    <span class="block text-[11.5px] text-[#786150]">تعداد جلسات</span>
+                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(course.sessionsCount || '—')}</strong>
                   </div>
                   <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
                     <span class="block text-[11.5px] text-[#786150]">روز و ساعت کلاس</span>
                     <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(course.schedule || '—')}</strong>
                   </div>
                   <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
-                    <span class="block text-[11.5px] text-[#786150]">سطح آموزشی</span>
-                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(course.levelBadge)}</strong>
-                  </div>
-                  <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
                     <span class="block text-[11.5px] text-[#786150]">وضعیت ظرفیت</span>
-                    <strong class="text-[13.5px] font-bold text-[#235332] mt-1 block">${toPersianDigits(course.capacityLabel)}</strong>
+                    <strong class="text-[13.5px] font-bold text-[#235332] mt-1 block">${toPersianDigits(course.capacityLabel || '—')}</strong>
                   </div>
                 </div>
               </div>
@@ -176,7 +184,7 @@ export function createCourseDetailPage(
           }
         </div>
 
-        <!-- Syllabus Section -->
+        <!-- Syllabus Section (Numbered Session-by-Session List) -->
         <div class="p-6 sm:p-8 lg:p-10 rounded-3xl bg-[#FAF5EC] border border-[#E2D3BF] space-y-6">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
@@ -184,58 +192,69 @@ export function createCourseDetailPage(
                 سرفصل‌ها و جلسات دوره
               </h2>
               <p class="text-[13.5px] text-[#6B5444] mt-1">
-                برنامه جلسات تعریف‌شده برای این دوره آموزشی
+                برنامه جلسه به جلسه و سرفصل‌های آموزشی تعریف‌شده برای این دوره
               </p>
             </div>
-            <span class="px-3.5 py-1.5 rounded-xl bg-[#EFE2CE] text-[#5A3A22] text-[12.5px] font-bold self-start sm:self-auto">
-              ${toPersianDigits(course.sessionsCount)}
-            </span>
+            ${
+              course.sessionsCount || course.syllabus.length > 0
+                ? `<span class="px-3.5 py-1.5 rounded-xl bg-[#EFE2CE] text-[#5A3A22] text-[12.5px] font-bold self-start sm:self-auto">
+                    ${toPersianDigits(
+                      course.sessionsCount || `${course.syllabus.length} جلسه`
+                    )}
+                  </span>`
+                : ''
+            }
           </div>
 
           ${
             course.syllabus.length > 0
               ? `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <ol class="space-y-3.5 list-none">
               ${course.syllabus
                 .map(
-                  (mod) => `
-                <div class="p-5 rounded-2xl bg-[#F4E9DA]/65 border border-[#E2D2BC] space-y-3">
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="px-3 py-1 rounded-lg bg-[#5A3A22] text-[#FAF5EC] text-[11.5px] font-bold">
-                      ${toPersianDigits(mod.moduleNumber)}
-                    </span>
-                    <span class="text-[12px] font-semibold text-[#7A4B2A]">
-                      ${toPersianDigits(mod.sessionsRange)}
-                    </span>
+                  (mod, idx) => `
+                <li class="p-4 sm:p-5 rounded-2xl bg-[#F4E9DA]/65 border border-[#E2D2BC] flex items-start gap-4">
+                  <div class="w-9 h-9 rounded-xl bg-[#5A3A22] text-[#FAF5EC] font-display text-[14px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                    ${toPersianDigits(idx + 1)}
                   </div>
-                  <h3 class="font-display text-[17px] font-bold text-[#231912] leading-[1.6] text-justify">
-                    ${toPersianDigits(mod.title)}
-                  </h3>
-                  ${
-                    mod.topics.length > 0
-                      ? `<ul class="space-y-1.5 text-[13px] text-[#4A382B] leading-[1.8]">
-                          ${mod.topics
-                            .map(
-                              (t) => `
-                            <li class="flex items-start gap-2 text-justify">
-                              <span class="text-[#7A4B2A] font-bold mt-0.5">•</span>
-                              <span>${toPersianDigits(t)}</span>
-                            </li>
-                          `
-                            )
-                            .join('')}
-                        </ul>`
-                      : ''
-                  }
-                </div>
+                  <div class="flex-1 min-w-0 space-y-1.5">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <h3 class="font-display text-[16px] sm:text-[17px] font-bold text-[#231912] leading-[1.6] text-justify">
+                        ${
+                          mod.moduleNumber && !String(mod.moduleNumber).startsWith('جلسه')
+                            ? `جلسه ${toPersianDigits(mod.moduleNumber)}: `
+                            : mod.moduleNumber
+                            ? `${toPersianDigits(mod.moduleNumber)}: `
+                            : ''
+                        }${toPersianDigits(mod.title)}
+                      </h3>
+                      ${
+                        mod.sessionsRange
+                          ? `<span class="text-[12px] font-semibold text-[#7A4B2A]">
+                              ${toPersianDigits(mod.sessionsRange)}
+                            </span>`
+                          : ''
+                      }
+                    </div>
+                    ${
+                      mod.topics.length > 0
+                        ? `<div class="space-y-1 text-[13.5px] text-[#4A382B] leading-[1.85] text-justify">
+                            ${mod.topics
+                              .map((t) => `<p>${toPersianDigits(t)}</p>`)
+                              .join('')}
+                          </div>`
+                        : ''
+                    }
+                  </div>
+                </li>
               `
                 )
                 .join('')}
-            </div>
+            </ol>
           `
               : `
             <div class="p-6 rounded-2xl bg-[#F4E9DA]/50 border border-[#E2D2BC] text-center text-[13.5px] text-[#6B5444]">
-              هنوز جلسه‌ای برای این دوره ثبت نشده است.
+              هنوز سرفصل جلسات برای این دوره ثبت نشده است.
             </div>
           `
           }

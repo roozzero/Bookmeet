@@ -8,6 +8,7 @@ import type {
   ClubAnnouncement,
   ClubMember,
   ContactInfoData,
+  CourseSyllabusItem,
   EnrollmentRecord,
   GalleryImage,
   HeroSettings,
@@ -18,6 +19,7 @@ import type {
   UserComment,
 } from '../types/models.ts';
 import { toEnglishDigits, toPersianDigits } from '../utils/persianNumbers.ts';
+import { normalizeArticleHtml, sanitizeRichHtml } from '../utils/sanitizeHtml.ts';
 
 export type AdminTabKey =
   | 'dashboard'
@@ -256,10 +258,10 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           title: '',
           slug: '',
           category: 'یادداشت ادبی',
-          author: `${state.admin.first_name} ${state.admin.last_name}`,
-          published_date: '۱۴ آبان ۱۴۰۵',
-          reading_time: '۶ دقیقه مطالعه',
-          tags: 'ادبیات داستانی، نقد کتاب، بوک‌میت',
+          author: '',
+          published_date: '',
+          reading_time: '',
+          tags: '',
           status: 'منتشر شده',
           cover_url: state.gallery[0]?.url || '/assets/blog-1.png',
           excerpt: '',
@@ -386,6 +388,23 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
 
     const $classForm = $wrapper.find('.js-admin-class-form');
     if (editingClass && $classForm.length) {
+      const domSyllabus: CourseSyllabusItem[] = [];
+      $classForm.find('.js-admin-syllabus-row').each(function (idx) {
+        const $row = $(this);
+        const rawId = Number($row.attr('data-syllabus-id')) || Date.now() + idx;
+        const sessionNumber = String(
+          $row.find('.js-syllabus-number-input').val() || `جلسه ${toPersianDigits(idx + 1)}`
+        ).trim();
+        const itemTitle = String($row.find('.js-syllabus-title-input').val() || '').trim();
+        const itemDesc = String($row.find('.js-syllabus-desc-input').val() || '').trim();
+        domSyllabus.push({
+          id: rawId,
+          session_number: sessionNumber,
+          title: itemTitle,
+          description: itemDesc,
+        });
+      });
+
       editingClass = {
         ...editingClass,
         title: String($classForm.find('[name="title"]').val() || ''),
@@ -398,6 +417,12 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           $classForm.find('[name="schedule_summary"]').val() || ''
         ),
         level_label: String($classForm.find('[name="level_label"]').val() || 'مبتدی'),
+        start_date: String($classForm.find('[name="start_date"]').val() || ''),
+        end_date: String($classForm.find('[name="end_date"]').val() || ''),
+        duration_label: String($classForm.find('[name="duration_label"]').val() || ''),
+        sessions_count: String($classForm.find('[name="sessions_count"]').val() || ''),
+        capacity_label: String($classForm.find('[name="capacity_label"]').val() || ''),
+        syllabus: domSyllabus,
         cover_url: String(
           $classForm.find('[name="cover_url"]').val() ||
             editingClass.cover_url ||
@@ -409,6 +434,10 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
 
     const $blogForm = $wrapper.find('.js-admin-blog-form');
     if (editingBlogPost && $blogForm.length) {
+      const $wysiwyg = $blogForm.find('.js-admin-blog-wysiwyg');
+      const currentRichHtml = $wysiwyg.length
+        ? sanitizeRichHtml($wysiwyg.html() || '')
+        : String($blogForm.find('[name="full_content"]').val() || '');
       editingBlogPost = {
         ...editingBlogPost,
         title: String($blogForm.find('[name="title"]').val() || ''),
@@ -427,7 +456,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             '/assets/blog-1.png'
         ),
         excerpt: String($blogForm.find('[name="excerpt"]').val() || ''),
-        full_content: String($blogForm.find('[name="full_content"]').val() || ''),
+        full_content: currentRichHtml,
       };
     }
   }
@@ -1695,7 +1724,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         ${
           editingClass
             ? `
-          <form class="js-admin-class-form p-6 rounded-2xl bg-[#FAF5EC] border-2 border-[#C8AF8F] space-y-4">
+          <form class="js-admin-class-form p-6 rounded-2xl bg-[#FAF5EC] border-2 border-[#C8AF8F] space-y-5">
             <h3 class="font-display text-[17px] font-bold text-[#231912]">
               ${editingClass.id ? 'ویرایش کلاس آموزشی' : 'تعریف کلاس آموزشی جدید'}
             </h3>
@@ -1721,18 +1750,38 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 <input type="text" name="instructor_name" required value="${toPersianDigits(editingClass.instructor_name || '')}" placeholder="مثلاً: دکتر سهراب رستگار" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
               </div>
               <div>
-                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">برنامه هفتگی</label>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">برنامه هفتگی (روز و ساعت کلاس)</label>
                 <input type="text" name="schedule_summary" value="${toPersianDigits(editingClass.schedule_summary || '')}" placeholder="مثلاً: دوشنبه‌ها · ساعت ۱۷:۳۰ تا ۱۹:۳۰" class="js-persian-digits-input w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+              </div>
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">زمان شروع دوره</label>
+                <input type="text" name="start_date" value="${toPersianDigits(editingClass.start_date || '')}" placeholder="مثلاً: ۱۵ آبان ۱۴۰۵" class="js-persian-digits-input w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+              </div>
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">زمان پایان دوره</label>
+                <input type="text" name="end_date" value="${toPersianDigits(editingClass.end_date || '')}" placeholder="مثلاً: ۳۰ دی ۱۴۰۵" class="js-persian-digits-input w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+              </div>
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">مدت دوره</label>
+                <input type="text" name="duration_label" value="${toPersianDigits(editingClass.duration_label || '')}" placeholder="مثلاً: ۱۰ هفته (۲۰ ساعت)" class="js-persian-digits-input w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+              </div>
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">تعداد جلسات</label>
+                <input type="text" name="sessions_count" value="${toPersianDigits(editingClass.sessions_count || '')}" placeholder="مثلاً: ۱۰ جلسه آموزشی" class="js-persian-digits-input w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+              </div>
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">وضعیت ظرفیت</label>
+                <input type="text" name="capacity_label" value="${toPersianDigits(editingClass.capacity_label || '')}" placeholder="مثلاً: ظرفیت محدود (۸ نفر)" class="js-persian-digits-input w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
               </div>
               <div>
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">سطح کلاس *</label>
                 <select name="level_label" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]">
-                  <option value="مبتدی" ${editingClass.level_label === 'مبتدی' ? 'selected' : ''}>مبتدی</option>
-                  <option value="پیشرفته" ${editingClass.level_label === 'پیشرفته' || !editingClass.level_label ? 'selected' : ''}>پیشرفته</option>
+                  <option value="مبتدی" ${editingClass.level_label === 'مبتدی' || !editingClass.level_label ? 'selected' : ''}>مبتدی</option>
+                  <option value="پیشرفته" ${editingClass.level_label === 'پیشرفته' ? 'selected' : ''}>پیشرفته</option>
                   <option value="تخصصی" ${editingClass.level_label === 'تخصصی' ? 'selected' : ''}>تخصصی</option>
                 </select>
               </div>
-              <div class="sm:col-span-2">
+              <div class="sm:col-span-3">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">تصویر کاور کلاس (انتخاب از گالری تصاویر)</label>
                 <input type="hidden" name="cover_url" value="${editingClass.cover_url || '/assets/blog-1.png'}" />
                 <div class="flex items-center gap-3 p-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9]">
@@ -1755,6 +1804,107 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 <textarea name="description" rows="3" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]">${editingClass.description || ''}</textarea>
               </div>
             </div>
+
+            <!-- Session-by-Session Course Syllabus Builder -->
+            <div class="pt-4 border-t border-[#DFCEB9] space-y-3.5">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 class="font-display text-[15px] font-bold text-[#231912]">
+                    سرفصل‌های جلسه به جلسه دوره
+                  </h4>
+                  <p class="text-[12px] text-[#6B5444]">
+                    سرفصل هر جلسه از دوره را به‌صورت جداگانه اضافه، ویرایش یا جابه‌جا کنید تا در صفحه جزئیات دوره نمایش داده شود.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="js-admin-add-syllabus-item px-3.5 py-2 rounded-xl bg-[#EFE3D2] hover:bg-[#E2D0B8] border border-[#D4BEA2] text-[#3F2E21] text-[12px] font-bold cursor-pointer self-start sm:self-auto shrink-0"
+                >
+                  + افزودن جلسه به سرفصل
+                </button>
+              </div>
+
+              ${
+                Array.isArray(editingClass.syllabus) && editingClass.syllabus.length > 0
+                  ? `
+                <div class="space-y-2.5">
+                  ${editingClass.syllabus
+                    .map(
+                      (item, idx) => `
+                    <div
+                      data-syllabus-id="${item.id || idx + 1}"
+                      data-syllabus-index="${idx}"
+                      class="js-admin-syllabus-row p-3.5 rounded-xl bg-[#F4E9DA]/75 border border-[#DFCEB9] flex flex-col sm:flex-row items-stretch sm:items-start gap-3"
+                    >
+                      <div class="flex items-center gap-2 sm:w-36 shrink-0">
+                        <span class="w-7 h-7 rounded-lg bg-[#5A3A22] text-[#FAF5EC] text-[12px] font-bold inline-flex items-center justify-center shrink-0">
+                          ${toPersianDigits(idx + 1)}
+                        </span>
+                        <input
+                          type="text"
+                          value="${toPersianDigits(item.session_number || `جلسه ${idx + 1}`)}"
+                          placeholder="شماره جلسه"
+                          class="js-syllabus-number-input w-full px-2.5 py-1.5 rounded-lg bg-[#FAF5EC] border border-[#D8C5AC] text-[12px] font-semibold text-[#231912]"
+                        />
+                      </div>
+                      <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <input
+                          type="text"
+                          value="${item.title || ''}"
+                          placeholder="عنوان سرفصل این جلسه (مثلاً: الفبای سیریلیک و آواشناسی)"
+                          class="js-syllabus-title-input w-full px-3 py-1.5 rounded-lg bg-[#FAF5EC] border border-[#D8C5AC] text-[12.5px] text-[#231912]"
+                        />
+                        <input
+                          type="text"
+                          value="${item.description || ''}"
+                          placeholder="توضیح کوتاه یا مباحث جلسه (اختیاری)"
+                          class="js-syllabus-desc-input w-full px-3 py-1.5 rounded-lg bg-[#FAF5EC] border border-[#D8C5AC] text-[12.5px] text-[#231912]"
+                        />
+                      </div>
+                      <div class="flex items-center justify-end gap-1 shrink-0">
+                        <button
+                          type="button"
+                          data-move-syllabus="${idx}"
+                          data-move-dir="up"
+                          title="انتقال به بالا"
+                          ${idx === 0 ? 'disabled' : ''}
+                          class="js-admin-move-syllabus w-7 h-7 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C5AC] text-[#4E3B2D] text-[12px] font-bold inline-flex items-center justify-center cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          data-move-syllabus="${idx}"
+                          data-move-dir="down"
+                          title="انتقال به پایین"
+                          ${idx === (editingClass.syllabus?.length || 1) - 1 ? 'disabled' : ''}
+                          class="js-admin-move-syllabus w-7 h-7 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C5AC] text-[#4E3B2D] text-[12px] font-bold inline-flex items-center justify-center cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          data-remove-syllabus="${idx}"
+                          title="حذف این جلسه از سرفصل"
+                          class="js-admin-remove-syllabus-item px-2.5 h-7 rounded-lg border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[11.5px] font-semibold inline-flex items-center justify-center cursor-pointer"
+                        >
+                          حذف
+                        </button>
+                      </div>
+                    </div>
+                  `
+                    )
+                    .join('')}
+                </div>
+              `
+                  : `
+                <div class="p-4 rounded-xl bg-[#F4E9DA]/45 border border-dashed border-[#D8C5AC] text-center text-[12.5px] text-[#6B5444]">
+                  هنوز جلسه‌ای در سرفصل این دوره ثبت نشده است. با دکمه «+ افزودن جلسه به سرفصل» جلسات دوره را اضافه کنید.
+                </div>
+              `
+              }
+            </div>
+
             <div class="flex justify-end gap-2 pt-2">
               <button type="button" class="js-admin-cancel-class px-4 py-2 rounded-xl border border-[#C5B198] text-[12.5px] font-semibold text-[#4E3B2D] cursor-pointer">انصراف</button>
               <button type="submit" class="px-5 py-2 rounded-xl bg-[#5A3A22] text-[#FAF5EC] text-[13px] font-semibold cursor-pointer">ذخیره کلاس در دیتابیس</button>
@@ -1816,15 +1966,37 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                       }">${normStatus}</span>
                       <span class="px-2.5 py-1 rounded-lg bg-[#5A3A22]/90">سطح ${toPersianDigits(c.level_label)}</span>
                     </div>
-                    <span class="px-2.5 py-1 rounded-lg bg-[#1E140E]/65">${toPersianDigits((c.sub_sessions || []).length)} جلسه آموزشی</span>
+                    <span class="px-2.5 py-1 rounded-lg bg-[#1E140E]/65">${toPersianDigits(
+                      c.sessions_count || `${(c.syllabus || c.sub_sessions || []).length} جلسه آموزشی`
+                    )}</span>
                   </div>
                 </div>
                 <div class="p-5 space-y-2.5">
                   <h3 class="font-display text-[16.5px] font-bold text-[#231912] text-justify leading-[1.65]">${toPersianDigits(c.title)}</h3>
                   <p class="text-[12.5px] text-[#5B4739] text-justify leading-[1.8]">${toPersianDigits(c.description)}</p>
-                  <div class="pt-2 border-t border-[#E6D8C5] text-[12px] text-[#5B4739] space-y-1">
-                    <div>مدرس: <strong class="text-[#231912]">${toPersianDigits(c.instructor_name)}</strong></div>
-                    <div>برنامه: <strong class="text-[#231912]">${toPersianDigits(c.schedule_summary)}</strong></div>
+                  <div class="pt-2 border-t border-[#E6D8C5] text-[12px] text-[#5B4739] grid grid-cols-1 sm:grid-cols-2 gap-1">
+                    <div>مدرس: <strong class="text-[#231912]">${toPersianDigits(c.instructor_name || '—')}</strong></div>
+                    <div>برنامه: <strong class="text-[#231912]">${toPersianDigits(c.schedule_summary || '—')}</strong></div>
+                    ${
+                      c.start_date
+                        ? `<div>شروع: <strong class="text-[#231912]">${toPersianDigits(c.start_date)}</strong></div>`
+                        : ''
+                    }
+                    ${
+                      c.end_date
+                        ? `<div>پایان: <strong class="text-[#231912]">${toPersianDigits(c.end_date)}</strong></div>`
+                        : ''
+                    }
+                    ${
+                      c.duration_label
+                        ? `<div>مدت: <strong class="text-[#231912]">${toPersianDigits(c.duration_label)}</strong></div>`
+                        : ''
+                    }
+                    ${
+                      c.capacity_label
+                        ? `<div>ظرفیت: <strong class="text-[#235332]">${toPersianDigits(c.capacity_label)}</strong></div>`
+                        : ''
+                    }
                   </div>
                   ${renderEnrolledMembersBlock({
                     targetType: 'class',
@@ -2046,7 +2218,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     <td class="py-3.5 px-4 whitespace-nowrap font-medium">${toPersianDigits(u.phone)}</td>
                     <td class="py-3.5 px-4 whitespace-nowrap" dir="ltr">${u.email || '—'}</td>
                     <td class="py-3.5 px-4 whitespace-nowrap">${toPersianDigits(u.education || '—')}</td>
-                    <td class="py-3.5 px-4 whitespace-nowrap text-[#6B5444]">${toPersianDigits(u.joined_date || 'آبان ۱۴۰۵')}</td>
+                    <td class="py-3.5 px-4 whitespace-nowrap text-[#6B5444]">${toPersianDigits(u.joined_date || '—')}</td>
                     <td class="py-3.5 px-4 whitespace-nowrap">
                       <div class="flex items-center justify-center gap-1.5">
                         <!-- 1. Toggle Active / Inactive Icon Button -->
@@ -2551,7 +2723,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   type="text"
                   name="author"
                   required
-                  value="${editingBlogPost.author || 'سهراب رستگار'}"
+                  value="${editingBlogPost.author || ''}"
+                  placeholder="نام نویسنده مقاله را وارد کنید"
                   class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]"
                 />
               </div>
@@ -2570,7 +2743,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 <input
                   type="text"
                   name="published_date"
-                  value="${editingBlogPost.published_date || '۱۴ آبان ۱۴۰۵'}"
+                  value="${editingBlogPost.published_date || ''}"
+                  placeholder="مثلاً: ۱۴ آبان ۱۴۰۵"
                   class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]"
                 />
               </div>
@@ -2579,7 +2753,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 <input
                   type="text"
                   name="reading_time"
-                  value="${editingBlogPost.reading_time || '۶ دقیقه مطالعه'}"
+                  value="${editingBlogPost.reading_time || ''}"
+                  placeholder="مثلاً: ۶ دقیقه مطالعه"
                   class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]"
                 />
               </div>
@@ -2588,7 +2763,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 <input
                   type="text"
                   name="tags"
-                  value="${editingBlogPost.tags || 'ادبیات داستانی، نقد کتاب، بوک‌میت'}"
+                  value="${editingBlogPost.tags || ''}"
+                  placeholder="در صورت تمایل برچسب‌ها را با ویرگول وارد کنید"
                   class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]"
                 />
               </div>
@@ -2620,19 +2796,18 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </div>
 
               <div class="sm:col-span-3">
-                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">خلاصه مقاله (چکیده / لید) *</label>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">خلاصه مقاله (چکیده / لید)</label>
                 <textarea
                   name="excerpt"
                   rows="3"
-                  required
-                  placeholder="خلاصه‌ای جذاب از موضوع مقاله که در کارت‌های صفحه اصلی نمایش داده می‌شود..."
+                  placeholder="خلاصه‌ای از موضوع مقاله که در کارت‌های صفحه اصلی نمایش داده می‌شود..."
                   class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px] leading-[1.85]"
                 >${editingBlogPost.excerpt || ''}</textarea>
               </div>
 
               <div class="sm:col-span-3">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">متن کامل مقاله *</label>
-                <div class="rounded-xl border border-[#DFCEB9] bg-[#F4E9DA]/60 overflow-hidden">
+                <div class="rounded-xl border border-[#DFCEB9] bg-[#FAF5EC] overflow-hidden shadow-2xs">
                   <!-- Rich Text Formatting Toolbar -->
                   <div class="px-3 py-2 bg-[#EFE3D2] border-b border-[#DFCEB9] flex flex-wrap items-center gap-1.5">
                     <button
@@ -2654,7 +2829,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     <button
                       type="button"
                       data-editor-cmd="underline"
-                      title="زیرخط‌دار"
+                      title="زیرخط‌دار (Underline)"
                       class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] underline font-semibold text-[#231912] cursor-pointer"
                     >
                       U زیرخط
@@ -2663,7 +2838,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     <button
                       type="button"
                       data-editor-cmd="h2"
-                      title="افزودن تیتر اصلی"
+                      title="تیتر اصلی (H2)"
                       class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-bold text-[#231912] cursor-pointer"
                     >
                       تیتر H2
@@ -2671,15 +2846,23 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     <button
                       type="button"
                       data-editor-cmd="h3"
-                      title="افزودن زیرعنوان"
+                      title="زیرعنوان (H3)"
                       class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
                     >
                       زیرعنوان H3
                     </button>
                     <button
                       type="button"
+                      data-editor-cmd="p"
+                      title="پاراگراف معمولی"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                    >
+                      پاراگراف
+                    </button>
+                    <button
+                      type="button"
                       data-editor-cmd="quote"
-                      title="درج نقل‌قول ادبی"
+                      title="نقل‌قول (Blockquote)"
                       class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
                     >
                       « نقل‌قول »
@@ -2701,6 +2884,40 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     >
                       ۱. لیست شماره‌دار
                     </button>
+                    <span class="w-px h-5 bg-[#D5C3AE] mx-0.5"></span>
+                    <button
+                      type="button"
+                      data-editor-cmd="align-right"
+                      title="تراز از راست"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                    >
+                      راست‌چین
+                    </button>
+                    <button
+                      type="button"
+                      data-editor-cmd="align-center"
+                      title="وسط‌چین"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                    >
+                      وسط‌چین
+                    </button>
+                    <button
+                      type="button"
+                      data-editor-cmd="align-left"
+                      title="چپ‌چین"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                    >
+                      چپ‌چین
+                    </button>
+                    <button
+                      type="button"
+                      data-editor-cmd="align-justify"
+                      title="تراز دوطرفه (Justify)"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                    >
+                      هم‌تراز
+                    </button>
+                    <span class="w-px h-5 bg-[#D5C3AE] mx-0.5"></span>
                     <button
                       type="button"
                       data-editor-cmd="link"
@@ -2711,11 +2928,19 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     </button>
                     <button
                       type="button"
-                      data-editor-cmd="hr"
-                      title="درج خط جداکننده"
+                      data-editor-cmd="undo"
+                      title="بازگشت به قبل (Undo)"
                       class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
                     >
-                      ― جداکننده
+                      ↶ واگرد
+                    </button>
+                    <button
+                      type="button"
+                      data-editor-cmd="redo"
+                      title="انجام مجدد (Redo)"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                    >
+                      ↷ از نو
                     </button>
                     <button
                       type="button"
@@ -2726,13 +2951,42 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                       پاک‌سازی فرمت
                     </button>
                   </div>
+
+                  <!-- Inline Link Inserter Bar (Hidden by default) -->
+                  <div class="js-blog-link-bar hidden px-3.5 py-2.5 bg-[#F4E9DA] border-b border-[#DFCEB9] flex flex-wrap items-center gap-2">
+                    <span class="text-[12px] font-semibold text-[#4E3B2D]">نشانی لینک (URL):</span>
+                    <input
+                      type="url"
+                      dir="ltr"
+                      placeholder="https://example.com"
+                      class="js-blog-link-url-input flex-1 min-w-[200px] px-3 py-1.5 rounded-lg bg-[#FAF5EC] border border-[#D8C4AA] text-[12.5px] text-[#231912] text-left"
+                    />
+                    <button
+                      type="button"
+                      class="js-blog-apply-link px-3.5 py-1.5 rounded-lg bg-[#5A3A22] text-[#FAF5EC] text-[12px] font-semibold cursor-pointer"
+                    >
+                      اعمال لینک
+                    </button>
+                    <button
+                      type="button"
+                      class="js-blog-cancel-link px-3 py-1.5 rounded-lg border border-[#C5B198] text-[12px] font-semibold text-[#4E3B2D] cursor-pointer"
+                    >
+                      بستن
+                    </button>
+                  </div>
+
+                  <!-- RTL ContentEditable Rich Text Surface -->
+                  <div
+                    dir="rtl"
+                    contenteditable="true"
+                    data-placeholder="متن کامل مقاله، تیترها، لیست‌ها و تحلیل‌های ادبی را در این بخش بنویسید..."
+                    class="js-admin-blog-wysiwyg min-h-[280px] w-full px-4 py-3.5 bg-[#FAF5EC] text-[14px] text-[#231912] leading-[2] focus:outline-none [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-[#2d1c10] [&_h2]:my-2.5 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-[#382315] [&_h3]:my-2 [&_ul]:list-disc [&_ul]:pr-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pr-6 [&_ol]:my-2 [&_blockquote]:my-3 [&_blockquote]:p-4 [&_blockquote]:bg-[#f2ecde] [&_blockquote]:border-r-4 [&_blockquote]:border-[#6b4c32] [&_blockquote]:rounded-l-xl [&_a]:text-[#7a4b2a] [&_a]:underline empty:before:content-[attr(data-placeholder)] empty:before:text-[#8C7662]"
+                  >${normalizeArticleHtml(editingBlogPost.full_content || '')}</div>
+
                   <textarea
                     name="full_content"
-                    rows="11"
-                    required
-                    placeholder="متن کامل مقاله، پاراگراف‌ها و تحلیل‌های ادبی را در این بخش بنویسید..."
-                    class="js-admin-blog-content-textarea w-full px-4 py-3 bg-transparent text-[13.5px] text-[#231912] leading-[2] focus:outline-none"
-                  >${editingBlogPost.full_content || ''}</textarea>
+                    class="js-admin-blog-content-textarea hidden"
+                  >${normalizeArticleHtml(editingBlogPost.full_content || '')}</textarea>
                 </div>
               </div>
             </div>
@@ -3786,6 +4040,12 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       instructor_name: '',
       schedule_summary: '',
       level_label: 'مبتدی',
+      start_date: '',
+      end_date: '',
+      duration_label: '',
+      sessions_count: '',
+      capacity_label: '',
+      syllabus: [],
       status: 'فعال',
       cover_url: state.gallery[5]?.url || '/assets/blog-1.png',
       description: '',
@@ -3797,7 +4057,10 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     const id = Number($(this).data('edit-class'));
     const found = state.classes.find((c) => c.id === id);
     if (found) {
-      editingClass = { ...found };
+      editingClass = {
+        ...found,
+        syllabus: Array.isArray(found.syllabus) ? [...found.syllabus] : [],
+      };
       render();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -3808,10 +4071,65 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     render();
   });
 
+  $wrapper.on('click', '.js-admin-add-syllabus-item', () => {
+    syncOpenFormsFromDom();
+    if (!editingClass) return;
+    const currentList = Array.isArray(editingClass.syllabus) ? [...editingClass.syllabus] : [];
+    const nextNum = currentList.length + 1;
+    currentList.push({
+      id: Date.now() + nextNum,
+      session_number: `جلسه ${toPersianDigits(nextNum)}`,
+      title: '',
+      description: '',
+    });
+    editingClass.syllabus = currentList;
+    render();
+  });
+
+  $wrapper.on('click', '.js-admin-remove-syllabus-item', function () {
+    syncOpenFormsFromDom();
+    if (!editingClass) return;
+    const idx = Number($(this).attr('data-remove-syllabus'));
+    const currentList = Array.isArray(editingClass.syllabus) ? [...editingClass.syllabus] : [];
+    if (idx >= 0 && idx < currentList.length) {
+      currentList.splice(idx, 1);
+      editingClass.syllabus = currentList;
+      render();
+    }
+  });
+
+  $wrapper.on('click', '.js-admin-move-syllabus', function () {
+    syncOpenFormsFromDom();
+    if (!editingClass) return;
+    const idx = Number($(this).attr('data-move-syllabus'));
+    const dir = String($(this).attr('data-move-dir'));
+    const currentList = Array.isArray(editingClass.syllabus) ? [...editingClass.syllabus] : [];
+    const targetIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (idx >= 0 && idx < currentList.length && targetIdx >= 0 && targetIdx < currentList.length) {
+      const temp = currentList[idx];
+      currentList[idx] = currentList[targetIdx];
+      currentList[targetIdx] = temp;
+      editingClass.syllabus = currentList;
+      render();
+    }
+  });
+
   $wrapper.on('submit', '.js-admin-class-form', function (e) {
     e.preventDefault();
+    syncOpenFormsFromDom();
     const $f = $(this);
     const id = Number($f.find('[name="id"]').val() || 0) || undefined;
+    const cleanedSyllabus = (editingClass?.syllabus || [])
+      .map((item, idx) => ({
+        id: item.id || idx + 1,
+        session_number: String(
+          item.session_number || `جلسه ${toPersianDigits(idx + 1)}`
+        ).trim(),
+        title: String(item.title || '').trim(),
+        description: String(item.description || '').trim(),
+      }))
+      .filter((item) => item.title.length > 0 || (item.description && item.description.length > 0));
+
     const payload: Partial<MemberClassItem> & { id?: number } = {
       id,
       title: String($f.find('[name="title"]').val() || '').trim(),
@@ -3819,6 +4137,12 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       instructor_name: String($f.find('[name="instructor_name"]').val() || '').trim(),
       schedule_summary: String($f.find('[name="schedule_summary"]').val() || '').trim(),
       level_label: String($f.find('[name="level_label"]').val() || 'مبتدی').trim(),
+      start_date: String($f.find('[name="start_date"]').val() || '').trim(),
+      end_date: String($f.find('[name="end_date"]').val() || '').trim(),
+      duration_label: String($f.find('[name="duration_label"]').val() || '').trim(),
+      sessions_count: String($f.find('[name="sessions_count"]').val() || '').trim(),
+      capacity_label: String($f.find('[name="capacity_label"]').val() || '').trim(),
+      syllabus: cleanedSyllabus,
       status: String($f.find('[name="status"]').val() || 'فعال') as MemberClassItem['status'],
       cover_url: String($f.find('[name="cover_url"]').val() || '/assets/blog-1.png').trim(),
       description: String($f.find('[name="description"]').val() || '').trim(),
@@ -4374,10 +4698,10 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       title: '',
       slug: '',
       category: 'یادداشت ادبی',
-      author: `${state.admin.first_name} ${state.admin.last_name}`,
-      published_date: '۱۴ آبان ۱۴۰۵',
-      reading_time: '۶ دقیقه مطالعه',
-      tags: 'ادبیات داستانی، نقد کتاب، بوک‌میت',
+      author: '',
+      published_date: '',
+      reading_time: '',
+      tags: '',
       status: 'منتشر شده',
       cover_url: state.gallery[5]?.url || '/assets/blog-1.png',
       excerpt: '',
@@ -4447,82 +4771,139 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     showToast(`دسته‌بندی جدید «${newCat}» به مقالات اضافه شد.`);
   });
 
-  // Rich Text Editor Toolbar Handler for Blog Content
-  $wrapper.on('click', '.js-blog-editor-tool', function () {
+  // Rich Text WYSIWYG Editor Toolbar & Sync Handlers for Blog Content
+  let savedLinkSelectionRange: Range | null = null;
+
+  function syncBlogWysiwygToHiddenInput(): void {
+    const editorEl = $wrapper.find('.js-admin-blog-wysiwyg')[0] as HTMLElement | undefined;
+    if (!editorEl) return;
+    const rawHtml = editorEl.innerHTML || '';
+    const $hidden = $wrapper.find('.js-admin-blog-content-textarea');
+    $hidden.val(rawHtml);
+    if (editingBlogPost) {
+      editingBlogPost.full_content = rawHtml;
+    }
+  }
+
+  $wrapper.on('input keyup paste', '.js-admin-blog-wysiwyg', () => {
+    syncBlogWysiwygToHiddenInput();
+  });
+
+  $wrapper.on('click', '.js-blog-editor-tool', function (e) {
+    e.preventDefault();
     const cmd = String($(this).data('editor-cmd') || '');
-    const textarea = $wrapper.find('.js-admin-blog-content-textarea')[0] as
-      | HTMLTextAreaElement
-      | undefined;
-    if (!textarea) return;
+    const editorEl = $wrapper.find('.js-admin-blog-wysiwyg')[0] as HTMLElement | undefined;
+    if (!editorEl) return;
 
-    const start = textarea.selectionStart || 0;
-    const end = textarea.selectionEnd || 0;
-    const currentVal = textarea.value;
-    const selected = currentVal.slice(start, end);
+    editorEl.focus();
 
-    let replacement = selected;
     switch (cmd) {
       case 'bold':
-        replacement = `**${selected || 'متن برجسته'}**`;
+        document.execCommand('bold', false);
         break;
       case 'italic':
-        replacement = `*${selected || 'متن مورب'}*`;
+        document.execCommand('italic', false);
         break;
       case 'underline':
-        replacement = `<u>${selected || 'متن زیرخط‌دار'}</u>`;
+        document.execCommand('underline', false);
         break;
       case 'h2':
-        replacement = `\n## ${selected || 'تیتر بخش اصلی'}\n`;
+        document.execCommand('formatBlock', false, 'H2');
         break;
       case 'h3':
-        replacement = `\n### ${selected || 'زیرعنوان بخش'}\n`;
+        document.execCommand('formatBlock', false, 'H3');
+        break;
+      case 'p':
+        document.execCommand('formatBlock', false, 'P');
         break;
       case 'quote':
-        replacement = `\n«${selected || 'جمله یا نقل‌قول ادبی برگزیده را اینجا بنویسید...'}»\n`;
+        document.execCommand('formatBlock', false, 'BLOCKQUOTE');
         break;
       case 'ul':
-        replacement = selected
-          ? selected
-              .split('\n')
-              .map((line) => `• ${line}`)
-              .join('\n')
-          : `\n• مورد اول\n• مورد دوم\n• مورد سوم\n`;
+        document.execCommand('insertUnorderedList', false);
         break;
       case 'ol':
-        replacement = selected
-          ? selected
-              .split('\n')
-              .map((line, idx) => `${toPersianDigits(idx + 1)}. ${line}`)
-              .join('\n')
-          : `\n۱. نکته اول\n۲. نکته دوم\n۳. نکته سوم\n`;
+        document.execCommand('insertOrderedList', false);
         break;
-      case 'link':
-        replacement = `[${selected || 'عنوان لینک'}](https://bookmeet.ir)`;
+      case 'align-right':
+        document.execCommand('justifyRight', false);
         break;
-      case 'hr':
-        replacement = `\n────────────────────\n`;
+      case 'align-center':
+        document.execCommand('justifyCenter', false);
+        break;
+      case 'align-left':
+        document.execCommand('justifyLeft', false);
+        break;
+      case 'align-justify':
+        document.execCommand('justifyFull', false);
+        break;
+      case 'undo':
+        document.execCommand('undo', false);
+        break;
+      case 'redo':
+        document.execCommand('redo', false);
         break;
       case 'clear':
-        replacement = selected
-          .replace(/(\*\*|\*|<u>|<\/u>|^##\s+|^###\s+|«|»)/gm, '')
-          .trim();
+        document.execCommand('removeFormat', false);
+        document.execCommand('formatBlock', false, 'P');
         break;
+      case 'link': {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          savedLinkSelectionRange = sel.getRangeAt(0).cloneRange();
+        }
+        const $bar = $wrapper.find('.js-blog-link-bar');
+        $bar.toggleClass('hidden');
+        if (!$bar.hasClass('hidden')) {
+          $bar.find('.js-blog-link-url-input').val('https://').trigger('focus');
+        }
+        return;
+      }
       default:
         break;
     }
 
-    const nextVal = currentVal.slice(0, start) + replacement + currentVal.slice(end);
-    textarea.value = nextVal;
-    if (editingBlogPost) {
-      editingBlogPost.full_content = nextVal;
+    syncBlogWysiwygToHiddenInput();
+  });
+
+  $wrapper.on('click', '.js-blog-apply-link', () => {
+    const editorEl = $wrapper.find('.js-admin-blog-wysiwyg')[0] as HTMLElement | undefined;
+    const rawUrl = String($wrapper.find('.js-blog-link-url-input').val() || '').trim();
+    if (!editorEl || !rawUrl) return;
+
+    editorEl.focus();
+    if (savedLinkSelectionRange) {
+      const sel = window.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(savedLinkSelectionRange);
+      }
     }
-    textarea.focus();
-    const cursorPos = start + replacement.length;
-    textarea.setSelectionRange(cursorPos, cursorPos);
+
+    const sel = window.getSelection();
+    if (sel && sel.toString().trim().length > 0) {
+      document.execCommand('createLink', false, rawUrl);
+    } else {
+      document.execCommand(
+        'insertHTML',
+        false,
+        `<a href="${rawUrl}" target="_blank" rel="noopener noreferrer">${rawUrl}</a>`
+      );
+    }
+
+    $wrapper.find('.js-blog-link-bar').addClass('hidden');
+    savedLinkSelectionRange = null;
+    syncBlogWysiwygToHiddenInput();
+  });
+
+  $wrapper.on('click', '.js-blog-cancel-link', () => {
+    $wrapper.find('.js-blog-link-bar').addClass('hidden');
+    savedLinkSelectionRange = null;
   });
 
   $wrapper.on('submit', '.js-admin-blog-form', function (e) {
     e.preventDefault();
+    syncBlogWysiwygToHiddenInput();
     const $f = $(this);
     const id = Number($f.find('[name="id"]').val() || 0) || undefined;
     const rawTitle = String($f.find('[name="title"]').val() || '').trim();
@@ -4534,6 +4915,17 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         .trim()
         .replace(/\s+/g, '-') ||
       `blog-post-${Date.now()}`;
+
+    const editorEl = $f.find('.js-admin-blog-wysiwyg')[0] as HTMLElement | undefined;
+    const rawEditorHtml = editorEl
+      ? editorEl.innerHTML
+      : String($f.find('[name="full_content"]').val() || '');
+    const sanitizedContent = sanitizeRichHtml(rawEditorHtml);
+
+    if (!sanitizedContent || !(editorEl?.textContent || '').trim()) {
+      showToast('لطفاً متن کامل مقاله را وارد نمایید.', true);
+      return;
+    }
 
     const payload: Partial<BlogPost> & { id?: number } = {
       id,
@@ -4549,7 +4941,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         | 'پیش‌نویس',
       cover_url: String($f.find('[name="cover_url"]').val() || '/assets/blog-1.png').trim(),
       excerpt: String($f.find('[name="excerpt"]').val() || '').trim(),
-      full_content: String($f.find('[name="full_content"]').val() || '').trim(),
+      full_content: sanitizedContent,
     };
     ApiService.saveAdminBlogPost(payload)
       .then((res) => {

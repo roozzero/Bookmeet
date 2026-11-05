@@ -196,6 +196,13 @@ export interface MemberSessionRow {
   sort_order: number;
 }
 
+export interface CourseSyllabusRow {
+  id: number;
+  session_number: number | string;
+  title: string;
+  description?: string;
+}
+
 export interface MemberClassRow {
   id: number;
   member_phone: string;
@@ -204,6 +211,12 @@ export interface MemberClassRow {
   instructor_name: string;
   schedule_summary: string;
   level_label: string;
+  start_date?: string;
+  end_date?: string;
+  duration_label?: string;
+  sessions_count?: string;
+  capacity_label?: string;
+  syllabus?: CourseSyllabusRow[];
   cover_url: string;
   status: 'ثبت‌نام‌شده' | 'برگزارشده' | 'فعال' | 'غیرفعال';
   description: string;
@@ -372,10 +385,49 @@ function safeJsonParse<T>(raw: unknown, fallback: T): T {
   }
 }
 
+export function formatPersianRegistrationDate(
+  createdAtInput?: Date | string | null,
+  fallbackJoinedDate?: string
+): string {
+  if (createdAtInput) {
+    const parsed =
+      createdAtInput instanceof Date ? createdAtInput : new Date(String(createdAtInput));
+    if (!Number.isNaN(parsed.getTime())) {
+      try {
+        const formatted = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }).format(parsed);
+        return toPersianDigitsServer(formatted);
+      } catch {
+        // fallback below if Intl Persian calendar is unavailable
+      }
+    }
+  }
+  const trimmedFallback = String(fallbackJoinedDate || '').trim();
+  if (trimmedFallback && trimmedFallback !== '۱۴۰۵' && trimmedFallback !== 'آبان ۱۴۰۵') {
+    return toPersianDigitsServer(trimmedFallback);
+  }
+  try {
+    return toPersianDigitsServer(
+      new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }).format(new Date())
+    );
+  } catch {
+    return trimmedFallback || '—';
+  }
+}
+
 function stripPassword(row: ClubMemberRow): PublicClubMember {
   const { password_hash: _removed, ...rest } = row;
+  const exactJoinedDate = formatPersianRegistrationDate(row.created_at, row.joined_date);
   return {
     ...rest,
+    joined_date: exactJoinedDate,
     role: row.role === 'admin' ? 'admin' : 'member',
     status: row.status || 'فعال',
   };
@@ -623,9 +675,15 @@ class MySQLDatabaseManager {
         member_phone VARCHAR(60) NOT NULL DEFAULT 'all',
         title VARCHAR(220) NOT NULL,
         book_title VARCHAR(180) NOT NULL DEFAULT '',
-        instructor_name VARCHAR(150) NOT NULL,
-        schedule_summary VARCHAR(150) NOT NULL,
+        instructor_name VARCHAR(150) NOT NULL DEFAULT '',
+        schedule_summary VARCHAR(150) NOT NULL DEFAULT '',
         level_label VARCHAR(80) NOT NULL DEFAULT 'مبتدی',
+        start_date VARCHAR(100) NOT NULL DEFAULT '',
+        end_date VARCHAR(100) NOT NULL DEFAULT '',
+        duration_label VARCHAR(100) NOT NULL DEFAULT '',
+        sessions_count VARCHAR(100) NOT NULL DEFAULT '',
+        capacity_label VARCHAR(100) NOT NULL DEFAULT '',
+        syllabus_json LONGTEXT NOT NULL,
         cover_url LONGTEXT NOT NULL,
         status VARCHAR(60) NOT NULL DEFAULT 'فعال',
         description TEXT NOT NULL,
@@ -760,6 +818,43 @@ class MySQLDatabaseManager {
         await this.pool.execute(
           `ALTER TABLE member_sessions ADD COLUMN \`${col.name}\` ${col.definition}`
         );
+      }
+    }
+
+    // 3. Safely add new course metadata and syllabus columns to member_classes if missing
+    const classColumnsToEnsure: Array<{ name: string; definition: string }> = [
+      { name: 'start_date', definition: "VARCHAR(100) NOT NULL DEFAULT ''" },
+      { name: 'end_date', definition: "VARCHAR(100) NOT NULL DEFAULT ''" },
+      { name: 'duration_label', definition: "VARCHAR(100) NOT NULL DEFAULT ''" },
+      { name: 'sessions_count', definition: "VARCHAR(100) NOT NULL DEFAULT ''" },
+      { name: 'capacity_label', definition: "VARCHAR(100) NOT NULL DEFAULT ''" },
+      { name: 'syllabus_json', definition: 'LONGTEXT NULL' },
+    ];
+
+    for (const col of classColumnsToEnsure) {
+      const [colRows] = await this.pool.execute<RowDataPacket[]>(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'member_classes' AND COLUMN_NAME = ?`,
+        [dbName, col.name]
+      );
+      if (colRows.length === 0) {
+        await this.pool.execute(
+          `ALTER TABLE member_classes ADD COLUMN \`${col.name}\` ${col.definition}`
+        );
+      }
+    }
+
+    // 4. Backfill exact Jalali joined_date from created_at on club_members where placeholder was stored
+    const [membersToBackfill] = await this.pool.execute<RowDataPacket[]>(
+      "SELECT id, created_at, joined_date FROM club_members WHERE joined_date = '' OR joined_date = '۱۴۰۵' OR joined_date = 'آبان ۱۴۰۵'"
+    );
+    for (const m of membersToBackfill) {
+      const exactDate = formatPersianRegistrationDate(m.created_at, m.joined_date);
+      if (exactDate && exactDate !== m.joined_date) {
+        await this.pool.execute('UPDATE club_members SET joined_date = ? WHERE id = ?', [
+          exactDate,
+          m.id,
+        ]);
       }
     }
   }
@@ -1070,7 +1165,7 @@ class MySQLDatabaseManager {
     }
 
     const passwordHash = await bcrypt.hash(input.password_plain, 12);
-    const joinedDate = '۱۴۰۵';
+    const joinedDate = formatPersianRegistrationDate(new Date());
     const tempCode = `BM-۱۴۰۵-${toPersianDigitsServer(Math.floor(100 + Math.random() * 900))}`;
 
     const [result] = await this.pool.execute<ResultSetHeader>(
@@ -1256,6 +1351,12 @@ class MySQLDatabaseManager {
       instructor_name: String(r.instructor_name || ''),
       schedule_summary: String(r.schedule_summary || ''),
       level_label: String(r.level_label || 'مبتدی'),
+      start_date: String(r.start_date || ''),
+      end_date: String(r.end_date || ''),
+      duration_label: String(r.duration_label || ''),
+      sessions_count: String(r.sessions_count || ''),
+      capacity_label: String(r.capacity_label || ''),
+      syllabus: safeJsonParse<CourseSyllabusRow[]>(r.syllabus_json, []),
       cover_url: String(r.cover_url || '/assets/blog-1.png'),
       status: (r.status as MemberClassRow['status']) || 'فعال',
       description: String(r.description || ''),
@@ -2297,13 +2398,45 @@ class MySQLDatabaseManager {
         throw new Error('کلاس مورد نظر یافت نشد.');
       }
       const current = rows[0];
-      const nextTitle = input.title ?? current.title;
-      const nextBookTitle = input.book_title ?? current.book_title;
-      const nextInstructor = input.instructor_name ?? current.instructor_name;
-      const nextSchedule = input.schedule_summary ?? current.schedule_summary;
-      const nextLevel = input.level_label ?? current.level_label;
+      const nextTitle = input.title !== undefined ? String(input.title).trim() : current.title;
+      const nextBookTitle =
+        input.book_title !== undefined ? String(input.book_title).trim() : current.book_title;
+      const nextInstructor =
+        input.instructor_name !== undefined
+          ? String(input.instructor_name).trim()
+          : current.instructor_name;
+      const nextSchedule =
+        input.schedule_summary !== undefined
+          ? String(input.schedule_summary).trim()
+          : current.schedule_summary;
+      const nextLevel =
+        input.level_label !== undefined ? String(input.level_label).trim() : current.level_label;
+      const nextStartDate =
+        input.start_date !== undefined
+          ? String(input.start_date).trim()
+          : String(current.start_date || '');
+      const nextEndDate =
+        input.end_date !== undefined
+          ? String(input.end_date).trim()
+          : String(current.end_date || '');
+      const nextDuration =
+        input.duration_label !== undefined
+          ? String(input.duration_label).trim()
+          : String(current.duration_label || '');
+      const nextSessionsCount =
+        input.sessions_count !== undefined
+          ? String(input.sessions_count).trim()
+          : String(current.sessions_count || '');
+      const nextCapacityLabel =
+        input.capacity_label !== undefined
+          ? String(input.capacity_label).trim()
+          : String(current.capacity_label || '');
+      const nextSyllabus = Array.isArray(input.syllabus)
+        ? JSON.stringify(input.syllabus)
+        : String(current.syllabus_json || '[]');
       const nextCover = input.cover_url || current.cover_url || '/assets/blog-1.png';
-      const nextDesc = input.description ?? current.description;
+      const nextDesc =
+        input.description !== undefined ? String(input.description).trim() : current.description;
       const nextStatus = input.status || current.status || 'فعال';
       const nextSubs = Array.isArray(input.sub_sessions)
         ? JSON.stringify(input.sub_sessions)
@@ -2312,7 +2445,9 @@ class MySQLDatabaseManager {
       await this.pool.execute(
         `UPDATE member_classes
          SET title = ?, book_title = ?, instructor_name = ?, schedule_summary = ?,
-             level_label = ?, cover_url = ?, description = ?, status = ?, sub_sessions_json = ?
+             level_label = ?, start_date = ?, end_date = ?, duration_label = ?,
+             sessions_count = ?, capacity_label = ?, syllabus_json = ?,
+             cover_url = ?, description = ?, status = ?, sub_sessions_json = ?
          WHERE id = ?`,
         [
           nextTitle,
@@ -2320,6 +2455,12 @@ class MySQLDatabaseManager {
           nextInstructor,
           nextSchedule,
           nextLevel,
+          nextStartDate,
+          nextEndDate,
+          nextDuration,
+          nextSessionsCount,
+          nextCapacityLabel,
+          nextSyllabus,
           nextCover,
           nextDesc,
           nextStatus,
@@ -2336,11 +2477,19 @@ class MySQLDatabaseManager {
       return mapped[0];
     }
 
-    const title = String(input.title || 'کلاس آموزشی جدید').trim();
-    const bookTitle = String(input.book_title || 'سرفصل تخصصی ادبیات').trim();
-    const instructorName = String(input.instructor_name || 'دکتر سهراب رستگار').trim();
+    const title = String(input.title || '').trim();
+    const bookTitle = String(input.book_title || '').trim();
+    const instructorName = String(input.instructor_name || '').trim();
     const scheduleSummary = String(input.schedule_summary || '').trim();
-    const levelLabel = String(input.level_label || 'پیشرفته').trim();
+    const levelLabel = String(input.level_label || 'مبتدی').trim();
+    const startDate = String(input.start_date || '').trim();
+    const endDate = String(input.end_date || '').trim();
+    const durationLabel = String(input.duration_label || '').trim();
+    const sessionsCount = String(input.sessions_count || '').trim();
+    const capacityLabel = String(input.capacity_label || '').trim();
+    const syllabusJson = JSON.stringify(
+      Array.isArray(input.syllabus) ? input.syllabus : []
+    );
     const coverUrl = String(input.cover_url || '/assets/blog-1.png').trim();
     const status = String(input.status || 'فعال').trim();
     const description = String(input.description || '').trim();
@@ -2350,14 +2499,22 @@ class MySQLDatabaseManager {
 
     const [result] = await this.pool.execute<ResultSetHeader>(
       `INSERT INTO member_classes
-        (member_phone, title, book_title, instructor_name, schedule_summary, level_label, cover_url, status, description, sub_sessions_json, sort_order)
-       VALUES ('all', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        (member_phone, title, book_title, instructor_name, schedule_summary, level_label,
+         start_date, end_date, duration_label, sessions_count, capacity_label, syllabus_json,
+         cover_url, status, description, sub_sessions_json, sort_order)
+       VALUES ('all', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
       [
         title,
         bookTitle,
         instructorName,
         scheduleSummary,
         levelLabel,
+        startDate,
+        endDate,
+        durationLabel,
+        sessionsCount,
+        capacityLabel,
+        syllabusJson,
         coverUrl,
         status,
         description,
@@ -2446,11 +2603,12 @@ class MySQLDatabaseManager {
 
     const passwordHash = await bcrypt.hash(String(input.password).trim(), 12);
     const persianPhone = toPersianDigitsServer(normalizeIdentifierDigits(input.phone));
+    const exactJoinedDate = formatPersianRegistrationDate(new Date());
 
     const [result] = await this.pool.execute<ResultSetHeader>(
       `INSERT INTO club_members
         (first_name, last_name, phone, role, status, education, email, avatar_url, bio, membership_code, joined_date, password_hash)
-       VALUES (?, ?, ?, 'member', ?, ?, ?, '', ?, ?, '۱۴۰۵', ?)`,
+       VALUES (?, ?, ?, 'member', ?, ?, ?, '', ?, ?, ?, ?)`,
       [
         String(input.first_name || 'کاربر').trim(),
         String(input.last_name || 'جدید').trim(),
@@ -2460,6 +2618,7 @@ class MySQLDatabaseManager {
         String(input.email || '').trim(),
         String(input.bio || 'عضو باشگاه کتابخوانی بوک‌میت').trim(),
         String(input.membership_code || 'BM-۱۴۰۵-۱۰۰').trim(),
+        exactJoinedDate,
         passwordHash,
       ]
     );
@@ -2697,12 +2856,20 @@ class MySQLDatabaseManager {
       const nextCategory = input.category ?? existing.category;
       const nextAuthor = input.author ?? existing.author;
       const nextDate = input.published_date ?? existing.published_date;
-      const nextReadingTime = input.reading_time ?? existing.reading_time;
-      const nextTags = input.tags ?? existing.tags ?? '';
+      const nextReadingTime =
+        input.reading_time !== undefined
+          ? String(input.reading_time).trim()
+          : existing.reading_time;
+      const nextTags =
+        input.tags !== undefined ? String(input.tags).trim() : String(existing.tags || '');
       const nextStatus = input.status ?? existing.status ?? 'منتشر شده';
       const nextCover = input.cover_url || existing.cover_url || '/assets/blog-1.png';
-      const nextExcerpt = input.excerpt ?? existing.excerpt;
-      const nextContent = input.full_content ?? existing.full_content;
+      const nextExcerpt =
+        input.excerpt !== undefined ? String(input.excerpt).trim() : existing.excerpt;
+      const nextContent =
+        input.full_content !== undefined
+          ? String(input.full_content).trim()
+          : existing.full_content;
 
       await this.pool.execute(
         `UPDATE blog_posts
@@ -2732,15 +2899,17 @@ class MySQLDatabaseManager {
       return updated[0] as BlogPostRow;
     }
 
-    const finalTitle = String(input.title || 'مقاله جدید باشگاه').trim();
+    const finalTitle = String(input.title || '').trim();
     const finalSlug =
       input.slug && String(input.slug).trim()
         ? String(input.slug).trim()
         : autoSlug(finalTitle, Date.now());
     const category = String(input.category || 'یادداشت ادبی').trim();
-    const author = String(input.author || 'سهراب رستگار').trim();
-    const publishedDate = String(input.published_date || 'امروز').trim();
-    const readingTime = String(input.reading_time || '۶ دقیقه مطالعه').trim();
+    const author = String(input.author || '').trim();
+    const publishedDate = String(
+      input.published_date || formatPersianRegistrationDate(new Date())
+    ).trim();
+    const readingTime = String(input.reading_time || '').trim();
     const tags = String(input.tags || '').trim();
     const status = String(input.status || 'منتشر شده').trim();
     const coverUrl = String(input.cover_url || '/assets/blog-1.png').trim();
