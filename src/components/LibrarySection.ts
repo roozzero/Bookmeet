@@ -2,8 +2,328 @@ import $ from 'jquery';
 import type { LibraryBook } from '../types/models.ts';
 import { toPersianDigits } from '../utils/persianNumbers.ts';
 
+export interface EventSessionPlanItem {
+  sessionNumber: string;
+  title: string;
+  dateLabel: string;
+  timeLabel: string;
+  pagesToRead: string;
+  status: 'برگزار شده' | 'نشست پیش رو';
+}
+
+export interface EventAudienceComment {
+  id: number;
+  authorName: string;
+  roleLabel: string;
+  dateLabel: string;
+  rating: number;
+  commentText: string;
+}
+
+export interface ClubEventDetailItem {
+  id: number;
+  title: string;
+  bookTitle: string;
+  bookAuthor: string;
+  bookTranslator: string;
+  publisher: string;
+  pagesCount: number;
+  publicationYear: number;
+  coverUrl: string;
+  dateLabel: string;
+  timeLabel: string;
+  mentor: string;
+  location: string;
+  shortDescription: string;
+  bookIntroduction: string;
+  fullDescription: string[];
+  sessionsList: EventSessionPlanItem[];
+  comments: EventAudienceComment[];
+}
+
+export const UPCOMING_EVENTS_DATA: ClubEventDetailItem[] = [
+  {
+    id: 1,
+    title: 'نشست هم‌خوانی و تحلیل «صد سال تنهایی» (فصل‌های ۱۲ تا ۱۵)',
+    bookTitle: 'صد سال تنهایی',
+    bookAuthor: 'گابریل گارسیا مارکز',
+    bookTranslator: 'بهمن فرزانه',
+    publisher: 'نشر نیلوفر',
+    pagesCount: 468,
+    publicationYear: 1967,
+    coverUrl: '/assets/book-current.png',
+    dateLabel: 'چهارشنبه ۲۴ آبان ۱۴۰۵',
+    timeLabel: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+    mentor: 'دکتر سهراب رستگار',
+    location: 'نشست حضوری · سالن اصلی خانه کتاب بوک‌میت',
+    shortDescription:
+      'واکاوی ساختار دایره‌ای زمان، استعاره‌های تنهایی خاندان بوئندیا و گفت‌وگوی گروهی اعضا درباره فصل‌های میانی رمان.',
+    bookIntroduction:
+      '«صد سال تنهایی» شاهکار بی‌بدیل گابریل گارسیا مارکز و یکی از ستون‌های اصلی ادبیات قرن بیستم است که سرگذشت هفت نسل از خاندان بوئندیا را در دهکده خیالی ماکوندو روایت می‌کند؛ جایی که اسطوره، تاریخ و واقعیت روزمره در بافتی شاعرانه به هم گره می‌خورند.',
+    fullDescription: [
+      'در این حلقه هم‌خوانی، فصل‌به‌فصل همراه با ساکنان ماکوندو پیش می‌رویم تا ببینیم چگونه مارکز با بهره‌گیری از شگردهای رئالیسم جادویی، مفهوم زمان خطی را می‌شکند و تاریخ آمریکای لاتین را در آیینه یک خانواده بازتاب می‌دهد.',
+      'نشست پیش رو به بررسی فصل‌های ۱۲ تا ۱۵ اختصاص دارد؛ بخش‌هایی که در آن ورود شرکت موز، دگرگونی ناگهانی دهکده و آغاز باران‌های چهارساله، نقطه اوج دراماتیک رمان را رقم می‌زند.',
+    ],
+    sessionsList: [
+      {
+        sessionNumber: 'جلسه اول',
+        title: 'پیدایش ماکوندو، کولی‌ها و کیمیاگری ملکیادس',
+        dateLabel: '۲۵ مهر ۱۴۰۵',
+        timeLabel: '۱۸:۰۰ تا ۲۰:۰۰',
+        pagesToRead: 'صفحات ۱ تا ۱۱۵ (فصل‌های ۱ تا ۳)',
+        status: 'برگزار شده',
+      },
+      {
+        sessionNumber: 'جلسه دوم',
+        title: 'طاعون بی‌خوابی و فراموشی جمعی در ماکوندو',
+        dateLabel: '۲ آبان ۱۴۰۵',
+        timeLabel: '۱۸:۰۰ تا ۲۰:۰۰',
+        pagesToRead: 'صفحات ۱۱۶ تا ۲۲۵ (فصل‌های ۴ تا ۷)',
+        status: 'برگزار شده',
+      },
+      {
+        sessionNumber: 'جلسه سوم',
+        title: 'جنگ‌های داخلی سرهنگ اورلیانو بوئندیا و ماهی‌های طلایی',
+        dateLabel: '۹ آبان ۱۴۰۵',
+        timeLabel: '۱۸:۰۰ تا ۲۰:۰۰',
+        pagesToRead: 'صفحات ۲۲۶ تا ۳۱۸ (فصل‌های ۸ تا ۱۱)',
+        status: 'برگزار شده',
+      },
+      {
+        sessionNumber: 'جلسه چهارم',
+        title: 'ورود شرکت موز و باران‌های چهارساله ماکوندو',
+        dateLabel: '۲۴ آبان ۱۴۰۵',
+        timeLabel: '۱۸:۰۰ تا ۲۰:۰۰',
+        pagesToRead: 'صفحات ۳۱۹ تا ۳۹۵ (فصل‌های ۱۲ تا ۱۵)',
+        status: 'نشست پیش رو',
+      },
+      {
+        sessionNumber: 'جلسه پنجم',
+        title: 'رمزگشایی از دست‌نوشته‌های ملکیادس و جمع‌بندی نهایی رمان',
+        dateLabel: '۱ آذر ۱۴۰۵',
+        timeLabel: '۱۸:۰۰ تا ۲۰:۳۰',
+        pagesToRead: 'صفحات ۳۹۶ تا ۴۶۸ (فصل‌های ۱۶ تا پایان کتاب)',
+        status: 'نشست پیش رو',
+      },
+    ],
+    comments: [
+      {
+        id: 501,
+        authorName: 'پرنیا فرهمند',
+        roleLabel: 'عضو حلقه هم‌خوانی',
+        dateLabel: '۱۲ آبان ۱۴۰۵',
+        rating: 5,
+        commentText:
+          'تحلیل شجره‌نامه خاندان بوئندیا و بررسی تکرار نام‌ها در جلسات دکتر رستگار، خوانش این رمان را برایم به تجربه‌ای فراموش‌نشدنی تبدیل کرده است.',
+      },
+      {
+        id: 502,
+        authorName: 'کیانوش معتمدی',
+        roleLabel: 'عضو فعال باشگاه',
+        dateLabel: '۱۳ آبان ۱۴۰۵',
+        rating: 5,
+        commentText:
+          'گفت‌وگوهای گروهی درباره مفهوم فراموشی تاریخی در ماکوندو بسیار عمیق و روشنگر بود.',
+      },
+    ],
+  },
+  {
+    id: 2,
+    title: 'شب ادبیات کلاسیک؛ کالبدشکافی رمان «مرشد و مارگاریتا»',
+    bookTitle: 'مرشد و مارگاریتا',
+    bookAuthor: 'میخائیل بولگاکف',
+    bookTranslator: 'عباس میلانی',
+    publisher: 'نشر فرهنگ نشر نو',
+    pagesCount: 512,
+    publicationYear: 1967,
+    coverUrl: '/assets/book-recent-1.png',
+    dateLabel: 'جمعه ۲۶ آبان ۱۴۰۵',
+    timeLabel: 'ساعت ۱۹:۰۰ تا ۲۱:۰۰',
+    mentor: 'دکتر سهراب رستگار و نیلوفر فرهادی',
+    location: 'نشست برخط (آنلاین) · تالار گفت‌وگوی بوک‌میت',
+    shortDescription:
+      'بررسی طنز فلسفی میخائیل بولگاکف، تقابل خیر و شر در مسکوی دهه ۱۹۳۰ و تحلیل شخصیت‌پردازی پروفسور ولاند.',
+    bookIntroduction:
+      '«مرشد و مارگاریتا» اثر درخشان میخائیل بولگاکف، ترکیبی شگفت‌انگیز از طنز گروتسک، فلسفه اخلاق، تاریخ و عاشقانه‌ای جاودان است که در دو بستر موازی مسکوی دهه ۱۹۳۰ و اورشلیم عصر پونتیوس پیلاتوس جریان می‌یابد.',
+    fullDescription: [
+      'در این نشست تخصصی، ساختار «رمان در رمان» اثر بولگاکف را کالبدشکافی می‌کنیم و به این پرسش بنیادین می‌پردازیم که چرا ورود پروفسور ولاند و دستیارانش به مسکو، نقاب از چهره جامعه بوروکراتیک و ریاکار آن دوران برمی‌دارد.',
+      'همچنین مفهوم جمله مشهور «دست‌نوشته‌ها نمی‌سوزند» و جایگاه آزادی هنر و شجاعت اخلاقی در شخصیت‌های مرشد، مارگاریتا و پونتیوس پیلاتوس با مشارکت اعضا بررسی خواهد شد.',
+    ],
+    sessionsList: [
+      {
+        sessionNumber: 'جلسه اول',
+        title: 'مباحثه در پارک پاتریارخ و آغاز روایت پونتیوس پیلاتوس',
+        dateLabel: '۱۹ آبان ۱۴۰۵',
+        timeLabel: '۱۹:۰۰ تا ۲۱:۰۰',
+        pagesToRead: 'صفحات ۱ تا ۱۷۰ (بخش اول رمان)',
+        status: 'برگزار شده',
+      },
+      {
+        sessionNumber: 'جلسه دوم',
+        title: 'تئاتر واریته، ورود مارگاریتا و دست‌نوشته‌هایی که نمی‌سوزند',
+        dateLabel: '۲۶ آبان ۱۴۰۵',
+        timeLabel: '۱۹:۰۰ تا ۲۱:۰۰',
+        pagesToRead: 'صفحات ۱۷۱ تا ۳۴۰',
+        status: 'نشست پیش رو',
+      },
+      {
+        sessionNumber: 'جلسه سوم',
+        title: 'جشن بزرگ بهار، پرواز مارگاریتا و رستگاری ابدی مرشد',
+        dateLabel: '۳ آذر ۱۴۰۵',
+        timeLabel: '۱۹:۰۰ تا ۲۱:۰۰',
+        pagesToRead: 'صفحات ۳۴۱ تا ۵۱۲ (تا پایان کتاب)',
+        status: 'نشست پیش رو',
+      },
+    ],
+    comments: [
+      {
+        id: 503,
+        authorName: 'مهسا تاجیک',
+        roleLabel: 'عضو باشگاه بوک‌میت',
+        dateLabel: '۱۱ آبان ۱۴۰۵',
+        rating: 5,
+        commentText:
+          'بررسی موازی فصل‌های مسکو و اورشلیم در این نشست باعث شد لایه‌های فلسفی و تاریخی کتاب را بسیار دقیق‌تر درک کنم.',
+      },
+    ],
+  },
+  {
+    id: 3,
+    title: 'کارگاه عملی حاشیه‌نویسی و خوانش خلاق متون داستانی',
+    bookTitle: 'هنر داستان‌نویسی و روایت‌شناسی کاربردی',
+    bookAuthor: 'ای. ام. فورستر',
+    bookTranslator: 'ابراهیم یونسی',
+    publisher: 'نشر چشمه',
+    pagesCount: 250,
+    publicationYear: 1927,
+    coverUrl: '/assets/blog-3.png',
+    dateLabel: 'دوشنبه ۲۹ آبان ۱۴۰۵',
+    timeLabel: 'ساعت ۱۷:۳۰ تا ۱۹:۳۰',
+    mentor: 'آرمان کاظمی',
+    location: 'نشست حضوری · اتاق مطالعه باشگاه بوک‌میت',
+    shortDescription:
+      'آموزش شیوه‌های یادداشت‌برداری تحلیلی، ثبت تداعی‌های فردی هنگام مطالعه رمان و آماده‌سازی جستارهای نقد ادبی.',
+    bookIntroduction:
+      'این کارگاه بر پایه کتاب کلاسیک «جنبه‌های رمان» اثر ای. ام. فورستر و گزیده‌ای از متون روایت‌شناسی مدرن طراحی شده است تا خوانندگان را از مطالعه منفعل به خوانشگرانی خلاق و منتقد تبدیل کند.',
+    fullDescription: [
+      'بسیاری از دوستداران کتاب پس از پایان مطالعه یک رمان، دغدغه ثبت برداشت‌ها و تبدیل تجربیات خوانش خود به یک یادداشت تحلیلی منسجم را دارند. در این کارگاه عملی، روش‌های حرفه‌ای حاشیه‌نویسی، کدگذاری موتیف‌ها و ترسیم نقشه روابط شخصیت‌ها را تمرین می‌کنیم.',
+      'در پایان هر نشست، شرکت‌کنندگان یک جستار کوتاه ۵۰۰ کلمه‌ای درباره فصل مورد بررسی می‌نویسند و بازخورد تخصصی دریافت می‌کنند.',
+    ],
+    sessionsList: [
+      {
+        sessionNumber: 'جلسه اول',
+        title: 'تفاوت داستان و پیرنگ؛ چگونه گره‌های روایت را علامت‌گذاری کنیم؟',
+        dateLabel: '۱۵ آبان ۱۴۰۵',
+        timeLabel: '۱۷:۳۰ تا ۱۹:۳۰',
+        pagesToRead: 'فصل اول و دوم کتاب جنبه‌های رمان (صفحات ۱ تا ۸۵)',
+        status: 'برگزار شده',
+      },
+      {
+        sessionNumber: 'جلسه دوم',
+        title: 'شخصیت‌های مسطح و جامع و تکنیک ثبت دیالوگ‌های کلیدی',
+        dateLabel: '۲۲ آبان ۱۴۰۵',
+        timeLabel: '۱۷:۳۰ تا ۱۹:۳۰',
+        pagesToRead: 'فصل سوم و چهارم (صفحات ۸۶ تا ۱۷۵)',
+        status: 'برگزار شده',
+      },
+      {
+        sessionNumber: 'جلسه سوم',
+        title: 'کارگاه عملی نگارش جستار نقد ادبی بر پایه یادداشت‌های حاشیه‌ای',
+        dateLabel: '۲۹ آبان ۱۴۰۵',
+        timeLabel: '۱۷:۳۰ تا ۱۹:۳۰',
+        pagesToRead: 'فصل پنجم تا پایان کتاب (صفحات ۱۷۶ تا ۲۵۰)',
+        status: 'نشست پیش رو',
+      },
+    ],
+    comments: [
+      {
+        id: 504,
+        authorName: 'سروش کاوه',
+        roleLabel: 'شرکت‌کننده کارگاه',
+        dateLabel: '۱۳ آبان ۱۴۰۵',
+        rating: 5,
+        commentText:
+          'روش سه محور کلیدی که آقای کاظمی در جلسه اول آموزش دادند، شیوه کتاب خواندن من را به کل متحول کرد.',
+      },
+    ],
+  },
+];
+
+export function buildBookEventDetail(book: LibraryBook): ClubEventDetailItem {
+  const matchedPreset = UPCOMING_EVENTS_DATA.find(
+    (ev) => ev.bookTitle.trim() === book.title.trim()
+  );
+  if (matchedPreset) {
+    return {
+      ...matchedPreset,
+      coverUrl: book.cover_url || matchedPreset.coverUrl,
+      shortDescription: book.short_description || matchedPreset.shortDescription,
+    };
+  }
+
+  return {
+    id: 100 + book.id,
+    title: `حلقه هم‌خوانی و نقد و بررسی رمان «${book.title}»`,
+    bookTitle: book.title,
+    bookAuthor: book.author,
+    bookTranslator: book.translator,
+    publisher: 'انتشارات منتخب باشگاه بوک‌میت',
+    pagesCount: book.pages_count,
+    publicationYear: book.publication_year,
+    coverUrl: book.cover_url,
+    dateLabel: book.session_schedule || 'چهارشنبه‌ها · آبان و آذر ۱۴۰۵',
+    timeLabel: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+    mentor: 'دکتر سهراب رستگار',
+    location: 'نشست حضوری و برخط · تالار فردوسی خانه بوک‌میت',
+    shortDescription: book.short_description,
+    bookIntroduction: `${book.short_description} این اثر ارزشمند نوشته ${book.author} و با ترجمه ${book.translator} در قالب ${toPersianDigits(book.pages_count)} صفحه، یکی از آثار برجسته ادبیات ${book.category} در برنامه مطالعاتی باشگاه کتابخوانی بوک‌میت است.`,
+    fullDescription: [
+      `در سلسله نشست‌های هم‌خوانی کتاب «${book.title}»، اعضای باشگاه بوک‌میت به صورت هفتگی گرد هم می‌آیند تا ساختار روایی، شخصیت‌پردازی، درون‌مایه‌های فلسفی و زمینه تاریخی شکل‌گیری این اثر را مورد بحث و تبادل نظر قرار دهند.`,
+      'تمامی اعضای ثبت‌نام‌شده در این دوره به برنامه مطالعه هفتگی، خلاصه مباحث مطرح‌شده در جلسات گذشته و تالار گفت‌وگوی اختصاصی دوره دسترسی خواهند داشت.',
+    ],
+    sessionsList: [
+      {
+        sessionNumber: 'جلسه اول',
+        title: `معرفی جهان فکری ${book.author} و خوانش فصول آغازین «${book.title}»`,
+        dateLabel: '۱۶ آبان ۱۴۰۵',
+        timeLabel: '۱۸:۰۰ تا ۲۰:۰۰',
+        pagesToRead: `صفحات ۱ تا ${toPersianDigits(Math.round(book.pages_count / 3))}`,
+        status: 'برگزار شده',
+      },
+      {
+        sessionNumber: 'جلسه دوم',
+        title: `کالبدشکافی پیرنگ، گره‌افکنی و تحول شخصیت‌ها در «${book.title}»`,
+        dateLabel: '۲۳ آبان ۱۴۰۵',
+        timeLabel: '۱۸:۰۰ تا ۲۰:۰۰',
+        pagesToRead: `صفحات ${toPersianDigits(Math.round(book.pages_count / 3) + 1)} تا ${toPersianDigits(Math.round((book.pages_count * 2) / 3))}`,
+        status: 'نشست پیش رو',
+      },
+      {
+        sessionNumber: 'جلسه سوم',
+        title: `جمع‌بندی نهایی، نقد تطبیقی و گفت‌وگوی آزاد اعضا درباره «${book.title}»`,
+        dateLabel: '۳۰ آبان ۱۴۰۵',
+        timeLabel: '۱۸:۰۰ تا ۲۰:۰۰',
+        pagesToRead: `صفحات ${toPersianDigits(Math.round((book.pages_count * 2) / 3) + 1)} تا ${toPersianDigits(book.pages_count)} (پایان کتاب)`,
+        status: 'نشست پیش رو',
+      },
+    ],
+    comments: [
+      {
+        id: 600 + book.id,
+        authorName: 'پرنیا فرهمند',
+        roleLabel: 'عضو باشگاه بوک‌میت',
+        dateLabel: '۱۱ آبان ۱۴۰۵',
+        rating: 5,
+        commentText: `انتخاب کتاب «${book.title}» با ترجمه روان ${book.translator} برای هم‌خوانی گروهی بسیار هوشمندانه بود و مباحث جلسات زاویه دید جدیدی به من بخشید.`,
+      },
+    ],
+  };
+}
+
 export interface LibrarySectionProps {
   libraryBooks: LibraryBook[];
+  onOpenEventDetail?: (eventItem: ClubEventDetailItem) => void;
+  onRegisterEvent?: (eventItem: ClubEventDetailItem) => void;
 }
 
 export function createLibrarySectionComponent(
@@ -14,39 +334,6 @@ export function createLibrarySectionComponent(
   let activeBook = initialCurrent;
   let selectedCategory: 'همه' | 'کلاسیک' | 'معاصر' = 'همه';
   let hasEnteredViewport = false;
-
-  const upcomingEvents = [
-    {
-      id: 1,
-      title: 'نشست هم‌خوانی و تحلیل «صد سال تنهایی» (فصل‌های ۱۲ تا ۱۵)',
-      dateLabel: 'چهارشنبه ۲۴ آبان ۱۴۰۵',
-      timeLabel: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-      mentor: 'دکتر سهراب رستگار',
-      location: 'نشست حضوری · سالن اصلی خانه کتاب بوک‌میت',
-      description:
-        'واکاوی ساختار دایره‌ای زمان، استعاره‌های تنهایی خاندان بوئندیا و گفت‌وگوی گروهی اعضا درباره فصل‌های میانی رمان.',
-    },
-    {
-      id: 2,
-      title: 'شب ادبیات کلاسیک؛ کالبدشکافی رمان «مرشد و مارگاریتا»',
-      dateLabel: 'جمعه ۲۶ آبان ۱۴۰۵',
-      timeLabel: 'ساعت ۱۹:۰۰ تا ۲۱:۰۰',
-      mentor: 'دکتر سهراب رستگار و نیلوفر فرهادی',
-      location: 'نشست برخط (آنلاین) · تالار گفت‌وگوی بوک‌میت',
-      description:
-        'بررسی طنز فلسفی میخائیل بولگاکف، تقابل خیر و شر در مسکوی دهه ۱۹۳۰ و تحلیل شخصیت‌پردازی پروفسور ولاند.',
-    },
-    {
-      id: 3,
-      title: 'کارگاه عملی حاشیه‌نویسی و خوانش خلاق متون داستانی',
-      dateLabel: 'دوشنبه ۲۹ آبان ۱۴۰۵',
-      timeLabel: 'ساعت ۱۷:۳۰ تا ۱۹:۳۰',
-      mentor: 'آرمان کاظمی',
-      location: 'نشست حضوری · اتاق مطالعه باشگاه بوک‌میت',
-      description:
-        'آموزش شیوه‌های یادداشت‌برداری تحلیلی، ثبت تداعی‌های فردی هنگام مطالعه رمان و آماده‌سازی جستارهای نقد ادبی.',
-    },
-  ];
 
   const $section = $(`
     <section
@@ -92,8 +379,7 @@ export function createLibrarySectionComponent(
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            ${upcomingEvents
-              .slice(0, 3)
+            ${UPCOMING_EVENTS_DATA.slice(0, 3)
               .map(
                 (ev) => `
               <article class="bg-[#e6decb]/55 border border-[#d5cab6] hover:border-[#8a725a] rounded-xl p-5 flex flex-col justify-between space-y-4 transition-colors">
@@ -106,12 +392,31 @@ export function createLibrarySectionComponent(
                     ${toPersianDigits(ev.title)}
                   </h4>
                   <p class="text-[13px] leading-[1.9] text-[#4e3e30] font-normal text-justify" style="text-align: justify; text-justify: inter-word;">
-                    ${toPersianDigits(ev.description)}
+                    ${toPersianDigits(ev.shortDescription)}
                   </p>
                 </div>
-                <div class="pt-3 border-t border-[#d8ceba] space-y-1.5 text-xs text-[#5f4d3d]">
-                  <div>تسهیل‌گر: <strong class="text-[#38281b]">${toPersianDigits(ev.mentor)}</strong></div>
-                  <div>محل برگزاری: <span class="text-[#4e3e30]">${toPersianDigits(ev.location)}</span></div>
+                <div class="pt-3 border-t border-[#d8ceba] space-y-3 text-xs text-[#5f4d3d]">
+                  <div class="space-y-1.5">
+                    <div>تسهیل‌گر: <strong class="text-[#38281b]">${toPersianDigits(ev.mentor)}</strong></div>
+                    <div>محل برگزاری: <span class="text-[#4e3e30]">${toPersianDigits(ev.location)}</span></div>
+                  </div>
+                  <!-- Action Buttons: مشاهده جزئیات & ثبت‌نام -->
+                  <div class="pt-2 border-t border-[#ded4c1] grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      data-event-id="${ev.id}"
+                      class="js-event-detail-btn px-3 py-2.5 rounded-lg border border-[#7c624a] text-[#38281b] hover:bg-[#dfd5c0] text-xs font-semibold text-center transition-colors cursor-pointer"
+                    >
+                      مشاهده جزئیات
+                    </button>
+                    <button
+                      type="button"
+                      data-event-id="${ev.id}"
+                      class="js-event-register-btn px-3 py-2.5 rounded-lg bg-[#3e2d1f] hover:bg-[#2b1e14] text-[#faf6ec] text-xs font-semibold text-center transition-colors cursor-pointer"
+                    >
+                      ثبت‌نام در نشست
+                    </button>
+                  </div>
                 </div>
               </article>
             `
@@ -206,7 +511,7 @@ export function createLibrarySectionComponent(
 
     const $card = $(`
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-stretch">
-        <!-- Right Column in RTL: Book Cover Showcase (Clean, no change-cover button) -->
+        <!-- Right Column in RTL: Book Cover Showcase -->
         <div class="lg:col-span-4 flex flex-col">
           <div class="relative w-full h-full min-h-[290px] sm:min-h-[340px] rounded-xl overflow-hidden border border-[#d0c3ac] bg-[#dfd6c1] flex items-center justify-center group">
             <img
@@ -218,7 +523,7 @@ export function createLibrarySectionComponent(
           </div>
         </div>
 
-        <!-- Left Column in RTL: Book Details, Justified Short Description & Animated Progress -->
+        <!-- Left Column in RTL: Book Details, Justified Short Description, Animated Progress & Action Buttons -->
         <div class="lg:col-span-8 flex flex-col justify-between text-right space-y-6">
           <div class="space-y-3">
             <!-- Unboxed Metadata Kicker -->
@@ -251,25 +556,55 @@ export function createLibrarySectionComponent(
             </p>
           </div>
 
-          <!-- Group Reading Progress & Next Session Info -->
-          <div class="pt-5 border-t border-[#d6cbb7] space-y-3">
-            <div class="flex items-center justify-between text-xs font-medium text-[#4a392b]">
-              <span>${toPersianDigits(book.session_schedule)}</span>
-              <span class="js-reading-progress-text tabular-nums font-bold text-[#38281b]">
-                پیشرفت هم‌خوانی: ۰٪
-              </span>
+          <!-- Group Reading Progress & Action Buttons -->
+          <div class="pt-5 border-t border-[#d6cbb7] space-y-4">
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between text-xs font-medium text-[#4a392b]">
+                <span>${toPersianDigits(book.session_schedule)}</span>
+                <span class="js-reading-progress-text tabular-nums font-bold text-[#38281b]">
+                  پیشرفت هم‌خوانی: ۰٪
+                </span>
+              </div>
+
+              <div class="w-full h-2.5 bg-[#d5cab6] rounded-full overflow-hidden">
+                <div
+                  class="js-reading-progress-bar h-full bg-[#3e2d1f] rounded-full"
+                  style="width: 0%;"
+                ></div>
+              </div>
             </div>
 
-            <div class="w-full h-2.5 bg-[#d5cab6] rounded-full overflow-hidden">
-              <div
-                class="js-reading-progress-bar h-full bg-[#3e2d1f] rounded-full"
-                style="width: 0%;"
-              ></div>
+            <!-- Action Buttons on Currently Reading Book: مشاهده جزئیات & ثبت‌نام -->
+            <div class="pt-2 flex flex-wrap items-center justify-end gap-3">
+              <button
+                type="button"
+                class="js-current-book-detail-btn px-5 py-2.5 rounded-xl border border-[#7c624a] text-[#38281b] hover:bg-[#dfd5c0] text-xs sm:text-[13px] font-semibold transition-colors cursor-pointer"
+              >
+                مشاهده جزئیات نشست و معرفی کتاب
+              </button>
+              <button
+                type="button"
+                class="js-current-book-register-btn px-6 py-2.5 rounded-xl bg-[#3e2d1f] hover:bg-[#2b1e14] text-[#faf6ec] text-xs sm:text-[13px] font-semibold transition-colors cursor-pointer"
+              >
+                ثبت‌نام در دوره هم‌خوانی این کتاب
+              </button>
             </div>
           </div>
         </div>
       </div>
     `);
+
+    $card.find('.js-current-book-detail-btn').on('click', () => {
+      if (props.onOpenEventDetail) {
+        props.onOpenEventDetail(buildBookEventDetail(book));
+      }
+    });
+
+    $card.find('.js-current-book-register-btn').on('click', () => {
+      if (props.onRegisterEvent) {
+        props.onRegisterEvent(buildBookEventDetail(book));
+      }
+    });
 
     $currentContainer.append($card);
 
@@ -352,6 +687,23 @@ export function createLibrarySectionComponent(
       $recentGrid.append($item);
     });
   }
+
+  // Wire Upcoming Events Action Buttons
+  $section.on('click', '.js-event-detail-btn', function () {
+    const id = Number($(this).attr('data-event-id'));
+    const found = UPCOMING_EVENTS_DATA.find((e) => e.id === id);
+    if (found && props.onOpenEventDetail) {
+      props.onOpenEventDetail(found);
+    }
+  });
+
+  $section.on('click', '.js-event-register-btn', function () {
+    const id = Number($(this).attr('data-event-id'));
+    const found = UPCOMING_EVENTS_DATA.find((e) => e.id === id);
+    if (found && props.onRegisterEvent) {
+      props.onRegisterEvent(found);
+    }
+  });
 
   // Wire Category Filter Buttons
   $section.find('.js-lib-filter').on('click', function () {

@@ -606,6 +606,28 @@ async function startServer() {
     }
   });
 
+  app.post('/api/member/enroll', async (req, res) => {
+    try {
+      const result = await mysqlDb.enrollMemberInItem(req.body || {});
+      res.json({ success: true, ...result });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ثبت‌نام دوره یا نشست';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.put('/api/admin/enrollments', async (req, res) => {
+    try {
+      const result = await mysqlDb.updateAdminEnrollmentStatus(req.body || {});
+      res.json({ success: true, ...result });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در بروزرسانی وضعیت ثبت‌نام کاربر';
+      res.status(400).json({ error: message });
+    }
+  });
+
 
 
   if (process.env.NODE_ENV !== 'production') {

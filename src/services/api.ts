@@ -642,6 +642,69 @@ export const ApiService = {
       });
     });
   },
+
+  enrollMemberInItem(payload: {
+    member_phone: string;
+    member_name?: string;
+    target_type: 'session' | 'class';
+    title: string;
+    book_title?: string;
+    book_author?: string;
+    pages_count?: number;
+    publisher?: string;
+    mentor_or_instructor?: string;
+    schedule_text?: string;
+    time_text?: string;
+    level_label?: string;
+    cover_url?: string;
+    description?: string;
+  }): Promise<{
+    success: boolean;
+    target_type: 'session' | 'class';
+    session?: MemberSession;
+    classItem?: MemberClassItem;
+  }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/member/enroll',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  updateAdminEnrollmentStatus(payload: {
+    target_type: 'session' | 'class';
+    target_id: number;
+    member_phone: string;
+    status: 'فعال' | 'غیرفعال' | 'لغو شده';
+  }): Promise<{
+    success: boolean;
+    session?: MemberSession;
+    classItem?: MemberClassItem;
+  }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/admin/enrollments',
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
 };
 
 

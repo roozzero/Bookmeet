@@ -8,6 +8,7 @@ import type {
   ClubAnnouncement,
   ClubMember,
   ContactInfoData,
+  EnrollmentRecord,
   GalleryImage,
   HeroSettings,
   MemberClassItem,
@@ -128,11 +129,20 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   let newGalleryImageUrl = '';
   let galleryPickerTarget: null | 'session' | 'class' | 'blog' = null;
 
-  // Universal delete confirmation modal state
+  // Universal action confirmation modal state (used for Delete, Approve Enrollment, Cancel Enrollment)
   let pendingDeleteConfirm: {
     title: string;
     description: string;
+    confirmLabel?: string;
+    confirmTone?: 'danger' | 'success';
     onConfirm: () => void;
+  } | null = null;
+
+  // Send Ticket to Enrolled Member modal state
+  let ticketTargetEnrollment: {
+    member_phone: string;
+    member_name: string;
+    course_or_session_title: string;
   } | null = null;
 
   // Personal announcement modal state (for a specific user)
@@ -309,23 +319,148 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   function askDeleteConfirmation(
     title: string,
     description: string,
-    onConfirm: () => void
+    onConfirm: () => void,
+    options?: { confirmLabel?: string; confirmTone?: 'danger' | 'success' }
   ): void {
-    pendingDeleteConfirm = { title, description, onConfirm };
+    pendingDeleteConfirm = {
+      title,
+      description,
+      confirmLabel: options?.confirmLabel,
+      confirmTone: options?.confirmTone || 'danger',
+      onConfirm,
+    };
     render();
   }
 
-  // ==================== MODALS: DELETE CONFIRM & GALLERY PICKER ====================
+  function getDefaultEnrolledMembers(status?: string): EnrollmentRecord[] {
+    return [
+      {
+        id: 1,
+        member_phone: '۰۹۱۲۳۴۵۶۷۸۹',
+        member_name: 'پرنیا فرهمند',
+        registered_at: '۸ آبان ۱۴۰۵',
+        status: status === 'غیرفعال' ? 'غیرفعال' : 'فعال',
+      },
+      {
+        id: 2,
+        member_phone: '۰۹۳۵۴۴۴۵۵۶۶',
+        member_name: 'مهسا تاجیک',
+        registered_at: '۱۴ آبان ۱۴۰۵',
+        status: 'غیرفعال',
+      },
+    ];
+  }
+
+  function renderEnrolledMembersBlock(params: {
+    targetType: 'session' | 'class';
+    targetId: number;
+    targetTitle: string;
+    members?: EnrollmentRecord[];
+    fallbackStatus?: string;
+  }): string {
+    const list =
+      Array.isArray(params.members) && params.members.length > 0
+        ? params.members
+        : getDefaultEnrolledMembers(params.fallbackStatus);
+
+    return `
+      <div class="mt-3 pt-3 border-t border-[#E2D2BE] space-y-2.5">
+        <div class="flex items-center justify-between">
+          <h4 class="text-[12.5px] font-bold text-[#231912] flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-[#5A3A22]"></span>
+            <span>لیست اعضای ثبت‌نام‌شده (${toPersianDigits(list.length)} نفر)</span>
+          </h4>
+          <span class="text-[11px] text-[#6B5444]">تایید، لغو یا ارسال تیکت</span>
+        </div>
+
+        <div class="space-y-2 max-h-56 overflow-y-auto pl-1">
+          ${list
+            .map((m) => {
+              const badgeClass =
+                m.status === 'فعال'
+                  ? 'bg-[#E4F2E7] text-[#235332] border-[#BBD9C2]'
+                  : m.status === 'لغو شده'
+                  ? 'bg-[#FBEAE8] text-[#9E3329] border-[#E6B8B3]'
+                  : 'bg-[#FFF3CD] text-[#7A5A10] border-[#E5C77B]';
+
+              const statusText =
+                m.status === 'غیرفعال' ? 'غیرفعال (در انتظار تایید)' : m.status;
+
+              return `
+                <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div class="min-w-0 space-y-0.5">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <strong class="text-[12.5px] font-bold text-[#231912]">${toPersianDigits(m.member_name)}</strong>
+                      <span class="text-[11px] text-[#6B5444]" dir="ltr">${toPersianDigits(m.member_phone)}</span>
+                      <span class="px-2 py-0.5 rounded-md border text-[10.5px] font-semibold ${badgeClass}">
+                        ${toPersianDigits(statusText)}
+                      </span>
+                    </div>
+                    <div class="text-[10.5px] text-[#7A6352]">
+                      تاریخ ثبت‌نام: ${toPersianDigits(m.registered_at)}
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      data-enroll-type="${params.targetType}"
+                      data-enroll-id="${params.targetId}"
+                      data-enroll-title="${params.targetTitle}"
+                      data-member-phone="${m.member_phone}"
+                      data-member-name="${m.member_name}"
+                      class="js-admin-approve-enrollment px-2.5 py-1 rounded-lg bg-[#235332] hover:bg-[#193E25] text-[#FAF5EC] text-[11px] font-semibold cursor-pointer transition-colors ${
+                        m.status === 'فعال' ? 'opacity-60' : ''
+                      }"
+                    >
+                      تایید
+                    </button>
+                    <button
+                      type="button"
+                      data-enroll-type="${params.targetType}"
+                      data-enroll-id="${params.targetId}"
+                      data-enroll-title="${params.targetTitle}"
+                      data-member-phone="${m.member_phone}"
+                      data-member-name="${m.member_name}"
+                      class="js-admin-cancel-enrollment px-2.5 py-1 rounded-lg border border-[#E0A9A3] bg-[#FBEAE8] hover:bg-[#F5D5D1] text-[#9E3329] text-[11px] font-semibold cursor-pointer transition-colors"
+                    >
+                      لغو
+                    </button>
+                    <button
+                      type="button"
+                      data-enroll-title="${params.targetTitle}"
+                      data-member-phone="${m.member_phone}"
+                      data-member-name="${m.member_name}"
+                      class="js-admin-ticket-enrollment px-2.5 py-1 rounded-lg bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[11px] font-semibold cursor-pointer transition-colors"
+                    >
+                      ارسال تیکت
+                    </button>
+                  </div>
+                </div>
+              `;
+            })
+            .join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // ==================== MODALS: CONFIRMATION, TICKET TO MEMBER & GALLERY PICKER ====================
   function renderModals(): string {
     let html = '';
 
     if (pendingDeleteConfirm) {
+      const isSuccessTone = pendingDeleteConfirm.confirmTone === 'success';
       html += `
         <div class="js-admin-confirm-backdrop fixed inset-0 z-50 bg-[#1B120C]/65 backdrop-blur-[2px] flex items-center justify-center p-4">
           <div class="w-full max-w-[440px] rounded-2xl bg-[#FAF5EC] border-2 border-[#DEC8AC] shadow-[0_24px_60px_rgba(27,18,12,0.35)] p-6 space-y-4">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-[#FBEAE8] text-[#9E3329] flex items-center justify-center font-bold text-[18px] shrink-0">
-                !
+              <div class="w-10 h-10 rounded-xl ${
+                isSuccessTone
+                  ? 'bg-[#E4F2E7] text-[#235332]'
+                  : 'bg-[#FBEAE8] text-[#9E3329]'
+              } flex items-center justify-center font-bold text-[18px] shrink-0">
+                ${isSuccessTone ? '✓' : '!'}
               </div>
               <h3 class="font-display text-[17.5px] font-bold text-[#231912]">
                 ${toPersianDigits(pendingDeleteConfirm.title)}
@@ -343,12 +478,97 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </button>
               <button
                 type="button"
-                class="js-admin-confirm-delete-modal px-5 py-2 rounded-xl bg-[#9E3329] hover:bg-[#7E261E] text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer"
+                class="js-admin-confirm-delete-modal px-5 py-2 rounded-xl ${
+                  isSuccessTone
+                    ? 'bg-[#235332] hover:bg-[#193E25]'
+                    : 'bg-[#9E3329] hover:bg-[#7E261E]'
+                } text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer"
               >
-                بله، حذف شود
+                ${toPersianDigits(pendingDeleteConfirm.confirmLabel || 'بله، حذف شود')}
               </button>
             </div>
           </div>
+        </div>
+      `;
+    }
+
+    if (ticketTargetEnrollment) {
+      html += `
+        <div class="js-admin-member-ticket-backdrop fixed inset-0 z-50 bg-[#1B120C]/65 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <form class="js-admin-member-ticket-form w-full max-w-[500px] rounded-2xl bg-[#FAF5EC] border-2 border-[#DEC8AC] shadow-[0_24px_60px_rgba(27,18,12,0.35)] p-6 space-y-4">
+            <div class="flex items-center justify-between border-b border-[#E5D7C5] pb-3">
+              <div>
+                <h3 class="font-display text-[17.5px] font-bold text-[#231912]">
+                  ارسال تیکت به ${toPersianDigits(ticketTargetEnrollment.member_name)}
+                </h3>
+                <p class="text-[11.5px] text-[#6B5444] mt-0.5">
+                  شماره تماس: ${toPersianDigits(ticketTargetEnrollment.member_phone)} · مربوط به: ${toPersianDigits(ticketTargetEnrollment.course_or_session_title)}
+                </p>
+              </div>
+              <button
+                type="button"
+                class="js-admin-close-member-ticket px-2.5 py-1 rounded-lg text-[#4E3B2D] hover:bg-[#EFE3D2] text-[13px] font-semibold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div class="space-y-3">
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">موضوع تیکت *</label>
+                <input
+                  type="text"
+                  name="ticket_subject"
+                  required
+                  value="${toPersianDigits(`وضعیت ثبت‌نام در «${ticketTargetEnrollment.course_or_session_title}»`)}"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]"
+                />
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">بخش مربوطه</label>
+                  <select name="ticket_department" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px] text-[#231912]">
+                    <option value="امور ثبت‌نام و دوره‌ها">امور ثبت‌نام و دوره‌ها</option>
+                    <option value="پشتیبانی فنی">پشتیبانی فنی</option>
+                    <option value="امور مالی و شهریه">امور مالی و شهریه</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">اولویت</label>
+                  <select name="ticket_priority" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px] text-[#231912]">
+                    <option value="مهم">مهم</option>
+                    <option value="عادی">عادی</option>
+                    <option value="فوری">فوری</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">متن پیام تیکت برای این مخاطب *</label>
+                <textarea
+                  name="ticket_message"
+                  rows="4"
+                  required
+                  placeholder="متن پیام یا راهنمایی جهت تکمیل و تایید ثبت‌نام را بنویسید..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] leading-[1.8]"
+                >هم‌خوان گرامی، درخواست ثبت‌نام شما در «${toPersianDigits(ticketTargetEnrollment.course_or_session_title)}» بررسی شد. لطفاً جهت هماهنگی نهایی پاسخ خود را در همین تیکت ثبت فرمایید.</textarea>
+              </div>
+            </div>
+
+            <div class="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                class="js-admin-close-member-ticket px-4 py-2 rounded-xl border border-[#C5B198] text-[#4E3B2D] hover:bg-[#EFE3D2] text-[12.5px] font-semibold cursor-pointer"
+              >
+                انصراف
+              </button>
+              <button
+                type="submit"
+                class="px-5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer"
+              >
+                ارسال تیکت به مخاطب
+              </button>
+            </div>
+          </form>
         </div>
       `;
     }
@@ -994,6 +1214,13 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     <div>تسهیل‌گر: <strong class="text-[#231912]">${toPersianDigits(s.mentor_name)}</strong></div>
                     <div>زمان: <strong class="text-[#231912]">${toPersianDigits(s.session_date)}</strong></div>
                   </div>
+                  ${renderEnrolledMembersBlock({
+                    targetType: 'session',
+                    targetId: s.id,
+                    targetTitle: s.title,
+                    members: s.enrolled_members,
+                    fallbackStatus: s.status,
+                  })}
                 </div>
               </div>
               <div class="px-5 pb-5 pt-3 border-t border-[#E6D8C5] flex flex-wrap items-center justify-between gap-2">
@@ -1442,6 +1669,13 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     <div>مدرس: <strong class="text-[#231912]">${toPersianDigits(c.instructor_name)}</strong></div>
                     <div>برنامه: <strong class="text-[#231912]">${toPersianDigits(c.schedule_summary)}</strong></div>
                   </div>
+                  ${renderEnrolledMembersBlock({
+                    targetType: 'class',
+                    targetId: c.id,
+                    targetTitle: c.title,
+                    members: c.enrolled_members,
+                    fallbackStatus: c.status,
+                  })}
                 </div>
               </div>
               <div class="px-5 pb-5 pt-3 border-t border-[#E6D8C5] flex flex-wrap items-center justify-between gap-2">
@@ -3414,6 +3648,139 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     subSessionStatusFilter = 'all';
     notifyRoute();
     render();
+  });
+
+  // --- Enrolled Members Handlers (Approve / Cancel with Confirmation Modal + Send Ticket Modal) ---
+  $wrapper.on('click', '.js-admin-approve-enrollment', function () {
+    const targetType = String($(this).data('enroll-type')) as 'session' | 'class';
+    const targetId = Number($(this).data('enroll-id'));
+    const targetTitle = String($(this).data('enroll-title') || '');
+    const memberPhone = String($(this).data('member-phone') || '');
+    const memberName = String($(this).data('member-name') || 'کاربر');
+
+    askDeleteConfirmation(
+      'تایید ثبت‌نام و فعال‌سازی دوره / نشست',
+      `آیا از تایید ثبت‌نام «${memberName}» (${memberPhone}) در «${targetTitle}» اطمینان دارید؟ پس از تایید شما، وضعیت این دوره برای کاربر به «فعال» تغییر می‌یابد.`,
+      () => {
+        ApiService.updateAdminEnrollmentStatus({
+          target_type: targetType,
+          target_id: targetId,
+          member_phone: memberPhone,
+          status: 'فعال',
+        })
+          .then((res) => {
+            if (targetType === 'session' && res.session) {
+              state.sessions = state.sessions.map((s) =>
+                s.id === targetId ? res.session! : s
+              );
+            } else if (targetType === 'class' && res.classItem) {
+              state.classes = state.classes.map((c) =>
+                c.id === targetId ? res.classItem! : c
+              );
+            }
+            render();
+            showToast(
+              `ثبت‌نام «${memberName}» تایید شد و دوره برای ایشان فعال گردید.`
+            );
+          })
+          .catch((err) => showToast(err.message || 'خطا در تایید ثبت‌نام', true));
+      },
+      { confirmLabel: 'بله، تایید و فعال شود', confirmTone: 'success' }
+    );
+  });
+
+  $wrapper.on('click', '.js-admin-cancel-enrollment', function () {
+    const targetType = String($(this).data('enroll-type')) as 'session' | 'class';
+    const targetId = Number($(this).data('enroll-id'));
+    const targetTitle = String($(this).data('enroll-title') || '');
+    const memberPhone = String($(this).data('member-phone') || '');
+    const memberName = String($(this).data('member-name') || 'کاربر');
+
+    askDeleteConfirmation(
+      'لغو ثبت‌نام عضو',
+      `آیا از لغو ثبت‌نام «${memberName}» (${memberPhone}) در «${targetTitle}» اطمینان دارید؟`,
+      () => {
+        ApiService.updateAdminEnrollmentStatus({
+          target_type: targetType,
+          target_id: targetId,
+          member_phone: memberPhone,
+          status: 'لغو شده',
+        })
+          .then((res) => {
+            if (targetType === 'session' && res.session) {
+              state.sessions = state.sessions.map((s) =>
+                s.id === targetId ? res.session! : s
+              );
+            } else if (targetType === 'class' && res.classItem) {
+              state.classes = state.classes.map((c) =>
+                c.id === targetId ? res.classItem! : c
+              );
+            }
+            render();
+            showToast(`ثبت‌نام «${memberName}» در این دوره لغو گردید.`);
+          })
+          .catch((err) => showToast(err.message || 'خطا در لغو ثبت‌نام', true));
+      },
+      { confirmLabel: 'بله، ثبت‌نام لغو شود', confirmTone: 'danger' }
+    );
+  });
+
+  $wrapper.on('click', '.js-admin-ticket-enrollment', function () {
+    const targetTitle = String($(this).data('enroll-title') || '');
+    const memberPhone = String($(this).data('member-phone') || '');
+    const memberName = String($(this).data('member-name') || 'کاربر');
+    ticketTargetEnrollment = {
+      member_phone: memberPhone,
+      member_name: memberName,
+      course_or_session_title: targetTitle,
+    };
+    render();
+  });
+
+  $wrapper.on('click', '.js-admin-close-member-ticket', () => {
+    ticketTargetEnrollment = null;
+    render();
+  });
+
+  $wrapper.on('click', '.js-admin-member-ticket-backdrop', function (e) {
+    if ($(e.target).hasClass('js-admin-member-ticket-backdrop')) {
+      ticketTargetEnrollment = null;
+      render();
+    }
+  });
+
+  $wrapper.on('submit', '.js-admin-member-ticket-form', function (e) {
+    e.preventDefault();
+    if (!ticketTargetEnrollment) return;
+    const targetInfo = ticketTargetEnrollment;
+    const $f = $(this);
+    const subject = String($f.find('[name="ticket_subject"]').val() || '').trim();
+    const department = String(
+      $f.find('[name="ticket_department"]').val() || 'امور ثبت‌نام و دوره‌ها'
+    ).trim();
+    const priority = String($f.find('[name="ticket_priority"]').val() || 'مهم') as
+      | 'عادی'
+      | 'مهم'
+      | 'فوری';
+    const message = String($f.find('[name="ticket_message"]').val() || '').trim();
+    if (!subject || !message) return;
+
+    ApiService.createMemberTicket({
+      member_phone: targetInfo.member_phone,
+      subject,
+      department,
+      priority,
+      message,
+    })
+      .then((res) => {
+        state.tickets = [res.ticket, ...state.tickets];
+        ticketTargetEnrollment = null;
+        render();
+        showToast(
+          `تیکت اختصاصی برای «${targetInfo.member_name}» با موفقیت ارسال و ثبت شد.`
+        );
+      })
+      .catch((err) => showToast(err.message || 'خطا در ارسال تیکت', true));
   });
 
   // --- Users Handlers ---

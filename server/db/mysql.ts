@@ -160,6 +160,14 @@ export interface SessionSubItemRow {
   meeting_link: string;
 }
 
+export interface EnrollmentRecordRow {
+  id: number;
+  member_phone: string;
+  member_name: string;
+  registered_at: string;
+  status: 'غیرفعال' | 'فعال' | 'لغو شده';
+}
+
 export interface MemberSessionRow {
   id: number;
   member_phone: string;
@@ -177,6 +185,7 @@ export interface MemberSessionRow {
   status: 'ثبت‌نام‌شده' | 'برگزارشده' | 'ظرفیت باز' | 'فعال' | 'غیرفعال';
   member_note: string;
   sub_sessions: SessionSubItemRow[];
+  enrolled_members?: EnrollmentRecordRow[];
   sort_order: number;
 }
 
@@ -192,6 +201,7 @@ export interface MemberClassRow {
   status: 'ثبت‌نام‌شده' | 'برگزارشده' | 'فعال' | 'غیرفعال';
   description: string;
   sub_sessions: SessionSubItemRow[];
+  enrolled_members?: EnrollmentRecordRow[];
   sort_order: number;
 }
 
@@ -941,7 +951,165 @@ const SEED_DATA: MySQLStoreSchema = {
           meeting_link: 'https://meet.bookmeet.ir/philo-lit-c2',
         },
       ],
+      enrolled_members: [
+        {
+          id: 9101,
+          member_phone: '۰۹۱۲۳۴۵۶۷۸۹',
+          member_name: 'پرنیا فرهمند',
+          registered_at: '۵ آبان ۱۴۰۵',
+          status: 'فعال',
+        },
+        {
+          id: 9102,
+          member_phone: '۰۹۱۲۱۱۱۲۲۳۳',
+          member_name: 'کیانوش معتمدی',
+          registered_at: '۶ آبان ۱۴۰۵',
+          status: 'فعال',
+        },
+        {
+          id: 9103,
+          member_phone: '۰۹۳۵۴۴۴۵۵۶۶',
+          member_name: 'مهسا تاجیک',
+          registered_at: '۱۴ آبان ۱۴۰۵',
+          status: 'غیرفعال',
+        },
+      ],
       sort_order: 2,
+    },
+    {
+      id: 3,
+      member_phone: 'all',
+      title: 'دوره آموزش زبان روسی — سطح پایه و مقدماتی (A1–A2)',
+      book_title: 'الفبای سیریلیک، آواشناسی و مکالمات پایه روسی',
+      instructor_name: 'دکتر آناستازیا رادین و سهراب رستگار',
+      schedule_summary: 'یکشنبه‌ها و سه‌شنبه‌ها · ساعت ۱۷:۳۰ تا ۱۹:۰۰',
+      level_label: 'مبتدی',
+      cover_url: '/assets/blog-1.png',
+      status: 'فعال',
+      description: 'آشنایی گام‌به‌گام با الفبای سیریلیک، اصول آواشناسی و تلفظ معیار روسی، ساخت جملات پایه، مکالمات روزمره و درک ساختارهای بنیادین دستور زبان روسی برای علاقه‌مندان به فرهنگ و ادبیات روسیه.',
+      sub_sessions: [
+        {
+          id: 701,
+          session_number: 'جلسه اول',
+          title: 'الفبای سیریلیک، واکه‌ها و قوانین تکیه در زبان روسی',
+          status: 'برگزار شده',
+          session_date: '۶ آبان ۱۴۰۵',
+          session_time: '۱۷:۳۰ تا ۱۹:۰۰',
+          cover_url: '/assets/blog-1.png',
+          pages_read: 28,
+          pages_to_read: 'درس اول و دوم کتاب «راه روسیه» (Дорога в Россию)',
+          reviewed_topics: 'آموزش ۳۳ حرف الفبای سیریلیک، تفاوت تلفظ حروف صدادار تکیه‌دار و بی‌تکیه و احوال‌پرسی رسمی و غیررسمی در زبان روسی.',
+          session_notes: 'تشخیص جایگاه تکیه (Ударение) در واژگان روسی کلید اصلی تلفظ صحیح و طبیعی است.',
+          meeting_link: 'https://meet.bookmeet.ir/russian-a1-s1',
+        },
+        {
+          id: 702,
+          session_number: 'جلسه دوم',
+          title: 'جنسیت اسم‌ها، ضمایر شخصی و ساخت جملات معرفی در روسی',
+          status: 'تعریف شده',
+          session_date: '۲۰ آبان ۱۴۰۵',
+          session_time: '۱۷:۳۰ تا ۱۹:۰۰',
+          cover_url: '/assets/blog-1.png',
+          pages_read: 0,
+          pages_to_read: 'درس سوم و چهارم کتاب «راه روسیه» (صفحات ۲۹ تا ۵۶)',
+          reviewed_topics: '',
+          session_notes: '',
+          meeting_link: 'https://meet.bookmeet.ir/russian-a1-s2',
+        },
+      ],
+      enrolled_members: [
+        {
+          id: 9201,
+          member_phone: '۰۹۱۲۱۱۱۲۲۳۳',
+          member_name: 'کیانوش معتمدی',
+          registered_at: '۱۰ آبان ۱۴۰۵',
+          status: 'فعال',
+        },
+        {
+          id: 9202,
+          member_phone: '۰۹۳۵۴۴۴۵۵۶۶',
+          member_name: 'مهسا تاجیک',
+          registered_at: '۱۴ آبان ۱۴۰۵',
+          status: 'غیرفعال',
+        },
+      ],
+      sort_order: 3,
+    },
+    {
+      id: 4,
+      member_phone: 'all',
+      title: 'دوره مکالمه و دستور زبان روسی — سطح متوسطه (B1–B2)',
+      book_title: 'حالت‌های اسمی (پادِژها)، افعال حرکتی و داستان‌های کوتاه معاصر',
+      instructor_name: 'دکتر آناستازیا رادین',
+      schedule_summary: 'دوشنبه‌ها و چهارشنبه‌ها · ساعت ۱۸:۰۰ تا ۱۹:۳۰',
+      level_label: 'پیشرفته',
+      cover_url: '/assets/blog-2.png',
+      status: 'فعال',
+      description: 'گسترش دایره واژگان کاربردی و فرهنگی، تسلط بر حالت‌های اسمی (پادِژها) و افعال حرکتی زبان روسی، تقویت مهارت گفت‌وگوی روان و خوانش داستان‌های کوتاه معاصر به زبان اصلی.',
+      sub_sessions: [
+        {
+          id: 801,
+          session_number: 'جلسه اول',
+          title: 'کاربرد شش حالت اسمی (پادِژها) در مکالمات و متون داستانی',
+          status: 'تعریف شده',
+          session_date: '۲۱ آبان ۱۴۰۵',
+          session_time: '۱۸:۰۰ تا ۱۹:۳۰',
+          cover_url: '/assets/blog-2.png',
+          pages_read: 0,
+          pages_to_read: 'بخش اول جزوه پادِژها و داستان کوتاه چخوف (صفحات ۱ تا ۳۵)',
+          reviewed_topics: '',
+          session_notes: '',
+          meeting_link: 'https://meet.bookmeet.ir/russian-b1-s1',
+        },
+      ],
+      enrolled_members: [
+        {
+          id: 9301,
+          member_phone: '۰۹۱۲۱۱۱۲۲۳۳',
+          member_name: 'کیانوش معتمدی',
+          registered_at: '۱۲ آبان ۱۴۰۵',
+          status: 'غیرفعال',
+        },
+      ],
+      sort_order: 4,
+    },
+    {
+      id: 5,
+      member_phone: 'all',
+      title: 'دوره تخصصی خوانش متون ادبی به زبان روسی (ویژه آثار کلاسیک)',
+      book_title: 'گزیده متون اصلی داستایفسکی، چخوف، تولستوی و بولگاکف',
+      instructor_name: 'دکتر سهراب رستگار',
+      schedule_summary: 'پنج‌شنبه‌ها · ساعت ۱۶:۳۰ تا ۱۸:۳۰',
+      level_label: 'تخصصی',
+      cover_url: '/assets/blog-3.png',
+      status: 'فعال',
+      description: 'خوانش دقیق و تحلیل زبانی و زیبایی‌شناختی گزیده‌ای از شاهکارهای داستایفسکی، چخوف، تولستوی و بولگاکف به زبان روسی همراه با کارگاه عملی ترجمه ادبی و بررسی ظرایف سبک‌شناختی.',
+      sub_sessions: [
+        {
+          id: 901,
+          session_number: 'جلسه اول',
+          title: 'خوانش فصل آغازین «مرشد و مارگاریتا» به زبان روسی',
+          status: 'تعریف شده',
+          session_date: '۲۴ آبان ۱۴۰۵',
+          session_time: '۱۶:۳۰ تا ۱۸:۳۰',
+          cover_url: '/assets/blog-3.png',
+          pages_read: 0,
+          pages_to_read: 'فصل اول متن روسی Мастер и Маргарита همراه با واژه‌نامه تحلیلی',
+          reviewed_topics: '',
+          session_notes: '',
+          meeting_link: 'https://meet.bookmeet.ir/russian-c1-s1',
+        },
+      ],
+      enrolled_members: [
+        {
+          id: 9401,
+          member_phone: '۰۹۱۲۳۴۵۶۷۸۹',
+          member_name: 'پرنیا فرهمند',
+          registered_at: '۱۱ آبان ۱۴۰۵',
+          status: 'فعال',
+        },
+      ],
+      sort_order: 5,
     },
   ],
   member_library: [
@@ -1772,17 +1940,63 @@ class MySQLDatabaseManager {
       );
     }
 
+    this.ensureEnrolledMembersSeeded();
+
     const foundMember =
       (phone && this.store.club_members.find((m) => m.phone === phone)) ||
       this.store.club_members[0];
     const { password_hash: _removed, ...publicMember } = foundMember;
+    const memberPhone = publicMember.phone;
+
+    const userSessions = [...this.store.member_sessions]
+      .filter((s) => {
+        const rec = (s.enrolled_members || []).find((e) => e.member_phone === memberPhone);
+        if (rec) {
+          return rec.status !== 'لغو شده';
+        }
+        return s.member_phone === 'all' || s.member_phone === memberPhone;
+      })
+      .map((s) => {
+        const rec = (s.enrolled_members || []).find((e) => e.member_phone === memberPhone);
+        if (rec) {
+          return {
+            ...s,
+            status: rec.status === 'فعال' ? ('فعال' as const) : ('غیرفعال' as const),
+          };
+        }
+        return s;
+      })
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    const userClasses = [...this.store.member_classes]
+      .filter((c) => {
+        const rec = (c.enrolled_members || []).find((e) => e.member_phone === memberPhone);
+        if (rec) {
+          return rec.status !== 'لغو شده';
+        }
+        // Only show classes the member is enrolled in or initial default classes 1 & 2
+        return (c.id <= 2 && c.member_phone === 'all') || c.member_phone === memberPhone;
+      })
+      .map((c) => {
+        const rec = (c.enrolled_members || []).find((e) => e.member_phone === memberPhone);
+        if (rec) {
+          return {
+            ...c,
+            status: rec.status === 'فعال' ? ('فعال' as const) : ('غیرفعال' as const),
+          };
+        }
+        return c;
+      })
+      .sort((a, b) => a.sort_order - b.sort_order);
 
     return {
       member: publicMember,
-      sessions: [...this.store.member_sessions].sort((a, b) => a.sort_order - b.sort_order),
-      classes: [...this.store.member_classes].sort((a, b) => a.sort_order - b.sort_order),
+      sessions: userSessions,
+      classes: userClasses,
       library: [...this.store.member_library],
-      tickets: [...this.store.member_tickets].sort((a, b) => b.id - a.id),
+      tickets: [...this.store.member_tickets]
+        .filter((t) => t.member_phone === 'all' || t.member_phone === memberPhone)
+        .sort((a, b) => b.id - a.id),
       calendarEvents: [...this.store.club_calendar_events].sort(
         (a, b) => a.sort_order - b.sort_order
       ),
@@ -2035,6 +2249,8 @@ class MySQLDatabaseManager {
       .filter((m) => m.role !== 'admin' && m.phone !== 'admin')
       .map(({ password_hash: _p, ...rest }) => rest);
 
+    this.ensureEnrolledMembersSeeded();
+
     return {
       admin: { ...adminPublic, role: 'admin' },
       sessions: [...(this.store.member_sessions || [])].sort(
@@ -2063,6 +2279,321 @@ class MySQLDatabaseManager {
         (a, b) => a.sort_order - b.sort_order
       ),
     };
+  }
+
+  private ensureEnrolledMembersSeeded(): void {
+    let changed = false;
+    if (!this.store.member_sessions) {
+      this.store.member_sessions = JSON.parse(JSON.stringify(SEED_DATA.member_sessions));
+      changed = true;
+    }
+    if (!this.store.member_classes) {
+      this.store.member_classes = JSON.parse(JSON.stringify(SEED_DATA.member_classes));
+      changed = true;
+    }
+
+    // Ensure Russian courses exist in member_classes
+    for (const seedClass of SEED_DATA.member_classes) {
+      const exists = this.store.member_classes.some(
+        (c) => c.id === seedClass.id || c.title === seedClass.title
+      );
+      if (!exists) {
+        this.store.member_classes.push(JSON.parse(JSON.stringify(seedClass)));
+        changed = true;
+      }
+    }
+
+    // Ensure enrolled_members array exists on every session
+    this.store.member_sessions.forEach((s, idx) => {
+      if (!Array.isArray(s.enrolled_members) || s.enrolled_members.length === 0) {
+        s.enrolled_members = [
+          {
+            id: 8000 + idx * 10 + 1,
+            member_phone: '۰۹۱۲۳۴۵۶۷۸۹',
+            member_name: 'پرنیا فرهمند',
+            registered_at: '۸ آبان ۱۴۰۵',
+            status: s.status === 'غیرفعال' ? 'غیرفعال' : 'فعال',
+          },
+          {
+            id: 8000 + idx * 10 + 2,
+            member_phone: '۰۹۱۲۱۱۱۲۲۳۳',
+            member_name: 'کیانوش معتمدی',
+            registered_at: '۱۰ آبان ۱۴۰۵',
+            status: 'فعال',
+          },
+          {
+            id: 8000 + idx * 10 + 3,
+            member_phone: '۰۹۳۵۴۴۴۵۵۶۶',
+            member_name: 'مهسا تاجیک',
+            registered_at: '۱۴ آبان ۱۴۰۵',
+            status: 'غیرفعال',
+          },
+        ];
+        changed = true;
+      }
+    });
+
+    // Ensure enrolled_members array exists on every class
+    this.store.member_classes.forEach((c, idx) => {
+      if (!Array.isArray(c.enrolled_members) || c.enrolled_members.length === 0) {
+        c.enrolled_members = [
+          {
+            id: 9000 + idx * 10 + 1,
+            member_phone: '۰۹۱۲۳۴۵۶۷۸۹',
+            member_name: 'پرنیا فرهمند',
+            registered_at: '۷ آبان ۱۴۰۵',
+            status: 'فعال',
+          },
+          {
+            id: 9000 + idx * 10 + 2,
+            member_phone: '۰۹۳۵۴۴۴۵۵۶۶',
+            member_name: 'مهسا تاجیک',
+            registered_at: '۱۴ آبان ۱۴۰۵',
+            status: 'غیرفعال',
+          },
+        ];
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      this.saveDiskStore();
+    }
+  }
+
+  public async enrollMemberInItem(input: {
+    member_phone: string;
+    member_name?: string;
+    target_type: 'session' | 'class';
+    title: string;
+    book_title?: string;
+    book_author?: string;
+    pages_count?: number;
+    publisher?: string;
+    mentor_or_instructor?: string;
+    schedule_text?: string;
+    time_text?: string;
+    level_label?: string;
+    cover_url?: string;
+    description?: string;
+    sub_sessions?: SessionSubItemRow[];
+  }): Promise<{
+    target_type: 'session' | 'class';
+    session?: MemberSessionRow;
+    classItem?: MemberClassRow;
+  }> {
+    this.ensureEnrolledMembersSeeded();
+
+    const memberObj = (this.store.club_members || []).find(
+      (m) => m.phone === input.member_phone
+    );
+    const resolvedName =
+      input.member_name ||
+      (memberObj ? `${memberObj.first_name} ${memberObj.last_name}` : 'عضو باشگاه');
+
+    if (input.target_type === 'class') {
+      let targetClass = this.store.member_classes.find(
+        (c) => c.title.trim() === input.title.trim()
+      );
+      if (!targetClass) {
+        const nextId =
+          this.store.member_classes.length > 0
+            ? Math.max(...this.store.member_classes.map((c) => c.id)) + 1
+            : 1;
+        targetClass = {
+          id: nextId,
+          member_phone: input.member_phone,
+          title: input.title,
+          book_title: input.book_title || 'سرفصل تخصصی دوره آموزشی',
+          instructor_name: input.mentor_or_instructor || 'دکتر آناستازیا رادین و سهراب رستگار',
+          schedule_summary: input.schedule_text || 'یکشنبه‌ها و سه‌شنبه‌ها · ساعت ۱۷:۳۰ تا ۱۹:۰۰',
+          level_label: input.level_label || 'مبتدی',
+          cover_url: input.cover_url || '/assets/blog-1.png',
+          status: 'غیرفعال',
+          description:
+            input.description ||
+            'دوره آموزشی ثبت‌نام‌شده از طریق صفحه اصلی سایت باشگاه کتابخوانی بوک‌میت.',
+          sub_sessions:
+            Array.isArray(input.sub_sessions) && input.sub_sessions.length > 0
+              ? input.sub_sessions
+              : [
+                  {
+                    id: Date.now() + 1,
+                    session_number: 'جلسه اول',
+                    title: `جلسه معارفه و آغازین «${input.title}»`,
+                    status: 'تعریف شده',
+                    session_date: '۲۲ آبان ۱۴۰۵',
+                    session_time: '۱۷:۳۰ تا ۱۹:۰۰',
+                    cover_url: input.cover_url || '/assets/blog-1.png',
+                    pages_read: 0,
+                    pages_to_read: 'طبق سرفصل جلسه اول دوره',
+                    reviewed_topics: '',
+                    session_notes: '',
+                    meeting_link: 'https://meet.bookmeet.ir/course-live',
+                  },
+                ],
+          enrolled_members: [],
+          sort_order: 0,
+        };
+        this.store.member_classes.unshift(targetClass);
+      }
+
+      if (!Array.isArray(targetClass.enrolled_members)) {
+        targetClass.enrolled_members = [];
+      }
+
+      const existingRec = targetClass.enrolled_members.find(
+        (e) => e.member_phone === input.member_phone
+      );
+      if (existingRec) {
+        existingRec.status = 'غیرفعال';
+        existingRec.registered_at = '۱۴ آبان ۱۴۰۵ · ثبت‌نام جدید';
+        existingRec.member_name = resolvedName;
+      } else {
+        targetClass.enrolled_members.unshift({
+          id: Date.now(),
+          member_phone: input.member_phone,
+          member_name: resolvedName,
+          registered_at: '۱۴ آبان ۱۴۰۵ · هم‌اکنون',
+          status: 'غیرفعال',
+        });
+      }
+
+      this.saveDiskStore();
+      return {
+        target_type: 'class',
+        classItem: { ...targetClass, status: 'غیرفعال' },
+      };
+    }
+
+    // Otherwise target_type === 'session'
+    let targetSession = this.store.member_sessions.find(
+      (s) =>
+        s.title.trim() === input.title.trim() ||
+        (input.book_title && s.book_title.trim() === input.book_title.trim() && s.title.includes(input.book_title.trim()))
+    );
+
+    if (!targetSession) {
+      const nextId =
+        this.store.member_sessions.length > 0
+          ? Math.max(...this.store.member_sessions.map((s) => s.id)) + 1
+          : 1;
+      targetSession = {
+        id: nextId,
+        member_phone: input.member_phone,
+        title: input.title,
+        book_title: input.book_title || input.title,
+        book_author: input.book_author || 'نویسنده اثر منتخب',
+        pages_count: Number(input.pages_count || 360),
+        publisher: input.publisher || 'نشر نیلوفر',
+        mentor_name: input.mentor_or_instructor || 'دکتر سهراب رستگار',
+        session_date: input.schedule_text || 'چهارشنبه ۲۴ آبان ۱۴۰۵',
+        session_time: input.time_text || 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+        cover_url: input.cover_url || '/assets/book-current.png',
+        location_type: 'حضوری و آنلاین',
+        meeting_link_or_room: 'تالار فردوسی خانه بوک‌میت',
+        status: 'غیرفعال',
+        member_note: '',
+        sub_sessions:
+          Array.isArray(input.sub_sessions) && input.sub_sessions.length > 0
+            ? input.sub_sessions
+            : [
+                {
+                  id: Date.now() + 2,
+                  session_number: 'جلسه اول',
+                  title: `نشست هم‌خوانی و تحلیل «${input.book_title || input.title}»`,
+                  status: 'تعریف شده',
+                  session_date: input.schedule_text || '۲۴ آبان ۱۴۰۵',
+                  session_time: input.time_text || '۱۸:۰۰ تا ۲۰:۰۰',
+                  cover_url: input.cover_url || '/assets/book-current.png',
+                  pages_read: 0,
+                  pages_to_read: 'فصل‌های تعیین‌شده در برنامه نشست',
+                  reviewed_topics: '',
+                  session_notes: '',
+                  meeting_link: 'https://meet.bookmeet.ir/session-live',
+                },
+              ],
+        enrolled_members: [],
+        sort_order: 0,
+      };
+      this.store.member_sessions.unshift(targetSession);
+    }
+
+    if (!Array.isArray(targetSession.enrolled_members)) {
+      targetSession.enrolled_members = [];
+    }
+
+    const existingRec = targetSession.enrolled_members.find(
+      (e) => e.member_phone === input.member_phone
+    );
+    if (existingRec) {
+      existingRec.status = 'غیرفعال';
+      existingRec.registered_at = '۱۴ آبان ۱۴۰۵ · ثبت‌نام جدید';
+      existingRec.member_name = resolvedName;
+    } else {
+      targetSession.enrolled_members.unshift({
+        id: Date.now(),
+        member_phone: input.member_phone,
+        member_name: resolvedName,
+        registered_at: '۱۴ آبان ۱۴۰۵ · هم‌اکنون',
+        status: 'غیرفعال',
+      });
+    }
+
+    this.saveDiskStore();
+    return {
+      target_type: 'session',
+      session: { ...targetSession, status: 'غیرفعال' },
+    };
+  }
+
+  public async updateAdminEnrollmentStatus(input: {
+    target_type: 'session' | 'class';
+    target_id: number;
+    member_phone: string;
+    status: 'فعال' | 'غیرفعال' | 'لغو شده';
+  }): Promise<{ session?: MemberSessionRow; classItem?: MemberClassRow }> {
+    this.ensureEnrolledMembersSeeded();
+
+    if (input.target_type === 'session') {
+      const sess = this.store.member_sessions.find(
+        (s) => s.id === Number(input.target_id)
+      );
+      if (!sess) {
+        throw new Error('نشست مورد نظر یافت نشد.');
+      }
+      if (!Array.isArray(sess.enrolled_members)) {
+        sess.enrolled_members = [];
+      }
+      const rec = sess.enrolled_members.find(
+        (e) => e.member_phone === input.member_phone
+      );
+      if (rec) {
+        rec.status = input.status;
+      }
+      if (input.status === 'فعال') {
+        sess.status = 'فعال';
+      }
+      this.saveDiskStore();
+      return { session: sess };
+    }
+
+    const cls = this.store.member_classes.find((c) => c.id === Number(input.target_id));
+    if (!cls) {
+      throw new Error('کلاس یا دوره مورد نظر یافت نشد.');
+    }
+    if (!Array.isArray(cls.enrolled_members)) {
+      cls.enrolled_members = [];
+    }
+    const rec = cls.enrolled_members.find((e) => e.member_phone === input.member_phone);
+    if (rec) {
+      rec.status = input.status;
+    }
+    if (input.status === 'فعال') {
+      cls.status = 'فعال';
+    }
+    this.saveDiskStore();
+    return { classItem: cls };
   }
 
   public async saveAdminGalleryImage(input: {

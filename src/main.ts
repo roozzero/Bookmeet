@@ -5,8 +5,19 @@ import { createNavbarComponent } from './components/Navbar.ts';
 import { createHeroSectionComponent } from './components/HeroSection.ts';
 import { createAboutClubSectionComponent } from './components/AboutClubSection.ts';
 import { createAboutManagerSectionComponent } from './components/AboutManagerSection.ts';
-import { createLibrarySectionComponent } from './components/LibrarySection.ts';
-import { createCoursesSectionComponent } from './components/CoursesSection.ts';
+import {
+  createLibrarySectionComponent,
+  UPCOMING_EVENTS_DATA,
+  buildBookEventDetail,
+  type ClubEventDetailItem,
+} from './components/LibrarySection.ts';
+import {
+  createCoursesSectionComponent,
+  RUSSIAN_COURSES_DATA,
+  type RussianCourseCard,
+} from './components/CoursesSection.ts';
+import { createCourseDetailPageComponent } from './components/CourseDetailPage.ts';
+import { createEventDetailPageComponent } from './components/EventDetailPage.ts';
 import { createBlogSectionComponent } from './components/BlogSection.ts';
 import { createBlogPostPageComponent } from './components/BlogPostPage.ts';
 import { createContactSectionComponent } from './components/ContactSection.ts';
@@ -267,7 +278,7 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
     section_kicker: '۰۵ · ارتباط با ما و عضویت در حلقه‌های مطالعاتی',
     title: 'صدای شما، آغازگر گفت‌وگوهای تازه در باشگاه بوک‌میت است',
     description:
-      'اگر درباره شیوه برگزاری نشست‌های هفتگی، پیشنهاد کتاب برای دوره‌های آینده، همکاری در نگارش جستارهای وبلاگ یا عضویت در حلقه‌های مطالعاتی بوک‌میت پرسشی دارید، پیام خود را برای ما ارسال کنید. دبیرخانه باشگاه در کوتاه‌ترین زمان پاسخگوی شما خواهد بود.',
+      'اگر درباره شیوه برگزاری نشست‌های هفتگی، پیشنهاد کتاب برای دوره‌های آینده، همکاری در نگارش جستارهای وبلاگ یا عضویت در حلقه‌های مطالعاتی بوک‌میت پرسشی دارید، پیام خود را برای ما ارسال کنید. دبیرخانه باشگاه در کوتاه‌ترین زمان پاسخگوی خواهد بود.',
     address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات بوک‌میت، پلاک ۴۲',
     meeting_hours: 'نشست‌های حضوری: چهارشنبه‌ها ساعت ۱۸ تا ۲۰ · نشست‌های برخط: جمعه‌ها ساعت ۱۹',
     email: 'hello@bookmeet.ir',
@@ -291,12 +302,18 @@ function pushRoute(path: string, replace = false): void {
   }
 }
 
+type PendingEnrollment =
+  | { type: 'course'; course: RussianCourseCard }
+  | { type: 'event'; eventItem: ClubEventDetailItem }
+  | null;
+
 function mountApplication(payload: BootstrapPayload): void {
   const $app = $('#app');
   let allPosts = payload.blogPosts || FALLBACK_BOOTSTRAP.blogPosts;
   let currentMember: ClubMember | null = null;
   let cachedAdminData: AdminPanelPayload | null = null;
   let cachedMemberData: MemberPanelPayload | null = null;
+  let pendingEnrollment: PendingEnrollment = null;
 
   function scrollToSection(href: string): void {
     const sectionMap: Record<string, string> = {
@@ -338,6 +355,66 @@ function mountApplication(payload: BootstrapPayload): void {
       return `پنل کاربری · ${currentMember.first_name} ${currentMember.last_name}`;
     }
     return payload.heroSettings.nav_cta_text || 'ورود به باشگاه';
+  }
+
+  function handleMemberAuthSuccess(member: ClubMember): void {
+    currentMember = member;
+    if (pendingEnrollment && member.role !== 'admin' && member.phone !== 'admin') {
+      const enrollmentToProcess = pendingEnrollment;
+      pendingEnrollment = null;
+
+      if (enrollmentToProcess.type === 'course') {
+        const course = enrollmentToProcess.course;
+        const noticeMsg = `دوره «${course.title}» با وضعیت غیرفعال در کلاس‌های شما ثبت شد. جهت تایید ثبت‌نام تیکت بزنید یا با شماره ۰۲۱-۸۸۹۴۳۲۱۰ تماس بگیرید.`;
+        ApiService.enrollMemberInItem({
+          member_phone: member.phone,
+          member_name: `${member.first_name} ${member.last_name}`.trim(),
+          target_type: 'class',
+          title: course.title,
+          mentor_or_instructor: course.instructor,
+          schedule_text: course.schedule,
+          cover_url: course.coverUrl,
+          level_label: course.level,
+          description: course.description,
+        })
+          .then(() => {
+            openMemberPanel(member.phone, 'classes', undefined, false, noticeMsg);
+          })
+          .catch(() => {
+            openMemberPanel(member.phone, 'classes', undefined, false, noticeMsg);
+          });
+        return;
+      }
+
+      if (enrollmentToProcess.type === 'event') {
+        const ev = enrollmentToProcess.eventItem;
+        const noticeMsg = `نشست «${ev.title}» با وضعیت غیرفعال در جلسات شما ثبت شد. جهت تایید ثبت‌نام تیکت بزنید یا با شماره ۰۲۱-۸۸۹۴۳۲۱۰ تماس بگیرید.`;
+        ApiService.enrollMemberInItem({
+          member_phone: member.phone,
+          member_name: `${member.first_name} ${member.last_name}`.trim(),
+          target_type: 'session',
+          title: ev.title,
+          book_title: ev.bookTitle,
+          book_author: ev.bookAuthor,
+          pages_count: ev.pagesCount,
+          publisher: ev.publisher,
+          mentor_or_instructor: ev.mentor,
+          schedule_text: ev.dateLabel,
+          time_text: ev.timeLabel,
+          cover_url: ev.coverUrl,
+          description: ev.shortDescription,
+        })
+          .then(() => {
+            openMemberPanel(member.phone, 'sessions', undefined, false, noticeMsg);
+          })
+          .catch(() => {
+            openMemberPanel(member.phone, 'sessions', undefined, false, noticeMsg);
+          });
+        return;
+      }
+    }
+
+    openAppropriatePanel(member);
   }
 
   function openAppropriatePanel(member?: ClubMember | null): void {
@@ -469,7 +546,8 @@ function mountApplication(payload: BootstrapPayload): void {
     phone?: string,
     initialTab: PanelTabKey = 'dashboard',
     initialSubPath?: string,
-    skipPush = false
+    skipPush = false,
+    initialEnrollmentNotice?: string
   ): void {
     if (!skipPush) {
       const targetUrl = initialSubPath
@@ -482,7 +560,12 @@ function mountApplication(payload: BootstrapPayload): void {
       .then((panelData: MemberPanelPayload) => {
         cachedMemberData = panelData;
         currentMember = panelData.member;
-        renderMemberPanelView(panelData, initialTab, initialSubPath);
+        renderMemberPanelView(
+          panelData,
+          initialTab,
+          initialSubPath,
+          initialEnrollmentNotice
+        );
       })
       .catch(() => {
         const fallbackMember: ClubMember = currentMember || {
@@ -508,14 +591,20 @@ function mountApplication(payload: BootstrapPayload): void {
           calendarEvents: [],
           announcements: [],
         };
-        renderMemberPanelView(fallbackPanel, initialTab, initialSubPath);
+        renderMemberPanelView(
+          fallbackPanel,
+          initialTab,
+          initialSubPath,
+          initialEnrollmentNotice
+        );
       });
   }
 
   function renderMemberPanelView(
     panelData: MemberPanelPayload,
     initialTab: PanelTabKey = 'dashboard',
-    initialSubPath?: string
+    initialSubPath?: string,
+    initialEnrollmentNotice?: string
   ): void {
     $app.empty();
 
@@ -539,6 +628,7 @@ function mountApplication(payload: BootstrapPayload): void {
       initialData: panelData,
       initialTab,
       initialSubPath,
+      initialEnrollmentNotice,
       onRouteChange: (newPath) => {
         pushRoute(newPath);
       },
@@ -575,8 +665,7 @@ function mountApplication(payload: BootstrapPayload): void {
 
     const $loginModal = createClubAuthModalComponent({
       onAuthSuccess: (member) => {
-        currentMember = member;
-        openAppropriatePanel(member);
+        handleMemberAuthSuccess(member);
       },
     });
 
@@ -588,6 +677,7 @@ function mountApplication(payload: BootstrapPayload): void {
         scrollToSection(href);
       },
       onLoginClick: () => {
+        pendingEnrollment = null;
         if (currentMember) {
           openAppropriatePanel(currentMember);
         } else {
@@ -611,9 +701,26 @@ function mountApplication(payload: BootstrapPayload): void {
 
     const $library = createLibrarySectionComponent({
       libraryBooks: payload.libraryBooks || FALLBACK_BOOTSTRAP.libraryBooks,
+      onOpenEventDetail: (eventItem) => {
+        pushRoute(`/event/${eventItem.id}`);
+        renderEventDetailPageView(eventItem, true);
+      },
+      onRegisterEvent: (eventItem) => {
+        pendingEnrollment = { type: 'event', eventItem };
+        $loginModal.removeClass('hidden');
+      },
     });
 
-    const $courses = createCoursesSectionComponent();
+    const $courses = createCoursesSectionComponent({
+      onOpenCourseDetail: (course) => {
+        pushRoute(`/course/${course.id}`);
+        renderCourseDetailPageView(course, true);
+      },
+      onRegisterCourse: (course) => {
+        pendingEnrollment = { type: 'course', course };
+        $loginModal.removeClass('hidden');
+      },
+    });
 
     const $blog = createBlogSectionComponent({
       blogPosts: allPosts,
@@ -652,6 +759,136 @@ function mountApplication(payload: BootstrapPayload): void {
     }
   }
 
+  function renderCourseDetailPageView(
+    course: RussianCourseCard,
+    skipPush = false
+  ): void {
+    if (!skipPush) {
+      pushRoute(`/course/${course.id}`);
+    }
+    $app.empty();
+
+    const $shell = $(
+      '<div dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
+    );
+
+    const $loginModal = createClubAuthModalComponent({
+      onAuthSuccess: (member) => {
+        handleMemberAuthSuccess(member);
+      },
+    });
+
+    const $navbar = createNavbarComponent({
+      navigationLinks: payload.navigationLinks,
+      ctaText: getNavbarCtaLabel(),
+      activeHref: '#courses',
+      isStationaryCta: Boolean(currentMember),
+      onNavigate: (href) => {
+        renderMainHomeView(href);
+      },
+      onLoginClick: () => {
+        pendingEnrollment = null;
+        if (currentMember) {
+          openAppropriatePanel(currentMember);
+        } else {
+          $loginModal.removeClass('hidden');
+        }
+      },
+    });
+
+    const $courseDetailPage = createCourseDetailPageComponent({
+      course,
+      onBackToHomeCourses: () => {
+        pushRoute('/courses');
+        renderMainHomeView('#courses', true);
+      },
+      onRegisterCourse: (targetCourse) => {
+        pendingEnrollment = { type: 'course', course: targetCourse };
+        $loginModal.removeClass('hidden');
+      },
+      onSelectCourse: (nextCourse) => {
+        pushRoute(`/course/${nextCourse.id}`);
+        renderCourseDetailPageView(nextCourse, true);
+      },
+    });
+
+    const $contact = createContactSectionComponent({
+      contactInfo: payload.contactInfo || FALLBACK_BOOTSTRAP.contactInfo,
+    });
+
+    const $scrollToTopBtn = createScrollToTopButtonComponent();
+
+    $shell.append($navbar, $courseDetailPage, $contact, $scrollToTopBtn, $loginModal);
+    $app.append($shell);
+
+    $('html, body').stop(true).animate({ scrollTop: 0 }, 250);
+  }
+
+  function renderEventDetailPageView(
+    eventItem: ClubEventDetailItem,
+    skipPush = false
+  ): void {
+    if (!skipPush) {
+      pushRoute(`/event/${eventItem.id}`);
+    }
+    $app.empty();
+
+    const $shell = $(
+      '<div dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
+    );
+
+    const $loginModal = createClubAuthModalComponent({
+      onAuthSuccess: (member) => {
+        handleMemberAuthSuccess(member);
+      },
+    });
+
+    const $navbar = createNavbarComponent({
+      navigationLinks: payload.navigationLinks,
+      ctaText: getNavbarCtaLabel(),
+      activeHref: '#events',
+      isStationaryCta: Boolean(currentMember),
+      onNavigate: (href) => {
+        renderMainHomeView(href);
+      },
+      onLoginClick: () => {
+        pendingEnrollment = null;
+        if (currentMember) {
+          openAppropriatePanel(currentMember);
+        } else {
+          $loginModal.removeClass('hidden');
+        }
+      },
+    });
+
+    const $eventDetailPage = createEventDetailPageComponent({
+      eventItem,
+      onBackToHomeEvents: () => {
+        pushRoute('/events');
+        renderMainHomeView('#events', true);
+      },
+      onRegisterEvent: (targetEvent) => {
+        pendingEnrollment = { type: 'event', eventItem: targetEvent };
+        $loginModal.removeClass('hidden');
+      },
+      onSelectEvent: (nextEvent) => {
+        pushRoute(`/event/${nextEvent.id}`);
+        renderEventDetailPageView(nextEvent, true);
+      },
+    });
+
+    const $contact = createContactSectionComponent({
+      contactInfo: payload.contactInfo || FALLBACK_BOOTSTRAP.contactInfo,
+    });
+
+    const $scrollToTopBtn = createScrollToTopButtonComponent();
+
+    $shell.append($navbar, $eventDetailPage, $contact, $scrollToTopBtn, $loginModal);
+    $app.append($shell);
+
+    $('html, body').stop(true).animate({ scrollTop: 0 }, 250);
+  }
+
   function renderBlogPostPageView(post: BlogPost, skipPush = false): void {
     if (!skipPush) {
       pushRoute(`/blog/${post.id}`);
@@ -664,8 +901,7 @@ function mountApplication(payload: BootstrapPayload): void {
 
     const $loginModal = createClubAuthModalComponent({
       onAuthSuccess: (member) => {
-        currentMember = member;
-        openAppropriatePanel(member);
+        handleMemberAuthSuccess(member);
       },
     });
 
@@ -678,6 +914,7 @@ function mountApplication(payload: BootstrapPayload): void {
         renderMainHomeView(href);
       },
       onLoginClick: () => {
+        pendingEnrollment = null;
         if (currentMember) {
           openAppropriatePanel(currentMember);
         } else {
@@ -734,6 +971,36 @@ function mountApplication(payload: BootstrapPayload): void {
     };
     if (sectionRoutes[first]) {
       renderMainHomeView(sectionRoutes[first], true);
+      return;
+    }
+
+    // Course detail routes: /course/:id
+    if (first === 'course' && segments[1]) {
+      const courseId = Number(segments[1]);
+      const targetCourse = RUSSIAN_COURSES_DATA.find((c) => c.id === courseId);
+      if (targetCourse) {
+        renderCourseDetailPageView(targetCourse, true);
+        return;
+      }
+      renderMainHomeView('#courses', true);
+      return;
+    }
+
+    // Event detail routes: /event/:id
+    if (first === 'event' && segments[1]) {
+      const eventId = Number(segments[1]);
+      const books = payload.libraryBooks || FALLBACK_BOOTSTRAP.libraryBooks;
+      const currentBook = books.find((b) => Number(b.is_current) === 1) || books[0];
+      if (currentBook && (eventId === 100 || eventId === currentBook.id)) {
+        renderEventDetailPageView(buildBookEventDetail(currentBook), true);
+        return;
+      }
+      const targetEvent = UPCOMING_EVENTS_DATA.find((ev) => ev.id === eventId);
+      if (targetEvent) {
+        renderEventDetailPageView(targetEvent, true);
+        return;
+      }
+      renderMainHomeView('#events', true);
       return;
     }
 

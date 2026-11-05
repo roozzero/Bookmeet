@@ -27,6 +27,7 @@ export interface MemberPanelPageProps {
   initialData: MemberPanelPayload;
   initialTab?: PanelTabKey;
   initialSubPath?: string;
+  initialEnrollmentNotice?: string;
   onRouteChange?: (path: string) => void;
   onBackToSite: () => void;
   onLogout: () => void;
@@ -119,12 +120,14 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
   }
 
   // Main Sessions list search & filter state (Item 1)
-  let sessionsListFilter: 'all' | 'ثبت‌نام‌شده' | 'برگزارشده' = 'all';
+  let sessionsListFilter: 'all' | 'فعال' | 'غیرفعال' | 'ثبت‌نام‌شده' | 'برگزارشده' = 'all';
   let sessionsListSearchQuery = '';
 
   // Main Classes list search & filter state (Item 3)
-  let classesListFilter: 'all' | 'پیشرفته' | 'تخصصی' = 'all';
+  let classesListFilter: 'all' | 'مبتدی' | 'پیشرفته' | 'تخصصی' = 'all';
   let classesListSearchQuery = '';
+
+  let enrollmentNoticeBanner: string = props.initialEnrollmentNotice || '';
 
   // Sub-session filter & search state (inside a Session or Class detail page)
   let subSessionFilter: 'all' | 'تعریف شده' | 'برگزار شده' = 'all';
@@ -919,14 +922,20 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     // در منوی جلسات من عنوان هر کارت باید یک خط باشد و اگر بیشتر شد بصورت ... نمایش دهد و به خط بعدی منتقل نشود و همچنین جستجو و فیلتر را ایجاد کن
     const query = sessionsListSearchQuery.trim().toLowerCase();
     const filteredSessions = state.sessions.filter((session) => {
-      if (sessionsListFilter !== 'all' && session.status !== sessionsListFilter) {
-        return false;
+      if (sessionsListFilter !== 'all') {
+        if (sessionsListFilter === 'فعال') {
+          if (session.status !== 'فعال' && session.status !== 'ثبت‌نام‌شده') return false;
+        } else if (session.status !== sessionsListFilter) {
+          return false;
+        }
       }
       if (!query) return true;
       const haystack =
         `${session.title} ${session.book_title} ${session.mentor_name} ${session.session_date}`.toLowerCase();
       return haystack.includes(query);
     });
+
+    const hasPendingSessions = state.sessions.some((s) => s.status === 'غیرفعال');
 
     return `
       <div class="space-y-6">
@@ -939,7 +948,34 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
           </p>
         </div>
 
-        <!-- Search & Filter Bar for Sessions List (Item 1) -->
+        ${
+          enrollmentNoticeBanner || hasPendingSessions
+            ? `
+          <div class="p-4 sm:p-5 rounded-2xl bg-[#FFF6E0] border-2 border-[#E3C178] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="space-y-1">
+              <div class="text-[13.5px] font-bold text-[#6E4B0C]">
+                ${toPersianDigits(
+                  enrollmentNoticeBanner ||
+                    'شما دارای نشست ثبت‌نام‌شده در وضعیت «غیرفعال» (در انتظار تایید مدیر) هستید.'
+                )}
+              </div>
+              <p class="text-[12.5px] text-[#5C4110] font-medium">
+                جهت تایید ثبت‌نام تیکت بزنید یا با شماره <strong dir="ltr" class="font-bold">۰۲۱-۸۸۹۴۳۲۱۰</strong> تماس بگیرید.
+              </p>
+            </div>
+            <button
+              type="button"
+              data-switch-tab="tickets"
+              class="js-switch-tab-btn px-4 py-2 rounded-xl bg-[#7A5411] hover:bg-[#5E3F0A] text-[#FAF5EC] text-[12px] font-semibold shrink-0 cursor-pointer self-start sm:self-auto"
+            >
+              ارسال تیکت تایید ثبت‌نام ←
+            </button>
+          </div>
+        `
+            : ''
+        }
+
+        <!-- Search & Filter Bar for Sessions List -->
         <div class="p-4 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           <div class="flex-1">
             <input
@@ -953,8 +989,8 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
             ${(
               [
                 { key: 'all', label: 'همه جلسات' },
-                { key: 'ثبت‌نام‌شده', label: 'ثبت‌نام‌شده' },
-                { key: 'برگزارشده', label: 'برگزارشده' },
+                { key: 'فعال', label: 'فعال' },
+                { key: 'غیرفعال', label: 'غیرفعال' },
               ] as const
             )
               .map(
@@ -983,11 +1019,14 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                   .map((session) => {
                     const totalCount = (session.sub_sessions || []).length;
                     const coverImg = session.cover_url || '/assets/book-current.png';
+                    const isInactive = session.status === 'غیرفعال';
 
                     return `
                 <article
                   data-open-session-id="${session.id}"
-                  class="js-open-session-card group rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] hover:border-[#8B5A36] hover:shadow-[0_16px_36px_rgba(61,46,34,0.1)] transition-all cursor-pointer overflow-hidden flex flex-col justify-between min-w-0"
+                  class="js-open-session-card group rounded-2xl bg-[#FAF5EC] border ${
+                    isInactive ? 'border-[#DFBA6F]' : 'border-[#E5D7C5]'
+                  } hover:border-[#8B5A36] hover:shadow-[0_16px_36px_rgba(61,46,34,0.1)] transition-all cursor-pointer overflow-hidden flex flex-col justify-between min-w-0"
                 >
                   <div class="min-w-0">
                     <!-- Card Image Header -->
@@ -999,8 +1038,12 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                       />
                       <div class="absolute inset-0 bg-gradient-to-t from-[#1E140E]/70 via-transparent to-transparent"></div>
                       <div class="absolute bottom-3 right-4 left-4 flex items-center justify-between text-[#FAF5EC]">
-                        <span class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-[#235332]/90 backdrop-blur-xs">
-                          ${toPersianDigits(session.status)}
+                        <span class="px-2.5 py-1 rounded-lg text-[11px] font-semibold ${
+                          isInactive
+                            ? 'bg-[#8A5A10]/95 text-[#FFF8E7]'
+                            : 'bg-[#235332]/90'
+                        } backdrop-blur-xs">
+                          ${isInactive ? 'غیرفعال (در انتظار تایید)' : toPersianDigits(session.status)}
                         </span>
                         <span class="text-[11.5px] font-semibold bg-[#1E140E]/65 px-2.5 py-1 rounded-lg">
                           ${toPersianDigits(totalCount)} نشست در این دوره
@@ -1031,6 +1074,16 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                           <strong class="text-[#231912] truncate">${toPersianDigits(session.session_date)} · ${toPersianDigits(session.session_time)}</strong>
                         </div>
                       </div>
+
+                      ${
+                        isInactive
+                          ? `
+                        <div class="p-3 rounded-xl bg-[#FFF6E0] border border-[#E3C178] text-[12px] text-[#6E4B0C] leading-[1.75]">
+                          <strong>وضعیت: غیرفعال</strong> — جهت تایید ثبت‌نام تیکت بزنید یا با شماره <span dir="ltr" class="font-bold">۰۲۱-۸۸۹۴۳۲۱۰</span> تماس بگیرید.
+                        </div>
+                      `
+                          : ''
+                      }
                     </div>
                   </div>
 
@@ -1083,6 +1136,8 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       return haystack.includes(query);
     });
 
+    const hasPendingClasses = state.classes.some((c) => c.status === 'غیرفعال');
+
     return `
       <div class="space-y-6">
         <div>
@@ -1093,6 +1148,33 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
             دوره‌ها و کلاس‌های تخصصی ثبت‌نام شده شما در باشگاه کتابخوانی بوک‌میت. با کلیک بر روی هر کارت می‌توانید وارد صفحه کلاس شده و کارت‌های جلسات تعریف شده و برگزار شده را مشاهده کنید.
           </p>
         </div>
+
+        ${
+          enrollmentNoticeBanner || hasPendingClasses
+            ? `
+          <div class="p-4 sm:p-5 rounded-2xl bg-[#FFF6E0] border-2 border-[#E3C178] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="space-y-1">
+              <div class="text-[13.5px] font-bold text-[#6E4B0C]">
+                ${toPersianDigits(
+                  enrollmentNoticeBanner ||
+                    'شما دارای دوره ثبت‌نام‌شده در وضعیت «غیرفعال» (در انتظار تایید مدیر) هستید.'
+                )}
+              </div>
+              <p class="text-[12.5px] text-[#5C4110] font-medium">
+                جهت تایید ثبت‌نام تیکت بزنید یا با شماره <strong dir="ltr" class="font-bold">۰۲۱-۸۸۹۴۳۲۱۰</strong> تماس بگیرید.
+              </p>
+            </div>
+            <button
+              type="button"
+              data-switch-tab="tickets"
+              class="js-switch-tab-btn px-4 py-2 rounded-xl bg-[#7A5411] hover:bg-[#5E3F0A] text-[#FAF5EC] text-[12px] font-semibold shrink-0 cursor-pointer self-start sm:self-auto"
+            >
+              ارسال تیکت تایید ثبت‌نام ←
+            </button>
+          </div>
+        `
+            : ''
+        }
 
         <!-- Search & Filter Bar for Classes List (Item 3) -->
         <div class="p-4 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -1108,6 +1190,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
             ${(
               [
                 { key: 'all', label: 'همه کلاس‌ها' },
+                { key: 'مبتدی', label: 'سطح مبتدی' },
                 { key: 'پیشرفته', label: 'سطح پیشرفته' },
                 { key: 'تخصصی', label: 'سطح تخصصی' },
               ] as const
@@ -1138,11 +1221,14 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                   .map((cls) => {
                     const totalCount = (cls.sub_sessions || []).length;
                     const coverImg = cls.cover_url || '/assets/blog-1.png';
+                    const isInactive = cls.status === 'غیرفعال';
 
                     return `
                 <article
                   data-open-class-id="${cls.id}"
-                  class="js-open-class-card group rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] hover:border-[#8B5A36] hover:shadow-[0_16px_36px_rgba(61,46,34,0.1)] transition-all cursor-pointer overflow-hidden flex flex-col justify-between"
+                  class="js-open-class-card group rounded-2xl bg-[#FAF5EC] border ${
+                    isInactive ? 'border-[#DFBA6F]' : 'border-[#E5D7C5]'
+                  } hover:border-[#8B5A36] hover:shadow-[0_16px_36px_rgba(61,46,34,0.1)] transition-all cursor-pointer overflow-hidden flex flex-col justify-between"
                 >
                   <div>
                     <!-- Class Cover Image -->
@@ -1154,9 +1240,18 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                       />
                       <div class="absolute inset-0 bg-gradient-to-t from-[#1E140E]/70 via-transparent to-transparent"></div>
                       <div class="absolute bottom-3 right-4 left-4 flex items-center justify-between text-[#FAF5EC]">
-                        <span class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-[#5A3A22]/90">
-                          سطح ${toPersianDigits(cls.level_label)}
-                        </span>
+                        <div class="flex items-center gap-1.5">
+                          <span class="px-2.5 py-1 rounded-lg text-[11px] font-semibold ${
+                            isInactive
+                              ? 'bg-[#8A5A10]/95 text-[#FFF8E7]'
+                              : 'bg-[#235332]/90'
+                          }">
+                            ${isInactive ? 'غیرفعال (در انتظار تایید)' : 'فعال'}
+                          </span>
+                          <span class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-[#5A3A22]/90">
+                            سطح ${toPersianDigits(cls.level_label)}
+                          </span>
+                        </div>
                         <span class="text-[11.5px] font-semibold bg-[#1E140E]/65 px-2.5 py-1 rounded-lg">
                           ${toPersianDigits(totalCount)} جلسه آموزشی
                         </span>
@@ -1186,6 +1281,16 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                           <strong class="text-[#231912]">${toPersianDigits(cls.schedule_summary)}</strong>
                         </div>
                       </div>
+
+                      ${
+                        isInactive
+                          ? `
+                        <div class="p-3 rounded-xl bg-[#FFF6E0] border border-[#E3C178] text-[12px] text-[#6E4B0C] leading-[1.75]">
+                          <strong>وضعیت: غیرفعال</strong> — جهت تایید ثبت‌نام تیکت بزنید یا با شماره <span dir="ltr" class="font-bold">۰۲۱-۸۸۹۴۳۲۱۰</span> تماس بگیرید.
+                        </div>
+                      `
+                          : ''
+                      }
                     </div>
                   </div>
 

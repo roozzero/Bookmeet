@@ -161,6 +161,14 @@ export interface SessionSubItem {
   meeting_link?: string;
 }
 
+export interface EnrollmentRecord {
+  id: number;
+  member_phone: string;
+  member_name: string;
+  registered_at: string;
+  status: 'غیرفعال' | 'فعال' | 'لغو شده';
+}
+
 export interface MemberSession {
   id: number;
   member_phone: string;
@@ -178,6 +186,7 @@ export interface MemberSession {
   status: 'فعال' | 'غیرفعال' | 'ثبت‌نام‌شده' | 'برگزارشده' | 'ظرفیت باز';
   member_note: string;
   sub_sessions: SessionSubItem[];
+  enrolled_members?: EnrollmentRecord[];
   sort_order: number;
 }
 
@@ -195,6 +204,7 @@ export interface MemberClassItem {
   status: 'فعال' | 'غیرفعال' | 'ثبت‌نام‌شده' | 'برگزارشده' | string;
   description: string;
   sub_sessions: SessionSubItem[];
+  enrolled_members?: EnrollmentRecord[];
   sort_order: number;
 }
 
