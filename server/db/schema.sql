@@ -1,256 +1,336 @@
--- Bookmeet MySQL Schema (Persian RTL Edition)
-CREATE DATABASE IF NOT EXISTS bookmeet_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE bookmeet_db;
+-- ============================================================================
+-- Bookmeet MySQL Database Schema (XAMPP & cPanel Compatible, UTF-8 / Persian)
+-- ============================================================================
+-- Note: In XAMPP phpMyAdmin, you can either run this file directly or first
+-- select your database (e.g. `bookmeet_db`) and import this file.
+-- ============================================================================
 
-CREATE TABLE IF NOT EXISTS navigation_links (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  label VARCHAR(100) NOT NULL,
-  href VARCHAR(255) NOT NULL,
-  sort_order INT NOT NULL DEFAULT 0,
-  is_active TINYINT(1) NOT NULL DEFAULT 1,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+SET NAMES utf8mb4;
+SET time_zone = '+00:00';
 
-CREATE TABLE IF NOT EXISTS hero_settings (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  headline VARCHAR(255) NOT NULL,
-  subtitle_line_1 VARCHAR(255) NOT NULL,
-  subtitle_line_2 VARCHAR(255) NOT NULL,
-  nav_cta_text VARCHAR(100) NOT NULL,
-  nav_cta_target VARCHAR(255) NOT NULL,
-  hero_image_url VARCHAR(255) NOT NULL,
-  audio_progress_percent INT NOT NULL DEFAULT 100,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+CREATE DATABASE IF NOT EXISTS `bookmeet_db`
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS featured_books (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  title VARCHAR(150) NOT NULL,
-  persian_title VARCHAR(150) NOT NULL,
-  author VARCHAR(150) NOT NULL,
-  publication_year INT NOT NULL,
-  synopsis TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+USE `bookmeet_db`;
 
-CREATE TABLE IF NOT EXISTS about_club (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  section_kicker VARCHAR(120) NOT NULL,
-  title VARCHAR(255) NOT NULL,
-  paragraph_1 TEXT NOT NULL,
-  paragraph_2 TEXT NOT NULL,
-  image_url VARCHAR(255) NOT NULL,
-  image_caption VARCHAR(255) NOT NULL,
-  stat_1_value VARCHAR(50) NOT NULL,
-  stat_1_label VARCHAR(120) NOT NULL,
-  stat_2_value VARCHAR(50) NOT NULL,
-  stat_2_label VARCHAR(120) NOT NULL,
-  stat_3_value VARCHAR(50) NOT NULL,
-  stat_3_label VARCHAR(120) NOT NULL,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+-- 1. Navigation Links
+CREATE TABLE IF NOT EXISTS `navigation_links` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `label` VARCHAR(100) NOT NULL,
+  `href` VARCHAR(255) NOT NULL,
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_nav_sort` (`sort_order`, `is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS about_manager (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  section_kicker VARCHAR(120) NOT NULL,
-  full_name VARCHAR(150) NOT NULL,
-  role_title VARCHAR(200) NOT NULL,
-  bio_paragraph_1 TEXT NOT NULL,
-  bio_paragraph_2 TEXT NOT NULL,
-  quote_text TEXT NOT NULL,
-  image_url VARCHAR(255) NOT NULL,
-  credentials_line VARCHAR(255) NOT NULL,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+-- 2. Homepage Hero Settings
+CREATE TABLE IF NOT EXISTS `hero_settings` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `headline` VARCHAR(255) NOT NULL,
+  `subtitle_line_1` VARCHAR(255) NOT NULL,
+  `subtitle_line_2` VARCHAR(255) NOT NULL,
+  `nav_cta_text` VARCHAR(100) NOT NULL,
+  `nav_cta_target` VARCHAR(255) NOT NULL,
+  `hero_image_url` VARCHAR(255) NOT NULL,
+  `audio_progress_percent` INT NOT NULL DEFAULT 100,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS library_books (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  is_current TINYINT(1) NOT NULL DEFAULT 0,
-  title VARCHAR(150) NOT NULL,
-  original_title VARCHAR(150) NOT NULL,
-  author VARCHAR(150) NOT NULL,
-  translator VARCHAR(150) NOT NULL,
-  category VARCHAR(80) NOT NULL,
-  publication_year INT NOT NULL,
-  pages_count INT NOT NULL,
-  reading_progress_percent INT NOT NULL DEFAULT 0,
-  session_schedule VARCHAR(180) NOT NULL,
-  cover_url VARCHAR(255) NOT NULL,
-  short_description TEXT NOT NULL,
-  sort_order INT NOT NULL DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- 3. Featured Books (Hero Showcase)
+CREATE TABLE IF NOT EXISTS `featured_books` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `title` VARCHAR(150) NOT NULL,
+  `persian_title` VARCHAR(150) NOT NULL,
+  `author` VARCHAR(150) NOT NULL,
+  `publication_year` INT NOT NULL DEFAULT 2000,
+  `synopsis` TEXT NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS blog_posts (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  title VARCHAR(220) NOT NULL,
-  slug VARCHAR(220) NOT NULL DEFAULT '',
-  category VARCHAR(100) NOT NULL,
-  author VARCHAR(150) NOT NULL,
-  published_date VARCHAR(80) NOT NULL,
-  reading_time VARCHAR(60) NOT NULL,
-  cover_url LONGTEXT NOT NULL,
-  excerpt TEXT NOT NULL,
-  full_content LONGTEXT NOT NULL,
-  tags VARCHAR(255) NOT NULL DEFAULT '',
-  status VARCHAR(40) NOT NULL DEFAULT 'منتشر شده',
-  sort_order INT NOT NULL DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- 4. About Club Section Settings
+CREATE TABLE IF NOT EXISTS `about_club` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `section_kicker` VARCHAR(120) NOT NULL,
+  `title` VARCHAR(255) NOT NULL,
+  `paragraph_1` TEXT NOT NULL,
+  `paragraph_2` TEXT NOT NULL,
+  `image_url` VARCHAR(255) NOT NULL,
+  `image_caption` VARCHAR(255) NOT NULL,
+  `stat_1_value` VARCHAR(50) NOT NULL,
+  `stat_1_label` VARCHAR(120) NOT NULL,
+  `stat_2_value` VARCHAR(50) NOT NULL,
+  `stat_2_label` VARCHAR(120) NOT NULL,
+  `stat_3_value` VARCHAR(50) NOT NULL,
+  `stat_3_label` VARCHAR(120) NOT NULL,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS gallery_images (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  title VARCHAR(180) NOT NULL,
-  url LONGTEXT NOT NULL,
-  category VARCHAR(80) NOT NULL DEFAULT 'عمومی',
-  created_at VARCHAR(80) NOT NULL
-);
+-- 5. About Manager Section Settings
+CREATE TABLE IF NOT EXISTS `about_manager` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `section_kicker` VARCHAR(120) NOT NULL,
+  `full_name` VARCHAR(150) NOT NULL,
+  `role_title` VARCHAR(200) NOT NULL,
+  `bio_paragraph_1` TEXT NOT NULL,
+  `bio_paragraph_2` TEXT NOT NULL,
+  `quote_text` TEXT NOT NULL,
+  `image_url` VARCHAR(255) NOT NULL,
+  `credentials_line` VARCHAR(255) NOT NULL,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS contact_info (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  section_kicker VARCHAR(120) NOT NULL,
-  title VARCHAR(255) NOT NULL,
-  description TEXT NOT NULL,
-  address VARCHAR(255) NOT NULL,
-  meeting_hours VARCHAR(180) NOT NULL,
-  email VARCHAR(150) NOT NULL,
-  phone VARCHAR(80) NOT NULL,
-  telegram_handle VARCHAR(100) NOT NULL,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+-- 6. Club Library Books
+CREATE TABLE IF NOT EXISTS `library_books` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `is_current` TINYINT(1) NOT NULL DEFAULT 0,
+  `title` VARCHAR(180) NOT NULL,
+  `original_title` VARCHAR(180) NOT NULL DEFAULT '',
+  `author` VARCHAR(150) NOT NULL,
+  `translator` VARCHAR(150) NOT NULL DEFAULT '',
+  `category` VARCHAR(80) NOT NULL DEFAULT 'کلاسیک',
+  `publication_year` INT NOT NULL DEFAULT 1400,
+  `pages_count` INT NOT NULL DEFAULT 300,
+  `reading_progress_percent` INT NOT NULL DEFAULT 0,
+  `session_schedule` VARCHAR(180) NOT NULL DEFAULT '',
+  `cover_url` LONGTEXT NOT NULL,
+  `short_description` TEXT NOT NULL,
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_library_books_sort` (`sort_order`, `is_current`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS contact_messages (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  full_name VARCHAR(150) NOT NULL,
-  email VARCHAR(150) NOT NULL,
-  subject VARCHAR(200) NOT NULL,
-  message TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- 7. Blog Posts
+CREATE TABLE IF NOT EXISTS `blog_posts` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `title` VARCHAR(220) NOT NULL,
+  `slug` VARCHAR(220) NOT NULL DEFAULT '',
+  `category` VARCHAR(100) NOT NULL DEFAULT 'یادداشت ادبی',
+  `author` VARCHAR(150) NOT NULL,
+  `published_date` VARCHAR(80) NOT NULL,
+  `reading_time` VARCHAR(60) NOT NULL DEFAULT '۵ دقیقه مطالعه',
+  `cover_url` LONGTEXT NOT NULL,
+  `excerpt` TEXT NOT NULL,
+  `full_content` LONGTEXT NOT NULL,
+  `tags` VARCHAR(255) NOT NULL DEFAULT '',
+  `status` VARCHAR(40) NOT NULL DEFAULT 'منتشر شده',
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_blog_sort` (`sort_order`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS club_members (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  first_name VARCHAR(100) NOT NULL,
-  last_name VARCHAR(100) NOT NULL,
-  phone VARCHAR(40) NOT NULL UNIQUE,
-  role VARCHAR(20) NOT NULL DEFAULT 'member',
-  education VARCHAR(120) NOT NULL,
-  favorite_genre VARCHAR(120) NOT NULL DEFAULT 'ادبیات داستانی و رمان کلاسیک',
-  email VARCHAR(150) NOT NULL DEFAULT '',
-  avatar_url LONGTEXT,
-  bio TEXT NOT NULL,
-  membership_code VARCHAR(40) NOT NULL DEFAULT 'BM-۱۴۰۵-۱۰۸',
-  joined_date VARCHAR(60) NOT NULL DEFAULT 'مهر ۱۴۰۵',
-  password_hash VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- 8. Gallery Images
+CREATE TABLE IF NOT EXISTS `gallery_images` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `title` VARCHAR(180) NOT NULL,
+  `url` LONGTEXT NOT NULL,
+  `category` VARCHAR(80) NOT NULL DEFAULT 'عمومی',
+  `created_at` VARCHAR(80) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS user_comments (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  author_name VARCHAR(150) NOT NULL,
-  author_phone VARCHAR(40) NOT NULL DEFAULT '',
-  target_title VARCHAR(220) NOT NULL,
-  target_type VARCHAR(60) NOT NULL DEFAULT 'مقاله وبلاگ',
-  rating INT NOT NULL DEFAULT 5,
-  comment_text TEXT NOT NULL,
-  admin_reply TEXT NOT NULL,
-  status VARCHAR(40) NOT NULL DEFAULT 'تایید شده',
-  created_date VARCHAR(80) NOT NULL,
-  sort_order INT NOT NULL DEFAULT 0
-);
+-- 9. Contact Info Settings
+CREATE TABLE IF NOT EXISTS `contact_info` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `section_kicker` VARCHAR(120) NOT NULL,
+  `title` VARCHAR(255) NOT NULL,
+  `description` TEXT NOT NULL,
+  `address` VARCHAR(255) NOT NULL,
+  `meeting_hours` VARCHAR(180) NOT NULL,
+  `email` VARCHAR(150) NOT NULL,
+  `phone` VARCHAR(80) NOT NULL,
+  `telegram_handle` VARCHAR(100) NOT NULL,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS member_sessions (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  member_phone VARCHAR(40) NOT NULL DEFAULT 'all',
-  title VARCHAR(220) NOT NULL,
-  book_title VARCHAR(180) NOT NULL,
-  book_author VARCHAR(150) NOT NULL DEFAULT '',
-  pages_count INT NOT NULL DEFAULT 350,
-  publisher VARCHAR(150) NOT NULL DEFAULT '',
-  mentor_name VARCHAR(150) NOT NULL,
-  session_date VARCHAR(80) NOT NULL,
-  session_time VARCHAR(80) NOT NULL,
-  cover_url LONGTEXT NOT NULL,
-  status VARCHAR(60) NOT NULL DEFAULT 'فعال',
-  member_note TEXT NOT NULL,
-  sub_sessions_json LONGTEXT NOT NULL,
-  sort_order INT NOT NULL DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- 10. Contact Messages (Submitted via Contact Form)
+CREATE TABLE IF NOT EXISTS `contact_messages` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `full_name` VARCHAR(150) NOT NULL,
+  `email` VARCHAR(150) NOT NULL,
+  `subject` VARCHAR(200) NOT NULL,
+  `message` TEXT NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS member_classes (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  member_phone VARCHAR(40) NOT NULL DEFAULT 'all',
-  title VARCHAR(220) NOT NULL,
-  book_title VARCHAR(180) NOT NULL,
-  instructor_name VARCHAR(150) NOT NULL,
-  schedule_summary VARCHAR(120) NOT NULL,
-  level_label VARCHAR(80) NOT NULL DEFAULT 'پیشرفته',
-  cover_url VARCHAR(255) NOT NULL DEFAULT '/assets/blog-1.png',
-  status VARCHAR(60) NOT NULL,
-  description TEXT NOT NULL,
-  sub_sessions_json LONGTEXT NOT NULL,
-  sort_order INT NOT NULL DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- 11. Club Members & Single Administrator Account
+CREATE TABLE IF NOT EXISTS `club_members` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `first_name` VARCHAR(100) NOT NULL,
+  `last_name` VARCHAR(100) NOT NULL,
+  `phone` VARCHAR(60) NOT NULL,
+  `role` ENUM('member', 'admin') NOT NULL DEFAULT 'member',
+  `status` VARCHAR(40) NOT NULL DEFAULT 'فعال',
+  `education` VARCHAR(120) NOT NULL DEFAULT '',
+  `favorite_genre` VARCHAR(120) NOT NULL DEFAULT 'ادبیات داستانی و رمان کلاسیک',
+  `email` VARCHAR(150) NOT NULL DEFAULT '',
+  `city` VARCHAR(100) NOT NULL DEFAULT 'تهران',
+  `avatar_url` LONGTEXT,
+  `bio` TEXT NOT NULL,
+  `membership_code` VARCHAR(60) NOT NULL DEFAULT '',
+  `joined_date` VARCHAR(60) NOT NULL DEFAULT '',
+  `password_hash` VARCHAR(255) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_club_members_phone` (`phone`),
+  INDEX `idx_club_members_role` (`role`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS member_library (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  member_phone VARCHAR(40) NOT NULL DEFAULT 'all',
-  book_title VARCHAR(180) NOT NULL,
-  author VARCHAR(150) NOT NULL,
-  translator VARCHAR(150) NOT NULL,
-  cover_url VARCHAR(255) NOT NULL,
-  reading_status VARCHAR(60) NOT NULL,
-  progress_percent INT NOT NULL DEFAULT 0,
-  pages_read INT NOT NULL DEFAULT 0,
-  pages_count INT NOT NULL DEFAULT 300,
-  personal_note TEXT NOT NULL,
-  updated_at VARCHAR(80) NOT NULL
-);
+-- 12. Authentication Sessions (Server-Side Verified Tokens)
+CREATE TABLE IF NOT EXISTS `auth_tokens` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `token` VARCHAR(128) NOT NULL,
+  `member_id` INT NOT NULL,
+  `expires_at` DATETIME NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_auth_tokens_token` (`token`),
+  INDEX `idx_auth_tokens_member` (`member_id`),
+  CONSTRAINT `fk_auth_tokens_member`
+    FOREIGN KEY (`member_id`) REFERENCES `club_members` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS member_tickets (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  member_phone VARCHAR(40) NOT NULL DEFAULT 'all',
-  ticket_code VARCHAR(40) NOT NULL,
-  subject VARCHAR(220) NOT NULL,
-  department VARCHAR(100) NOT NULL,
-  priority VARCHAR(40) NOT NULL,
-  status VARCHAR(60) NOT NULL,
-  message TEXT NOT NULL,
-  attachment_name VARCHAR(255) NOT NULL DEFAULT '',
-  admin_reply TEXT NOT NULL,
-  created_at VARCHAR(80) NOT NULL
-);
+-- 13. User Comments (Blog, Courses & Reading Sessions)
+CREATE TABLE IF NOT EXISTS `user_comments` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `author_name` VARCHAR(150) NOT NULL,
+  `author_phone` VARCHAR(60) NOT NULL DEFAULT '',
+  `target_title` VARCHAR(220) NOT NULL,
+  `target_type` VARCHAR(60) NOT NULL DEFAULT 'مقاله وبلاگ',
+  `rating` INT NOT NULL DEFAULT 5,
+  `comment_text` TEXT NOT NULL,
+  `admin_reply` TEXT NOT NULL,
+  `status` VARCHAR(40) NOT NULL DEFAULT 'در انتظار تایید',
+  `created_date` VARCHAR(80) NOT NULL,
+  `sort_order` INT NOT NULL DEFAULT 0,
+  INDEX `idx_user_comments_status` (`status`, `sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS club_calendar_events (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  title VARCHAR(220) NOT NULL,
-  event_type VARCHAR(100) NOT NULL,
-  day_of_month VARCHAR(20) NOT NULL,
-  month_name VARCHAR(60) NOT NULL,
-  weekday_name VARCHAR(60) NOT NULL,
-  time_range VARCHAR(80) NOT NULL,
-  host_name VARCHAR(150) NOT NULL,
-  location_label VARCHAR(180) NOT NULL,
-  capacity_info VARCHAR(100) NOT NULL,
-  description TEXT NOT NULL,
-  is_reserved TINYINT(1) NOT NULL DEFAULT 0,
-  sort_order INT NOT NULL DEFAULT 0
-);
+-- 14. Reading Sessions (دوره‌های هم‌خوانی و نشست‌ها)
+CREATE TABLE IF NOT EXISTS `member_sessions` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `member_phone` VARCHAR(60) NOT NULL DEFAULT 'all',
+  `title` VARCHAR(220) NOT NULL,
+  `book_title` VARCHAR(180) NOT NULL,
+  `book_author` VARCHAR(150) NOT NULL DEFAULT '',
+  `pages_count` INT NOT NULL DEFAULT 300,
+  `publisher` VARCHAR(150) NOT NULL DEFAULT '',
+  `mentor_name` VARCHAR(150) NOT NULL,
+  `session_date` VARCHAR(100) NOT NULL,
+  `session_time` VARCHAR(100) NOT NULL,
+  `cover_url` LONGTEXT NOT NULL,
+  `location_type` VARCHAR(80) NOT NULL DEFAULT 'حضوری و آنلاین',
+  `meeting_link_or_room` VARCHAR(255) NOT NULL DEFAULT '',
+  `status` VARCHAR(60) NOT NULL DEFAULT 'فعال',
+  `member_note` TEXT NOT NULL,
+  `sub_sessions_json` LONGTEXT NOT NULL,
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_member_sessions_sort` (`sort_order`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS club_announcements (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  title VARCHAR(220) NOT NULL,
-  category VARCHAR(80) NOT NULL,
-  published_date VARCHAR(80) NOT NULL,
-  summary TEXT NOT NULL,
-  content TEXT NOT NULL,
-  is_important TINYINT(1) NOT NULL DEFAULT 0,
-  is_read TINYINT(1) NOT NULL DEFAULT 0,
-  sort_order INT NOT NULL DEFAULT 0
-);
+-- 15. Educational Classes & Courses (کلاس‌ها و دوره‌های آموزشی)
+CREATE TABLE IF NOT EXISTS `member_classes` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `member_phone` VARCHAR(60) NOT NULL DEFAULT 'all',
+  `title` VARCHAR(220) NOT NULL,
+  `book_title` VARCHAR(180) NOT NULL DEFAULT '',
+  `instructor_name` VARCHAR(150) NOT NULL,
+  `schedule_summary` VARCHAR(150) NOT NULL,
+  `level_label` VARCHAR(80) NOT NULL DEFAULT 'مبتدی',
+  `cover_url` LONGTEXT NOT NULL,
+  `status` VARCHAR(60) NOT NULL DEFAULT 'فعال',
+  `description` TEXT NOT NULL,
+  `sub_sessions_json` LONGTEXT NOT NULL,
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_member_classes_sort` (`sort_order`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 16. Session & Course Enrollments + Attendance Tracking
+CREATE TABLE IF NOT EXISTS `session_enrollments` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `target_type` ENUM('session', 'class') NOT NULL DEFAULT 'session',
+  `target_id` INT NOT NULL,
+  `member_id` INT DEFAULT NULL,
+  `member_phone` VARCHAR(60) NOT NULL,
+  `member_name` VARCHAR(150) NOT NULL,
+  `status` VARCHAR(40) NOT NULL DEFAULT 'غیرفعال',
+  `attendance_status` VARCHAR(40) NOT NULL DEFAULT 'ثبت‌نام‌شده',
+  `member_note` TEXT,
+  `registered_at` VARCHAR(80) NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_enrollment_target_member` (`target_type`, `target_id`, `member_phone`),
+  INDEX `idx_enrollment_member_phone` (`member_phone`),
+  INDEX `idx_enrollment_target` (`target_type`, `target_id`),
+  CONSTRAINT `fk_enrollment_member`
+    FOREIGN KEY (`member_id`) REFERENCES `club_members` (`id`)
+    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 17. Member Personal Library Books
+CREATE TABLE IF NOT EXISTS `member_library` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `member_phone` VARCHAR(60) NOT NULL,
+  `book_title` VARCHAR(180) NOT NULL,
+  `author` VARCHAR(150) NOT NULL,
+  `translator` VARCHAR(150) NOT NULL DEFAULT '',
+  `cover_url` LONGTEXT NOT NULL,
+  `reading_status` VARCHAR(60) NOT NULL DEFAULT 'در حال مطالعه',
+  `progress_percent` INT NOT NULL DEFAULT 0,
+  `pages_read` INT NOT NULL DEFAULT 0,
+  `pages_count` INT NOT NULL DEFAULT 300,
+  `personal_note` TEXT NOT NULL,
+  `updated_at` VARCHAR(80) NOT NULL,
+  INDEX `idx_member_library_phone` (`member_phone`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 18. Support Tickets
+CREATE TABLE IF NOT EXISTS `member_tickets` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `member_phone` VARCHAR(60) NOT NULL,
+  `ticket_code` VARCHAR(40) NOT NULL,
+  `subject` VARCHAR(220) NOT NULL,
+  `department` VARCHAR(100) NOT NULL,
+  `priority` VARCHAR(40) NOT NULL DEFAULT 'عادی',
+  `status` VARCHAR(60) NOT NULL DEFAULT 'در انتظار بررسی',
+  `message` TEXT NOT NULL,
+  `attachment_name` VARCHAR(255) NOT NULL DEFAULT '',
+  `admin_reply` TEXT NOT NULL,
+  `admin_replies_json` LONGTEXT,
+  `created_at` VARCHAR(80) NOT NULL,
+  INDEX `idx_member_tickets_phone` (`member_phone`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 19. Club Calendar Events & Reservations
+CREATE TABLE IF NOT EXISTS `club_calendar_events` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `title` VARCHAR(220) NOT NULL,
+  `event_type` VARCHAR(100) NOT NULL,
+  `day_of_month` VARCHAR(20) NOT NULL,
+  `month_name` VARCHAR(60) NOT NULL,
+  `weekday_name` VARCHAR(60) NOT NULL,
+  `time_range` VARCHAR(80) NOT NULL,
+  `host_name` VARCHAR(150) NOT NULL,
+  `location_label` VARCHAR(180) NOT NULL,
+  `capacity_info` VARCHAR(100) NOT NULL,
+  `description` TEXT NOT NULL,
+  `is_reserved` TINYINT(1) NOT NULL DEFAULT 0,
+  `reserved_by_phones_json` LONGTEXT,
+  `sort_order` INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 20. Club Announcements
+CREATE TABLE IF NOT EXISTS `club_announcements` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `title` VARCHAR(220) NOT NULL,
+  `category` VARCHAR(80) NOT NULL,
+  `published_date` VARCHAR(80) NOT NULL,
+  `summary` TEXT NOT NULL,
+  `content` TEXT NOT NULL,
+  `is_important` TINYINT(1) NOT NULL DEFAULT 0,
+  `is_read` TINYINT(1) NOT NULL DEFAULT 0,
+  `target_user_phone` VARCHAR(60) DEFAULT NULL,
+  `target_user_name` VARCHAR(150) DEFAULT NULL,
+  `sort_order` INT NOT NULL DEFAULT 0,
+  INDEX `idx_announcements_target` (`target_user_phone`, `sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

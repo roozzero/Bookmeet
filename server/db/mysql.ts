@@ -1,6 +1,8 @@
-import mysql, { Pool } from 'mysql2/promise';
-import fs from 'fs';
-import path from 'path';
+import 'dotenv/config';
+import mysql, { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { DatabaseSync } from 'node:sqlite';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 export interface NavigationLinkRow {
   id: number;
@@ -117,7 +119,8 @@ export interface ClubMemberRow {
   first_name: string;
   last_name: string;
   phone: string;
-  role?: 'member' | 'admin';
+  role: 'member' | 'admin';
+  status: 'فعال' | 'غیرفعال';
   education: string;
   favorite_genre: string;
   email: string;
@@ -126,10 +129,11 @@ export interface ClubMemberRow {
   bio: string;
   membership_code: string;
   joined_date: string;
-  status?: 'فعال' | 'غیرفعال';
   password_hash: string;
   created_at: string;
 }
+
+export type PublicClubMember = Omit<ClubMemberRow, 'password_hash'>;
 
 export interface UserCommentRow {
   id: number;
@@ -166,6 +170,7 @@ export interface EnrollmentRecordRow {
   member_name: string;
   registered_at: string;
   status: 'غیرفعال' | 'فعال' | 'لغو شده';
+  attendance_status?: string;
 }
 
 export interface MemberSessionRow {
@@ -273,1419 +278,767 @@ export interface GalleryImageRow {
   created_at: string;
 }
 
-export interface MySQLStoreSchema {
-  schema_version: number;
-  navigation_links: NavigationLinkRow[];
-  hero_settings: HeroSettingsRow[];
-  featured_books: FeaturedBookRow[];
-  about_club: AboutClubRow[];
-  about_manager: AboutManagerRow[];
-  library_books: LibraryBookRow[];
-  blog_posts: BlogPostRow[];
-  contact_info: ContactInfoRow[];
-  contact_messages: ContactMessageRow[];
-  club_members: ClubMemberRow[];
-  member_sessions: MemberSessionRow[];
-  member_classes: MemberClassRow[];
-  member_library: MemberLibraryRow[];
-  member_tickets: MemberTicketRow[];
-  club_calendar_events: ClubCalendarEventRow[];
-  club_announcements: ClubAnnouncementRow[];
-  user_comments: UserCommentRow[];
-  gallery_images: GalleryImageRow[];
-  custom_tables?: Record<string, Record<string, unknown>[]>;
-}
+const DEFAULT_NAVIGATION_LINKS: NavigationLinkRow[] = [
+  { id: 1, label: 'صفحه اصلی', href: '#home', sort_order: 1, is_active: 1 },
+  { id: 2, label: 'درباره باشگاه', href: '#about-club', sort_order: 2, is_active: 1 },
+  { id: 3, label: 'درباره من', href: '#about-me', sort_order: 3, is_active: 1 },
+  { id: 4, label: 'رویدادها', href: '#events', sort_order: 4, is_active: 1 },
+  { id: 5, label: 'کتابخانه', href: '#library', sort_order: 5, is_active: 1 },
+  { id: 6, label: 'دوره ها', href: '#courses', sort_order: 6, is_active: 1 },
+  { id: 7, label: 'وبلاگ', href: '#blog', sort_order: 7, is_active: 1 },
+  { id: 8, label: 'ارتباط با ما', href: '#contact', sort_order: 8, is_active: 1 },
+];
 
-const CURRENT_SCHEMA_VERSION = 13;
-const STORAGE_FILE = path.resolve(process.cwd(), 'server/db/mysql_data.json');
-
-const SEED_DATA: MySQLStoreSchema = {
-  schema_version: CURRENT_SCHEMA_VERSION,
-  navigation_links: [
-    { id: 1, label: 'صفحه اصلی', href: '#home', sort_order: 1, is_active: 1 },
-    { id: 2, label: 'درباره باشگاه', href: '#about-club', sort_order: 2, is_active: 1 },
-    { id: 3, label: 'درباره من', href: '#about-me', sort_order: 3, is_active: 1 },
-    { id: 4, label: 'رویدادها', href: '#events', sort_order: 4, is_active: 1 },
-    { id: 5, label: 'کتابخانه', href: '#library', sort_order: 5, is_active: 1 },
-    { id: 6, label: 'دوره ها', href: '#courses', sort_order: 6, is_active: 1 },
-    { id: 7, label: 'وبلاگ', href: '#blog', sort_order: 7, is_active: 1 },
-    { id: 8, label: 'ارتباط با ما', href: '#contact', sort_order: 8, is_active: 1 },
-  ],
-  hero_settings: [
-    {
-      id: 1,
-      headline: 'به باشگاه کتابخوانی بوک میت خوش آمدید',
-      subtitle_line_1: 'بعضی جهان‌ها تنها زمانی جان می‌گیرند که از خواندن دست بکشید و به تماشا بنشینید.',
-      subtitle_line_2: 'این روایت‌ها برگرفته از کتاب‌هایی هستند که هرگز ما را رها نکرده‌اند.',
-      nav_cta_text: 'ورود به باشگاه',
-      nav_cta_target: '#login-club',
-      hero_image_url: '/assets/hero-bookshelf.png',
-      audio_progress_percent: 100,
-    },
-  ],
-  featured_books: [
-    {
-      id: 1,
-      title: 'The Little Prince',
-      persian_title: 'شازده کوچولو',
-      author: 'آنتوان دو سنت‌اگزوپری',
-      publication_year: 1943,
-      synopsis: 'نسخه مصور آبرنگ و مرکب از سفر شاعرانه شازده کوچولو در میان سیارک‌ها و گفت‌وگو با روباه.',
-    },
-    {
-      id: 2,
-      title: 'The Alchemist',
-      persian_title: 'کیمیاگر',
-      author: 'پائولو کوئیلو',
-      publication_year: 1988,
-      synopsis: 'روایت مصور سفر سانتیاگو از دشت‌های آندلس تا اهرام مصر در جست‌وجوی افسانه شخصی.',
-    },
-    {
-      id: 3,
-      title: 'Watership Down',
-      persian_title: 'تپه خرگوش‌ها',
-      author: 'ریچارد آدامز',
-      publication_year: 1972,
-      synopsis: 'حکاکی‌های طبیعت‌گرایانه از حماسه مهاجرت و بقای گروهی کوچک در تپه‌های سرسبز برکشایر.',
-    },
-    {
-      id: 4,
-      title: 'The Night Circus',
-      persian_title: 'سیرک شبانه',
-      author: 'ارین مورگنسترن',
-      publication_year: 2011,
-      synopsis: 'تصویرسازی‌های سیاه‌وسفید با رگه‌های سرخ از چادرهای جادویی سیرکی که تنها شب‌ها گشوده می‌شود.',
-    },
-    {
-      id: 5,
-      title: 'The Neverending Story',
-      persian_title: 'داستان بی‌پایان',
-      author: 'میشائیل انده',
-      publication_year: 1979,
-      synopsis: 'چاپ دو رنگ مسی و زمردی با سرلوحه‌های دست‌ساز که خواننده را به سرزمین فانتازیا فرا می‌خواند.',
-    },
-  ],
-  about_club: [
-    {
-      id: 1,
-      section_kicker: '۰۱ · درباره باشگاه کتابخوانی بوک‌میت',
-      title: 'جایی برای زیستن در جهانِ کتاب‌هایی که فراموش نمی‌شوند',
-      paragraph_1:
-        'باشگاه کتابخوانی بوک‌میت با هدف شکل‌دادن به فضایی صمیمی، عمیق و اندیشه‌ورز برای علاقه‌مندان به ادبیات داستانی و آثار ماندگار جهان راه‌اندازی شده است. ما در این باشگاه تنها به ورق زدن صفحه‌ها بسنده نمی‌کنیم؛ بلکه هر کتاب را دریچه‌ای تازه برای گفت‌وگو، کشف لایه‌های پنهان روایت و هم‌نشینی با ذهن‌های کنجکاوی می‌دانیم که دغدغه فهم عمیق‌تر زندگی و هنر داستان‌گویی را دارند.',
-      paragraph_2:
-        'در نشست‌های دوره‌ای و حلقه‌های مطالعاتی بوک‌میت، اعضا گرد هم می‌آیند تا ضمن واکاوی ساختار، شخصیت‌پردازی و درون‌مایه‌های فلسفی آثار برگزیده، تجربه‌های زیسته و برداشت‌های شخصی خود را به اشتراک بگذارند. چه خواننده‌ای حرفه‌ای باشید و چه به‌تازگی قدم در مسیر مطالعه جدی گذاشته باشید، بوک‌میت خانه‌ای الهام‌بخش برای تداوم عادت مطالعه و ساختن خاطراتی مشترک از جهان کتاب‌هاست.',
-      image_url: '/assets/about-club.png',
-      image_caption: 'نشست‌های هم‌خوانی و بررسی نسخه‌های ماندگار ادبی در باشگاه بوک‌میت',
-      stat_1_value: '+۱۲۰',
-      stat_1_label: 'نشست نقد و هم‌خوانی',
-      stat_2_value: '+۸۵۰',
-      stat_2_label: 'عضو فعال باشگاه',
-      stat_3_value: '۴۸',
-      stat_3_label: 'شاهکار ادبی بررسی‌شده',
-    },
-  ],
-  about_manager: [
-    {
-      id: 1,
-      section_kicker: '۰۲ · معرفی مدیر و بنیان‌گذار باشگاه',
-      full_name: 'سهراب رستگار',
-      role_title: 'پژوهشگر ادبیات تطبیقی، منتقد ادبی و بنیان‌گذار باشگاه کتابخوانی بوک‌میت',
-      bio_paragraph_1:
-        'سهراب رستگار بیش از دوازده سال است که در حوزه نقد ادبی، روایت‌شناسی و برگزاری کارگاه‌های تخصصی خوانش خلاق فعالیت می‌کند. او پس از سال‌ها پژوهش در زمینه ادبیات کلاسیک و معاصر جهان، باشگاه کتابخوانی بوک‌میت را با این باور بنیان گذاشت که مطالعه زمانی به تجربه‌ای دگرگون‌کننده بدل می‌شود که در بستر گفت‌وگو و تبادل نگاه‌ها جریان یابد. رویکرد او در هدایت نشست‌ها، پیوند زدن میان نظریه ادبی و تجربه‌های ملموس زندگی روزمره است تا هر خواننده بتواند صدای ویژه خود را در مواجهه با متن بیابد.',
-      bio_paragraph_2:
-        'او تاکنون میزبان دهه‌ها نشست تحلیل رمان، بررسی نسخه‌های مصور شاهکارهای ادبی و گفت‌وگو با مترجمان و نویسندگان برجسته بوده است. دغدغه اصلی او در بوک‌میت، احیای فرهنگ خواندنِ دقیق و آهسته در روزگاری پرشتاب و ایجاد پیوندی پایدار میان دوستداران کتاب است؛ جایی که هر اثر نه یک کالای مصرفی، بلکه جهانی زنده برای کاوش و هم‌اندیشی به شمار می‌آید.',
-      quote_text:
-        '«کتاب‌ها زمانی به راستی آغاز می‌شوند که آخرین صفحه‌شان را می‌بندیم و درباره آنچه در ما دگرگون کرده‌اند با یکدیگر سخن می‌گوییم.»',
-      image_url: '/assets/manager-portrait.png',
-      credentials_line: 'دکتری ادبیات تطبیقی · ۱۲ سال تجربه تسهیل‌گری نشست‌های کتاب · نویسنده و پژوهشگر روایت',
-    },
-  ],
-  library_books: [
-    {
-      id: 1,
-      is_current: 1,
-      title: 'صد سال تنهایی',
-      original_title: 'One Hundred Years of Solitude',
-      author: 'گابریل گارسیا مارکز',
-      translator: 'بهمن فرزانه',
-      category: 'کلاسیک',
-      publication_year: 1967,
-      pages_count: 468,
-      reading_progress_percent: 68,
-      session_schedule: 'نشست بعدی هم‌خوانی: چهارشنبه ساعت ۱۸:۰۰ (فصل‌های ۱۲ تا ۱۵)',
-      cover_url: '/assets/book-current.png',
-      short_description:
-        'حماسه پررمزوراز خاندان بوئندیا در دهکده خیالی ماکوندو؛ اثری بنیادین در سبک رئالیسم جادویی که مرز میان واقعیت، اسطوره، عشق و تنهایی ابدی انسان را با زبانی شاعرانه و تکرارناپذیر روایت می‌کند. در حلقه‌های مطالعاتی این ماه، ساختار دایره‌ای زمان و استعاره‌های تاریخی این شاهکار را فصل‌به‌فصل بررسی می‌کنیم.',
-      sort_order: 1,
-    },
-    {
-      id: 2,
-      is_current: 0,
-      title: 'مرشد و مارگاریتا',
-      original_title: 'The Master and Margarita',
-      author: 'میخائیل بولگاکف',
-      translator: 'عباس میلانی',
-      category: 'کلاسیک',
-      publication_year: 1967,
-      pages_count: 512,
-      reading_progress_percent: 100,
-      session_schedule: 'بررسی‌شده در دوره مهرماه باشگاه',
-      cover_url: '/assets/book-recent-1.png',
-      short_description:
-        'روایتی طنزآمیز، فلسفی و چندلایه از حضور ناگهانی پروفسور ولاند در مسکو دهه ۱۹۳۰ که در هم‌تنیدگی با عشق مرشد و مارگاریتا، تقابل جاودانه خیر، شر و آزادی هنر را به تصویر می‌کشد.',
-      sort_order: 2,
-    },
-    {
-      id: 3,
-      is_current: 0,
-      title: 'کوری',
-      original_title: 'Blindness',
-      author: 'ژوزه ساراماگو',
-      translator: 'مینو مشیری',
-      category: 'معاصر',
-      publication_year: 1995,
-      pages_count: 348,
-      reading_progress_percent: 100,
-      session_schedule: 'بررسی‌شده در دوره شهریورماه باشگاه',
-      cover_url: '/assets/book-recent-2.png',
-      short_description:
-        'تمثیلی تکان‌دهنده از شیوع یک نابینایی سفید در شهری بی‌نام که فروپاشی اخلاقی جامعه و درعین‌حال امید، همدلی و بیداری وجدان انسانی را در تاریک‌ترین لحظات می‌آزماید.',
-      sort_order: 3,
-    },
-    {
-      id: 4,
-      is_current: 0,
-      title: 'بلندی‌های بادگیر',
-      original_title: 'Wuthering Heights',
-      author: 'امیلی برونته',
-      translator: 'رضا رضایی',
-      category: 'کلاسیک',
-      publication_year: 1847,
-      pages_count: 420,
-      reading_progress_percent: 100,
-      session_schedule: 'بررسی‌شده در دوره مردادماه باشگاه',
-      cover_url: '/assets/book-recent-3.png',
-      short_description:
-        'داستانی پرشور و تسخیرکننده در دشت‌های مه‌آلود یورکشایر که پیوند پرتلاطم کاترین و هیت‌کلیف را در قالب ساختار روایی تو در تو و فضاسازی گوتیک واکاوی می‌کند.',
-      sort_order: 4,
-    },
-    {
-      id: 5,
-      is_current: 0,
-      title: 'کافکا در کرانه',
-      original_title: 'Kafka on the Shore',
-      author: 'هاروکی موراکامی',
-      translator: 'مهدی غبرائی',
-      category: 'معاصر',
-      publication_year: 2002,
-      pages_count: 614,
-      reading_progress_percent: 100,
-      session_schedule: 'بررسی‌شده در دوره تیرماه باشگاه',
-      cover_url: '/assets/book-recent-4.png',
-      short_description:
-        'سفری هزارتو و رؤیاگونه در پیوند دو روایت موازی از نوجوانی گریزان از خانه و پیرمردی ساده دل که مرزهای حافظه، موسیقی، تقدیر و ضمیر ناخودآگاه را درمی‌نوردد.',
-      sort_order: 5,
-    },
-  ],
-  blog_posts: [
-    {
-      id: 1,
-      title: 'چگونه خواندنِ آهسته و گروهی درک ما از رمان‌های کلاسیک را دگرگون می‌کند؟',
-      category: 'یادداشت ادبی',
-      author: 'سهراب رستگار',
-      published_date: '۱۲ آبان ۱۴۰۵',
-      reading_time: '۶ دقیقه مطالعه',
-      cover_url: '/assets/blog-1.png',
-      excerpt:
-        'در روزگاری که سرعت مصرف اطلاعات مجال درنگ را از ما گرفته است، خوانش آهسته و گفت‌وگوی گروهی درباره متون کلاسیک به ما می‌آموزد که چگونه میان سطرهای یک رمان زندگی کنیم و جزئیات پنهان معماری روایت را دریابیم.',
-      full_content:
-        'در نشست‌های باشگاه کتابخوانی بوک‌میت بارها تجربه کرده‌ایم که یک متن واحد، در برخورد با ذهن‌های گوناگون، لایه‌هایی تازه و غیرمنتظره از معنا را آشکار می‌سازد. خواندن آهسته به ما اجازه می‌دهد از سطح پیرنگ عبور کنیم و به ضرباهنگ جمله‌ها، استعاره‌های تکرارشونده و سکوت‌های میان دیالوگ‌ها گوش بسپاریم. هنگامی که اعضای باشگاه برداشت‌های خود را از یک فصل مشترک بازگو می‌کنند، کتاب از یک شیء خاموش به میدانی زنده برای تجربه همدلی و تفکر انتقادی تبدیل می‌شود.',
-      sort_order: 1,
-    },
-    {
-      id: 2,
-      title: 'نگاهی به رئالیسم جادویی؛ از تنهایی ماکوندو تا هزارتوهای روایت معاصر',
-      category: 'نقد و بررسی',
-      author: 'نیلوفر فرهادی',
-      published_date: '۵ آبان ۱۴۰۵',
-      reading_time: '۸ دقیقه مطالعه',
-      cover_url: '/assets/blog-2.png',
-      excerpt:
-        'رئالیسم جادویی صرفاً ترفندی فانتزی برای گریز از واقعیت نیست؛ بلکه شیوه‌ای اصیل برای نگریستن به تاریخ، حافظه جمعی و شگفتی‌های نهفته در زندگی روزمره مردمانی است که اسطوره و واقعیت را هم‌زمان زیسته اند.',
-      full_content:
-        'هنگامی که گابریل گارسیا مارکز در «صد سال تنهایی» از رویدادهای خارق‌العاده با لحنی کاملاً عادی و روزمره سخن می‌گوید، مرز سنتی میان باورپذیری و خیال را جابه‌جا می‌کند. در حلقه مطالعاتی این ماه بررسی کردیم که چگونه این شگرد روایی به نویسندگان آمریکای لاتین و سپس ادبیات معاصر جهان امکان داد تا زخم‌های تاریخی، فراموشی جمعی و تنهایی انسان مدرن را در قاب تصاویری فراموش‌نشدنی ثبت کنند.',
-      sort_order: 2,
-    },
-    {
-      id: 3,
-      title: 'راهنمای نوشتن حاشیه‌نویسی و یادداشت‌برداری خلاق هنگام مطالعه رمان',
-      category: 'کارگاه خوانش',
-      author: 'آرمان کاظمی',
-      published_date: '۲۷ مهر ۱۴۰۵',
-      reading_time: '۵ دقیقه مطالعه',
-      cover_url: '/assets/blog-3.png',
-      excerpt:
-        'گفت‌وگو با کتاب از لحظه‌ای آغاز می‌شود که مداد را در دست می‌گیرید و پرسش‌ها، تردیدها و تداعی‌های شخصی خود را در حاشیه صفحه‌ها یا دفترچه یادداشت‌های روزانه ثبت می‌کنید.',
-      full_content:
-        'بسیاری از خوانندگان پس از پایان یک رمان حجیم احساس می‌کنند بخش بزرگی از ظرایف اثر از یادشان رفته است. روش پیشنهادی ما در باشگاه بوک‌میت، ثبت سه محور کلیدی در پایان هر فصل است: نخست، یک جمله یا تصویر تکان‌دهنده؛ دوم، دگرگونی انگیزه شخصیت‌ها؛ و سوم، پرسشی که متن در ذهن ما بی‌پاسخ رها کرده است. این یادداشت‌های کوتاه، بهترین توشه برای مشارکت فعال در نشست‌های هفتگی نقد و بررسی هستند.',
-      sort_order: 3,
-    },
-  ],
-  contact_info: [
-    {
-      id: 1,
-      section_kicker: '۰۵ · ارتباط با ما و عضویت در حلقه‌های مطالعاتی',
-      title: 'صدای شما، آغازگر گفت‌وگوهای تازه در باشگاه بوک‌میت است',
-      description:
-        'اگر درباره شیوه برگزاری نشست‌های هفتگی، پیشنهاد کتاب برای دوره‌های آینده، همکاری در نگارش جستارهای وبلاگ یا عضویت در حلقه‌های مطالعاتی بوک‌میت پرسشی دارید، پیام خود را برای ما ارسال کنید. دبیرخانه باشگاه در کوتاه‌ترین زمان پاسخگوی شما خواهد بود.',
-      address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات بوک‌میت، پلاک ۴۲',
-      meeting_hours: 'نشست‌های حضوری: چهارشنبه‌ها ساعت ۱۸ تا ۲۰ · نشست‌های برخط: جمعه‌ها ساعت ۱۹',
-      email: 'hello@bookmeet.ir',
-      phone: '۰۲۱-۸۸۹۴۳۲۱۰',
-      telegram_handle: '@BookmeetClub',
-    },
-  ],
-  contact_messages: [],
-  club_members: [
-    {
-      id: 1,
-      first_name: 'پرنیا',
-      last_name: 'فرهمند',
-      phone: '۰۹۱۲۳۴۵۶۷۸۹',
-      role: 'member',
-      education: 'کارشناسی ارشد',
-      favorite_genre: 'ادبیات داستانی و رمان کلاسیک',
-      email: 'parnia.farahmand@bookmeet.ir',
-      city: 'تهران',
-      avatar_url: '',
-      bio: 'علاقه‌مند به ادبیات کلاسیک جهان، رئالیسم جادویی آمریکای لاتین و روایت‌شناسی تطبیقی. از مهرماه ۱۴۰۴ در حلقه‌های مطالعاتی هفتگی باشگاه کتابخوانی بوک‌میت حضور دارم و یادداشت‌های تحلیلی درباره ساختار زمان در رمان‌های مدرن می‌نویسم.',
-      membership_code: 'BM-۱۴۰۵-۱۰۸',
-      joined_date: '۱۲ مهر ۱۴۰۴',
-      password_hash: '1234',
-      created_at: '2026-10-04T10:00:00.000Z',
-    },
-    {
-      id: 2,
-      first_name: 'سهراب',
-      last_name: 'رستگار',
-      phone: 'admin',
-      role: 'admin',
-      education: 'دکتری',
-      favorite_genre: 'ادبیات تطبیقی و نقد ادبی',
-      email: 'admin@bookmeet.ir',
-      city: 'تهران',
-      avatar_url: '/assets/manager-portrait.png',
-      bio: 'پژوهشگر ادبیات تطبیقی، منتقد ادبی و مدیر و بنیان‌گذار باشگاه کتابخوانی بوک‌میت.',
-      membership_code: 'BM-ADMIN-۰۰۱',
-      joined_date: '۱ فروردین ۱۴۰۲',
-      password_hash: 'admin1234',
-      created_at: '2023-03-21T10:00:00.000Z',
-    },
-    {
-      id: 3,
-      first_name: 'کیانوش',
-      last_name: 'معتمدی',
-      phone: '۰۹۱۲۱۱۱۲۲۳۳',
-      role: 'member',
-      education: 'دکتری',
-      favorite_genre: 'فلسفه و ادبیات اگزیستانسیال',
-      email: 'kianoosh.m@bookmeet.ir',
-      city: 'تهران',
-      avatar_url: '',
-      bio: 'پژوهشگر فلسفه هنر و عضو حلقه‌های نقد رمان کلاسیک و معاصر در باشگاه بوک‌میت.',
-      membership_code: 'BM-۱۴۰۵-۱۱۴',
-      joined_date: '۲۰ مهر ۱۴۰۴',
-      password_hash: '1234',
-      created_at: '2026-10-12T10:00:00.000Z',
-    },
-    {
-      id: 4,
-      first_name: 'مهسا',
-      last_name: 'تاجیک',
-      phone: '۰۹۳۵۴۴۴۵۵۶۶',
-      role: 'member',
-      education: 'کارشناسی',
-      favorite_genre: 'ادبیات مدرن و داستان کوتاه',
-      email: 'mahsa.tajik@bookmeet.ir',
-      city: 'اصفهان',
-      avatar_url: '',
-      bio: 'علاقه‌مند به حاشیه‌نویسی خلاق و مطالعه گروهی آثار قرن بیستم.',
-      membership_code: 'BM-۱۴۰۵-۱۲۹',
-      joined_date: '۳ آبان ۱۴۰۵',
-      password_hash: '1234',
-      created_at: '2026-10-25T10:00:00.000Z',
-    },
-  ],
-  member_sessions: [
-    {
-      id: 1,
-      member_phone: 'all',
-      title: 'حلقه هم‌خوانی و تحلیل ساختار زمان در «صد سال تنهایی»',
-      book_title: 'صد سال تنهایی',
-      book_author: 'گابریل گارسیا مارکز',
-      pages_count: 468,
-      publisher: 'نشر نیلوفر',
-      mentor_name: 'دکتر سهراب رستگار',
-      session_date: 'چهارشنبه‌ها · آبان ۱۴۰۵',
-      session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-      cover_url: '/assets/book-current.png',
-      location_type: 'آنلاین',
-      meeting_link_or_room: 'تالار فردوسی خانه بوک‌میت',
-      status: 'فعال',
-      member_note: 'بررسی تکرار نام‌های اورلیانو و خوزه آرکادیو و ارتباط آن با مفهوم تنهایی ابدی در ماکوندو.',
-      sub_sessions: [
-        {
-          id: 101,
-          session_number: 'جلسه اول',
-          title: 'پیدایش ماکوندو و کیمیاگری ملکیادس',
-          status: 'برگزار شده',
-          session_date: '۲۵ مهر ۱۴۰۵',
-          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
-          cover_url: '/assets/book-current.png',
-          pages_read: 115,
-          pages_to_read: 'صفحات ۱ تا ۱۱۵',
-          reviewed_topics: 'تحلیل فصل‌های اول تا سوم، بررسی زاویه دید دانای کل، ورود کولی‌ها به دهکده ماکوندو و نقش نمادین یخ در آغاز رمان.',
-          session_notes: 'در این نشست مشخص شد که مارکز با لحنی خونسرد و روزمره، شگفت‌انگیزترین رخدادها را روایت می‌کند تا مرز خیال و واقعیت در ذهن خواننده رنگ ببازد.',
-          meeting_link: 'https://meet.bookmeet.ir/macondo-s1',
-        },
-        {
-          id: 102,
-          session_number: 'جلسه دوم',
-          title: 'بیماری بی‌خوابی و فراموشی جمعی در ماکوندو',
-          status: 'برگزار شده',
-          session_date: '۲ آبان ۱۴۰۵',
-          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
-          cover_url: '/assets/blog-2.png',
-          pages_read: 110,
-          pages_to_read: 'صفحات ۱۱۶ تا ۲۲۵',
-          reviewed_topics: 'واکاوی استعاره طاعون بی‌خوابی، برچسب‌گذاری اشیاء توسط خوزه آرکادیو بوئندیا و پیوند میان زبان، حافظه و تاریخ.',
-          session_notes: 'فراموشی در ماکوندو تنها یک رخداد داستانی نیست؛ بلکه استعاره‌ای از فراموشی تاریخی ملت‌هاست که تنها با نوشتن و ثبت کلمات درمان می‌شود.',
-          meeting_link: 'https://meet.bookmeet.ir/macondo-s2',
-        },
-        {
-          id: 103,
-          session_number: 'جلسه سوم',
-          title: 'جنگ‌های داخلی سرهنگ اورلیانو بوئندیا',
-          status: 'برگزار شده',
-          session_date: '۹ آبان ۱۴۰۵',
-          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
-          cover_url: '/assets/book-current.png',
-          pages_read: 93,
-          pages_to_read: 'صفحات ۲۲۶ تا ۳۱۸',
-          reviewed_topics: 'بررسی دگردیسی شخصیت سرهنگ اورلیانو در چرخه قدرت، ساختن و ذوب کردن ماهی‌های طلایی و تنهایی ناشی از قدرت.',
-          session_notes: 'تکرار ساختن ماهی‌های طلایی نماد دور باطل زمان و پناه بردن انسان تنها به کارهای تکرارشونده برای گریز از هجوم خاطرات است.',
-          meeting_link: 'https://meet.bookmeet.ir/macondo-s3',
-        },
-        {
-          id: 104,
-          session_number: 'جلسه چهارم',
-          title: 'ورود شرکت موز و باران‌های چهارساله',
-          status: 'تعریف شده',
-          session_date: '۱۶ آبان ۱۴۰۵',
-          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
-          cover_url: '/assets/blog-2.png',
-          pages_read: 0,
-          pages_to_read: 'صفحات ۳۱۹ تا ۳۹۵ (فصل‌های ۱۲ تا ۱۵)',
-          reviewed_topics: '',
-          session_notes: '',
-          meeting_link: 'https://meet.bookmeet.ir/macondo-s4',
-        },
-        {
-          id: 105,
-          session_number: 'جلسه پنجم',
-          title: 'رمزگشایی از دست‌نوشته‌های ملکیادس و پایان ماکوندو',
-          status: 'تعریف شده',
-          session_date: '۲۳ آبان ۱۴۰۵',
-          session_time: '۱۸:۰۰ تا ۲۰:۳۰',
-          cover_url: '/assets/book-current.png',
-          pages_read: 0,
-          pages_to_read: 'صفحات ۳۹۶ تا ۴۶۸ (فصل‌های ۱۶ تا پایان کتاب)',
-          reviewed_topics: '',
-          session_notes: '',
-          meeting_link: 'https://meet.bookmeet.ir/macondo-s5',
-        },
-      ],
-      sort_order: 1,
-    },
-    {
-      id: 2,
-      member_phone: 'all',
-      title: 'کارگاه تخصصی حاشیه‌نویسی و خوانش خلاق رمان',
-      book_title: 'هنر داستان‌نویسی و روایت‌شناسی کاربردی',
-      book_author: 'ای. ام. فورستر',
-      pages_count: 250,
-      publisher: 'نشر چشمه',
-      mentor_name: 'آرمان کاظمی',
-      session_date: 'جمعه‌ها · آبان ۱۴۰۵',
-      session_time: 'ساعت ۱۹:۰۰ تا ۲۰:۳۰',
-      cover_url: '/assets/blog-3.png',
-      location_type: 'آنلاین',
-      meeting_link_or_room: 'اتاق مجازی شماره ۲ باشگاه بوک‌میت',
-      status: 'فعال',
-      member_note: 'آماده‌سازی سه پرسش کلیدی از فصل آخر کتاب برای طرح در گروه هم‌خوانی.',
-      sub_sessions: [
-        {
-          id: 201,
-          session_number: 'جلسه اول',
-          title: 'معماری پیرنگ و کشف گره‌های پنهان روایت',
-          status: 'برگزار شده',
-          session_date: '۴ آبان ۱۴۰۵',
-          session_time: '۱۹:۰۰ تا ۲۰:۳۰',
-          cover_url: '/assets/blog-3.png',
-          pages_read: 85,
-          pages_to_read: 'صفحات ۱ تا ۸۵',
-          reviewed_topics: 'بررسی تفاوت داستان و پیرنگ از دیدگاه فورستر، تحلیل آغازبندی رمان‌های کلاسیک و شیوه ثبت کدهای نمادین در حاشیه کتاب.',
-          session_notes: 'در حاشیه‌نویسی خلاق، به جای خلاصه‌نویسی خطی باید به دنبال الگوهای تکرارشونده، تضادهای شخصیتی و سکوت‌های معنادار راوی گشت.',
-          meeting_link: 'https://meet.bookmeet.ir/creative-reading-1',
-        },
-        {
-          id: 202,
-          session_number: 'جلسه دوم',
-          title: 'ترسیم نقشه شخصیت‌ها و تحلیل دیالوگ‌ها',
-          status: 'برگزار شده',
-          session_date: '۱۱ آبان ۱۴۰۵',
-          session_time: '۱۹:۰۰ تا ۲۰:۳۰',
-          cover_url: '/assets/blog-1.png',
-          pages_read: 90,
-          pages_to_read: 'صفحات ۸۶ تا ۱۷۵',
-          reviewed_topics: 'کالبدشکافی دیالوگ‌های چندصدایی، بررسی انگیزه‌های ناخودآگاه قهرمان داستان و تمرین نگارش یادداشت‌های ۵۰۰ کلمه‌ای.',
-          session_notes: 'هر شخصیت بزرگ ادبی با یک تناقض درونی زنده می‌شود؛ ثبت لحظات تصمیم‌گیری شخصیت در دفترچه خوانش، کلید فهم تحول اوست.',
-          meeting_link: 'https://meet.bookmeet.ir/creative-reading-2',
-        },
-        {
-          id: 203,
-          session_number: 'جلسه سوم',
-          title: 'پیوند نظریه روایت با تجربه زیسته خواننده',
-          status: 'تعریف شده',
-          session_date: '۱۸ آبان ۱۴۰۵',
-          session_time: '۱۹:۰۰ تا ۲۰:۳۰',
-          cover_url: '/assets/blog-3.png',
-          pages_read: 0,
-          pages_to_read: 'صفحات ۱۷۶ تا ۲۵۰ (فصل‌های ۵ و ۶)',
-          reviewed_topics: '',
-          session_notes: '',
-          meeting_link: 'https://meet.bookmeet.ir/creative-reading-3',
-        },
-      ],
-      sort_order: 2,
-    },
-    {
-      id: 3,
-      member_phone: 'all',
-      title: 'دوره نقد تطبیقی طنز فلسفی در «مرشد و مارگاریتا»',
-      book_title: 'مرشد و مارگاریتا',
-      book_author: 'میخائیل بولگاکف',
-      pages_count: 512,
-      publisher: 'نشر فرهنگ نشر نو',
-      mentor_name: 'دکتر سهراب رستگار',
-      session_date: 'مهرماه ۱۴۰۵',
-      session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-      cover_url: '/assets/book-recent-1.png',
-      location_type: 'آنلاین',
-      meeting_link_or_room: 'تالار فردوسی خانه بوک‌میت',
-      status: 'غیرفعال',
-      member_note: 'تحلیل شخصیت پروفسور ولاند و نسبت آزادی هنر با حقیقت در دست‌نوشته‌های مرشد بسیار راهگشا بود.',
-      sub_sessions: [
-        {
-          id: 301,
-          session_number: 'جلسه اول',
-          title: 'حضور پروفسور ولاند در پارک پاتریارخ مسکو',
-          status: 'برگزار شده',
-          session_date: '۹ مهر ۱۴۰۵',
-          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
-          cover_url: '/assets/book-recent-1.png',
-          pages_read: 170,
-          pages_to_read: 'صفحات ۱ تا ۱۷۰',
-          reviewed_topics: 'مباحثه برلیوز و ایوان بی‌خانمان با ولاند، آغاز روایت موازی پونتیوس پیلاتوس در اورشلیم و ساختار رمان در رمان.',
-          session_notes: 'بولگاکف با ترکیب گروتسک و تاریخ، نشان می‌دهد که انکار امر متعالی در جامعه بوروکراتیک دهه ۱۹۳۰ چه پیامدهای طنزآمیزی به دنبال دارد.',
-          meeting_link: 'https://meet.bookmeet.ir/bulgakov-s1',
-        },
-        {
-          id: 302,
-          session_number: 'جلسه دوم',
-          title: 'دست‌نوشته‌ها نمی‌سوزند؛ عشق مرشد و مارگاریتا',
-          status: 'برگزار شده',
-          session_date: '۲۳ مهر ۱۴۰۵',
-          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
-          cover_url: '/assets/book-recent-1.png',
-          pages_read: 342,
-          pages_to_read: 'صفحات ۱۷۱ تا ۵۱۲',
-          reviewed_topics: 'ورود شخصیت مارگاریتا، جشن بزرگ بهار، رهایی مرشد و جاودانگی اثر هنری در برابر سانسور و ترس.',
-          session_notes: 'جمله کلیدی «دست‌نوشته‌ها نمی‌سوزند» عصاره فلسفی اثر است که اصالت حقیقت هنری را فراتر از زمان و قدرت سیاسی قرار می‌دهد.',
-          meeting_link: 'https://meet.bookmeet.ir/bulgakov-s2',
-        },
-      ],
-      sort_order: 3,
-    },
-    {
-      id: 4,
-      member_phone: 'all',
-      title: 'حلقه گفت‌وگو درباره تمثیل اخلاقی در رمان «کوری»',
-      book_title: 'کوری',
-      book_author: 'ژوزه ساراماگو',
-      pages_count: 348,
-      publisher: 'نشر علم',
-      mentor_name: 'نیلوفر فرهادی',
-      session_date: 'شهریور و آبان ۱۴۰۵',
-      session_time: 'ساعت ۱۸:۰۰ تا ۱۹:۴۵',
-      cover_url: '/assets/book-recent-2.png',
-      location_type: 'آنلاین',
-      meeting_link_or_room: 'اتاق مجازی شماره ۱ باشگاه بوک‌میت',
-      status: 'فعال',
-      member_note: 'بررسی فرم نقطه‌گذاری و دیالوگ‌های پیوسته ساراماگو که حس سرگشتگی شخصیت‌ها را به خواننده منتقل می‌کند.',
-      sub_sessions: [
-        {
-          id: 401,
-          session_number: 'جلسه اول',
-          title: 'شیوع نابینایی سفید و قرنطینه نخستین گروه',
-          status: 'برگزار شده',
-          session_date: '۱۸ شهریور ۱۴۰۵',
-          session_time: '۱۸:۰۰ تا ۱۹:۴۵',
-          cover_url: '/assets/book-recent-2.png',
-          pages_read: 180,
-          pages_to_read: 'صفحات ۱ تا ۱۸۰',
-          reviewed_topics: 'بررسی حذف نام شخصیت‌ها در رمان، فرم خاص جمله‌بندی ساراماگو و نقش همسر دکتر به عنوان تنها شاهد بینا.',
-          session_notes: 'حذف نام‌های خاص و جایگزینی آن‌ها با توصیف‌ها (همسر دکتر، پیرمرد با چشم‌بند سیاه) به اثر بعدی جهان‌شمول و اسطوره‌ای بخشیده است.',
-          meeting_link: 'https://meet.bookmeet.ir/blindness-s1',
-        },
-        {
-          id: 402,
-          session_number: 'جلسه دوم',
-          title: 'بازگشت به شهر و بازتعریف همدلی انسانی',
-          status: 'تعریف شده',
-          session_date: '۲۵ آبان ۱۴۰۵',
-          session_time: '۱۸:۰۰ تا ۱۹:۴۵',
-          cover_url: '/assets/book-recent-2.png',
-          pages_read: 0,
-          pages_to_read: 'صفحات ۱۸۱ تا ۳۴۸ (بخش پایانی کتاب)',
-          reviewed_topics: '',
-          session_notes: '',
-          meeting_link: 'https://meet.bookmeet.ir/blindness-s2',
-        },
-      ],
-      sort_order: 4,
-    },
-  ],
-  member_classes: [
-    {
-      id: 1,
-      member_phone: 'all',
-      title: 'کلاس جامع تاریخ تحلیلی رمان مدرن و پست‌مدرن جهان در قرن بیستم',
-      book_title: 'از پروست و جویس تا کالوینو و مارکز',
-      instructor_name: 'دکتر سهراب رستگار',
-      schedule_summary: 'دوشنبه‌ها · ساعت ۱۷:۳۰ تا ۱۹:۳۰',
-      level_label: 'پیشرفته',
-      cover_url: '/assets/blog-1.png',
-      status: 'فعال',
-      description: 'در این کلاس تخصصی، دگرگونی ساختار روایت، زمان روان‌شناختی، تک‌گویی درونی و تکنیک‌های فراروایت در شاهکارهای ادبیات داستانی قرن بیستم به صورت متن‌محور کالبدشکافی می‌شود.',
-      sub_sessions: [
-        {
-          id: 501,
-          session_number: 'جلسه اول',
-          title: 'جریان سیال ذهن و زمان درونی در آثار ویرجینیا وولف',
-          status: 'برگزار شده',
-          session_date: '۷ آبان ۱۴۰۵',
-          session_time: '۱۷:۳۰ تا ۱۹:۳۰',
-          cover_url: '/assets/blog-1.png',
-          pages_read: 95,
-          pages_to_read: 'صفحات ۱ تا ۹۵ کتاب «به سوی فانوس دریایی»',
-          reviewed_topics: 'تفاوت زمان ساعت‌شمار با زمان روان‌شناختی برگسون، تحلیل تک‌گویی‌های درونی خانم رمزی و تکنیک پرش میان زاویه دیدها.',
-          session_notes: 'در رمان مدرن، حادثه بیرونی جای خود را به بازتاب آن حادثه در آگاهی و حافظه شخصیت‌ها می‌دهد.',
-          meeting_link: 'https://meet.bookmeet.ir/modern-novel-c1',
-        },
-        {
-          id: 502,
-          session_number: 'جلسه دوم',
-          title: 'هزارتوی فراروایت در آثار ایتالو کالوینو',
-          status: 'تعریف شده',
-          session_date: '۲۱ آبان ۱۴۰۵',
-          session_time: '۱۷:۳۰ تا ۱۹:۳۰',
-          cover_url: '/assets/book-recent-3.png',
-          pages_read: 0,
-          pages_to_read: 'صفحات ۱ تا ۱۲۰ کتاب «اگر شبی از شب‌های زمستان مسافری»',
-          reviewed_topics: '',
-          session_notes: '',
-          meeting_link: 'https://meet.bookmeet.ir/modern-novel-c2',
-        },
-      ],
-      sort_order: 1,
-    },
-    {
-      id: 2,
-      member_phone: 'all',
-      title: 'کلاس فلسفه و ادبیات؛ کاوش مفاهیم اگزیستانسیال و اخلاق در رمان‌های بزرگ',
-      book_title: 'داستایفسکی، کامو و سارتر',
-      instructor_name: 'نیلوفر فرهادی',
-      schedule_summary: 'شنبه‌ها · ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-      level_label: 'تخصصی',
-      cover_url: '/assets/blog-2.png',
-      status: 'فعال',
-      description: 'بررسی تطبیقی مفاهیم آزادی، دلهره، انتخاب اخلاقی و مسئولیت انسان در برابر دیگری از رهگذر خوانش دقیق فصول کلیدی آثار داستایفسکی، آلبر کامو و ژان پل سارتر.',
-      sub_sessions: [
-        {
-          id: 601,
-          session_number: 'جلسه اول',
-          title: 'آزادی و عصیان در «بیگانه» و «طاعون» آلبر کامو',
-          status: 'برگزار شده',
-          session_date: '۵ آبان ۱۴۰۵',
-          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
-          cover_url: '/assets/blog-2.png',
-          pages_read: 130,
-          pages_to_read: 'صفحات ۱ تا ۱۳۰ متن کامل رمان «بیگانه»',
-          reviewed_topics: 'واکاوی شخصیت مورسو در مواجهه با پوچی، گذار از فردگرایی بیگانه به همبستگی اخلاقی دکتر ریو در رمان طاعون.',
-          session_notes: 'کامو در گذار از بیگانه به طاعون نشان می‌دهد که پاسخ اصیل انسان به رنج جمعی، همدلی و مسئولیت‌پذیری بی‌چشمداشت است.',
-          meeting_link: 'https://meet.bookmeet.ir/philo-lit-c1',
-        },
-        {
-          id: 602,
-          session_number: 'جلسه دوم',
-          title: 'چندصدایی و جدال ایده‌ها در «برادران کارامازوف»',
-          status: 'تعریف شده',
-          session_date: '۱۹ آبان ۱۴۰۵',
-          session_time: '۱۸:۰۰ تا ۲۰:۰۰',
-          cover_url: '/assets/book-recent-4.png',
-          pages_read: 0,
-          pages_to_read: 'صفحات ۲۱۰ تا ۳۴۰ (فصل مفتش بزرگ)',
-          reviewed_topics: '',
-          session_notes: '',
-          meeting_link: 'https://meet.bookmeet.ir/philo-lit-c2',
-        },
-      ],
-      enrolled_members: [
-        {
-          id: 9101,
-          member_phone: '۰۹۱۲۳۴۵۶۷۸۹',
-          member_name: 'پرنیا فرهمند',
-          registered_at: '۵ آبان ۱۴۰۵',
-          status: 'فعال',
-        },
-        {
-          id: 9102,
-          member_phone: '۰۹۱۲۱۱۱۲۲۳۳',
-          member_name: 'کیانوش معتمدی',
-          registered_at: '۶ آبان ۱۴۰۵',
-          status: 'فعال',
-        },
-        {
-          id: 9103,
-          member_phone: '۰۹۳۵۴۴۴۵۵۶۶',
-          member_name: 'مهسا تاجیک',
-          registered_at: '۱۴ آبان ۱۴۰۵',
-          status: 'غیرفعال',
-        },
-      ],
-      sort_order: 2,
-    },
-    {
-      id: 3,
-      member_phone: 'all',
-      title: 'دوره آموزش زبان روسی — سطح پایه و مقدماتی (A1–A2)',
-      book_title: 'الفبای سیریلیک، آواشناسی و مکالمات پایه روسی',
-      instructor_name: 'دکتر آناستازیا رادین و سهراب رستگار',
-      schedule_summary: 'یکشنبه‌ها و سه‌شنبه‌ها · ساعت ۱۷:۳۰ تا ۱۹:۰۰',
-      level_label: 'مبتدی',
-      cover_url: '/assets/blog-1.png',
-      status: 'فعال',
-      description: 'آشنایی گام‌به‌گام با الفبای سیریلیک، اصول آواشناسی و تلفظ معیار روسی، ساخت جملات پایه، مکالمات روزمره و درک ساختارهای بنیادین دستور زبان روسی برای علاقه‌مندان به فرهنگ و ادبیات روسیه.',
-      sub_sessions: [
-        {
-          id: 701,
-          session_number: 'جلسه اول',
-          title: 'الفبای سیریلیک، واکه‌ها و قوانین تکیه در زبان روسی',
-          status: 'برگزار شده',
-          session_date: '۶ آبان ۱۴۰۵',
-          session_time: '۱۷:۳۰ تا ۱۹:۰۰',
-          cover_url: '/assets/blog-1.png',
-          pages_read: 28,
-          pages_to_read: 'درس اول و دوم کتاب «راه روسیه» (Дорога в Россию)',
-          reviewed_topics: 'آموزش ۳۳ حرف الفبای سیریلیک، تفاوت تلفظ حروف صدادار تکیه‌دار و بی‌تکیه و احوال‌پرسی رسمی و غیررسمی در زبان روسی.',
-          session_notes: 'تشخیص جایگاه تکیه (Ударение) در واژگان روسی کلید اصلی تلفظ صحیح و طبیعی است.',
-          meeting_link: 'https://meet.bookmeet.ir/russian-a1-s1',
-        },
-        {
-          id: 702,
-          session_number: 'جلسه دوم',
-          title: 'جنسیت اسم‌ها، ضمایر شخصی و ساخت جملات معرفی در روسی',
-          status: 'تعریف شده',
-          session_date: '۲۰ آبان ۱۴۰۵',
-          session_time: '۱۷:۳۰ تا ۱۹:۰۰',
-          cover_url: '/assets/blog-1.png',
-          pages_read: 0,
-          pages_to_read: 'درس سوم و چهارم کتاب «راه روسیه» (صفحات ۲۹ تا ۵۶)',
-          reviewed_topics: '',
-          session_notes: '',
-          meeting_link: 'https://meet.bookmeet.ir/russian-a1-s2',
-        },
-      ],
-      enrolled_members: [
-        {
-          id: 9201,
-          member_phone: '۰۹۱۲۱۱۱۲۲۳۳',
-          member_name: 'کیانوش معتمدی',
-          registered_at: '۱۰ آبان ۱۴۰۵',
-          status: 'فعال',
-        },
-        {
-          id: 9202,
-          member_phone: '۰۹۳۵۴۴۴۵۵۶۶',
-          member_name: 'مهسا تاجیک',
-          registered_at: '۱۴ آبان ۱۴۰۵',
-          status: 'غیرفعال',
-        },
-      ],
-      sort_order: 3,
-    },
-    {
-      id: 4,
-      member_phone: 'all',
-      title: 'دوره مکالمه و دستور زبان روسی — سطح متوسطه (B1–B2)',
-      book_title: 'حالت‌های اسمی (پادِژها)، افعال حرکتی و داستان‌های کوتاه معاصر',
-      instructor_name: 'دکتر آناستازیا رادین',
-      schedule_summary: 'دوشنبه‌ها و چهارشنبه‌ها · ساعت ۱۸:۰۰ تا ۱۹:۳۰',
-      level_label: 'پیشرفته',
-      cover_url: '/assets/blog-2.png',
-      status: 'فعال',
-      description: 'گسترش دایره واژگان کاربردی و فرهنگی، تسلط بر حالت‌های اسمی (پادِژها) و افعال حرکتی زبان روسی، تقویت مهارت گفت‌وگوی روان و خوانش داستان‌های کوتاه معاصر به زبان اصلی.',
-      sub_sessions: [
-        {
-          id: 801,
-          session_number: 'جلسه اول',
-          title: 'کاربرد شش حالت اسمی (پادِژها) در مکالمات و متون داستانی',
-          status: 'تعریف شده',
-          session_date: '۲۱ آبان ۱۴۰۵',
-          session_time: '۱۸:۰۰ تا ۱۹:۳۰',
-          cover_url: '/assets/blog-2.png',
-          pages_read: 0,
-          pages_to_read: 'بخش اول جزوه پادِژها و داستان کوتاه چخوف (صفحات ۱ تا ۳۵)',
-          reviewed_topics: '',
-          session_notes: '',
-          meeting_link: 'https://meet.bookmeet.ir/russian-b1-s1',
-        },
-      ],
-      enrolled_members: [
-        {
-          id: 9301,
-          member_phone: '۰۹۱۲۱۱۱۲۲۳۳',
-          member_name: 'کیانوش معتمدی',
-          registered_at: '۱۲ آبان ۱۴۰۵',
-          status: 'غیرفعال',
-        },
-      ],
-      sort_order: 4,
-    },
-    {
-      id: 5,
-      member_phone: 'all',
-      title: 'دوره تخصصی خوانش متون ادبی به زبان روسی (ویژه آثار کلاسیک)',
-      book_title: 'گزیده متون اصلی داستایفسکی، چخوف، تولستوی و بولگاکف',
-      instructor_name: 'دکتر سهراب رستگار',
-      schedule_summary: 'پنج‌شنبه‌ها · ساعت ۱۶:۳۰ تا ۱۸:۳۰',
-      level_label: 'تخصصی',
-      cover_url: '/assets/blog-3.png',
-      status: 'فعال',
-      description: 'خوانش دقیق و تحلیل زبانی و زیبایی‌شناختی گزیده‌ای از شاهکارهای داستایفسکی، چخوف، تولستوی و بولگاکف به زبان روسی همراه با کارگاه عملی ترجمه ادبی و بررسی ظرایف سبک‌شناختی.',
-      sub_sessions: [
-        {
-          id: 901,
-          session_number: 'جلسه اول',
-          title: 'خوانش فصل آغازین «مرشد و مارگاریتا» به زبان روسی',
-          status: 'تعریف شده',
-          session_date: '۲۴ آبان ۱۴۰۵',
-          session_time: '۱۶:۳۰ تا ۱۸:۳۰',
-          cover_url: '/assets/blog-3.png',
-          pages_read: 0,
-          pages_to_read: 'فصل اول متن روسی Мастер и Маргарита همراه با واژه‌نامه تحلیلی',
-          reviewed_topics: '',
-          session_notes: '',
-          meeting_link: 'https://meet.bookmeet.ir/russian-c1-s1',
-        },
-      ],
-      enrolled_members: [
-        {
-          id: 9401,
-          member_phone: '۰۹۱۲۳۴۵۶۷۸۹',
-          member_name: 'پرنیا فرهمند',
-          registered_at: '۱۱ آبان ۱۴۰۵',
-          status: 'فعال',
-        },
-      ],
-      sort_order: 5,
-    },
-  ],
-  member_library: [
-    {
-      id: 1,
-      member_phone: 'all',
-      book_title: 'صد سال تنهایی',
-      author: 'گابریل گارسیا مارکز',
-      translator: 'بهمن فرزانه',
-      cover_url: '/assets/book-current.png',
-      reading_status: 'در حال مطالعه',
-      progress_percent: 68,
-      pages_read: 318,
-      pages_count: 468,
-      personal_note: 'تا پایان فصل یازدهم مطالعه شد. فضاسازی باران‌های چهارساله ماکوندو شگفت‌انگیز است.',
-      updated_at: '۱۴ آبان ۱۴۰۵',
-    },
-    {
-      id: 2,
-      member_phone: 'all',
-      book_title: 'مرشد و مارگاریتا',
-      author: 'میخائیل بولگاکف',
-      translator: 'عباس میلانی',
-      cover_url: '/assets/book-recent-1.png',
-      reading_status: 'خوانده‌شده',
-      progress_percent: 100,
-      pages_read: 512,
-      pages_count: 512,
-      personal_note: 'یکی از درخشان‌ترین آثار قرن بیستم؛ پیوند دو روایت مسکو و اورشلیم با ظرافت بی‌نظیری شکل گرفته است.',
-      updated_at: '۲۸ مهر ۱۴۰۵',
-    },
-    {
-      id: 3,
-      member_phone: 'all',
-      book_title: 'کوری',
-      author: 'ژوزه ساراماگو',
-      translator: 'مینو مشیری',
-      cover_url: '/assets/book-recent-2.png',
-      reading_status: 'خوانده‌شده',
-      progress_percent: 100,
-      pages_read: 348,
-      pages_count: 348,
-      personal_note: 'تجربه‌ای تکان‌دهنده از معنای دیدن و مسئولیت اخلاقی انسان در برابر دیگری.',
-      updated_at: '۲۴ شهریور ۱۴۰۵',
-    },
-    {
-      id: 4,
-      member_phone: 'all',
-      book_title: 'کافکا در کرانه',
-      author: 'هاروکی موراکامی',
-      translator: 'مهدی غبرائی',
-      cover_url: '/assets/book-recent-4.png',
-      reading_status: 'در نوبت مطالعه',
-      progress_percent: 15,
-      pages_read: 92,
-      pages_count: 614,
-      personal_note: 'برنامه‌ریزی برای مطالعه کامل در دوره آذرماه باشگاه به همراه یادداشت‌برداری از استعاره‌های موسیقایی.',
-      updated_at: '۱۰ آبان ۱۴۰۵',
-    },
-  ],
-  member_tickets: [
-    {
-      id: 1,
-      member_phone: 'all',
-      ticket_code: 'TK-۱۴۰۵-۴۱۲',
-      subject: 'درخواست دریافت فایل صوتی و جزوه نشست سوم صد سال تنهایی',
-      department: 'پشتیبانی فنی',
-      priority: 'عادی',
-      status: 'پاسخ داده‌شده',
-      message: 'با سلام و احترام، به دلیل تداخل کاری امکان حضور در بیست دقیقه پایانی نشست سوم را نداشتم. لطفاً در صورت امکان خلاصه مکتوب یا فایل صوتی جلسه را در اختیارم قرار دهید.',
-      attachment_name: 'یادداشت-جلسه-سوم.pdf',
-      admin_reply: 'هم‌خوان گرامی، فایل صوتی کامل نشست سوم به همراه جزوه دسته‌بندی شجره‌نامه خاندان بوئندیا در بخش جلسات من برای شما فعال گردید.',
-      created_at: '۱۰ آبان ۱۴۰۵',
-    },
-    {
-      id: 2,
-      member_phone: 'all',
-      ticket_code: 'TK-۱۴۰۵-۴۳۹',
-      subject: 'پیشنهاد بررسی رمان «ابله» داستایفسکی برای حلقه زمستان',
-      department: 'پیشنهاد کتاب',
-      priority: 'مهم',
-      status: 'پاسخ داده‌شده',
-      message: 'پیشنهاد می‌کنم در دوره زمستان باشگاه، یکی از آثار کلاسیک داستایفسکی به‌ویژه رمان «ابله» با ترجمه سروش حبیبی در برنامه هم‌خوانی هفتگی قرار گیرد.',
-      attachment_name: 'معرفی-رمان-ابله.pdf',
-      admin_reply: 'از پیشنهاد ارزشمند شما سپاسگزاریم. رمان «ابله» در فهرست نهایی رأی‌گیری اعضای باشگاه برای دوره دی‌ماه قرار گرفته است.',
-      created_at: '۱۲ آبان ۱۴۰۵',
-    },
-  ],
-  club_calendar_events: [
-    {
-      id: 1,
-      title: 'نشست دوم هم‌خوانی «صد سال تنهایی»',
-      event_type: 'هم‌خوانی هفتگی',
-      day_of_month: '۲',
-      month_name: 'آبان ۱۴۰۵',
-      weekday_name: 'چهارشنبه',
-      time_range: '۱۸:۰۰ تا ۲۰:۰۰',
-      host_name: 'دکتر سهراب رستگار',
-      location_label: 'تالار فردوسی خانه بوک‌میت',
-      capacity_info: 'برگزار شده',
-      description: 'بررسی بیماری بی‌خوابی و فراموشی جمعی در دهکده ماکوندو.',
-      is_reserved: 1,
-      sort_order: 1,
-    },
-    {
-      id: 2,
-      title: 'کلاس فلسفه و ادبیات (نشست اول)',
-      event_type: 'کلاس آموزشی',
-      day_of_month: '۵',
-      month_name: 'آبان ۱۴۰۵',
-      weekday_name: 'شنبه',
-      time_range: '۱۸:۰۰ تا ۲۰:۰۰',
-      host_name: 'نیلوفر فرهادی',
-      location_label: 'اتاق مجازی کلاس‌ها',
-      capacity_info: 'برگزار شده',
-      description: 'آزادی و عصیان در «بیگانه» و «طاعون» آلبر کامو.',
-      is_reserved: 1,
-      sort_order: 2,
-    },
-    {
-      id: 3,
-      title: 'نشست سوم هم‌خوانی «صد سال تنهایی»',
-      event_type: 'هم‌خوانی هفتگی',
-      day_of_month: '۹',
-      month_name: 'آبان ۱۴۰۵',
-      weekday_name: 'چهارشنبه',
-      time_range: '۱۸:۰۰ تا ۲۰:۰۰',
-      host_name: 'دکتر سهراب رستگار',
-      location_label: 'تالار فردوسی خانه بوک‌میت',
-      capacity_info: 'برگزار شده',
-      description: 'تحلیل جنگ‌های داخلی سرهنگ اورلیانو بوئندیا.',
-      is_reserved: 1,
-      sort_order: 3,
-    },
-    {
-      id: 4,
-      title: 'نشست چهارم «صد سال تنهایی» (فصل ۱۲ تا ۱۵)',
-      event_type: 'هم‌خوانی هفتگی',
-      day_of_month: '۱۶',
-      month_name: 'آبان ۱۴۰۵',
-      weekday_name: 'چهارشنبه',
-      time_range: '۱۸:۰۰ تا ۲۰:۰۰',
-      host_name: 'دکتر سهراب رستگار',
-      location_label: 'تالار فردوسی خانه بوک‌میت',
-      capacity_info: 'ظرفیت باقی‌مانده: ۶ نفر',
-      description: 'در این نشست، دگردیسی دهکده ماکوندو پس از ورود شرکت موز و جایگاه تنهایی سرهنگ اورلیانو بوئندیا را تحلیل و بررسی خواهیم کرد.',
-      is_reserved: 1,
-      sort_order: 4,
-    },
-    {
-      id: 5,
-      title: 'کارگاه حاشیه‌نویسی و یادداشت‌برداری خلاق',
-      event_type: 'کارگاه خوانش',
-      day_of_month: '۱۸',
-      month_name: 'آبان ۱۴۰۵',
-      weekday_name: 'جمعه',
-      time_range: '۱۹:۰۰ تا ۲۰:۳۰',
-      host_name: 'آرمان کاظمی',
-      location_label: 'اتاق مجازی باشگاه',
-      capacity_info: 'ظرفیت باقی‌مانده: ۱۱ نفر',
-      description: 'آشنایی با تکنیک‌های ثبت استعاره‌ها، ترسیم نقشه شخصیت‌ها و نگارش جستارهای کوتاه تحلیلی پس از مطالعه هر فصل.',
-      is_reserved: 1,
-      sort_order: 5,
-    },
-    {
-      id: 6,
-      title: 'کلاس تاریخ تحلیلی رمان مدرن (کالوینو)',
-      event_type: 'کلاس آموزشی',
-      day_of_month: '۲۱',
-      month_name: 'آبان ۱۴۰۵',
-      weekday_name: 'دوشنبه',
-      time_range: '۱۷:۳۰ تا ۱۹:۳۰',
-      host_name: 'دکتر سهراب رستگار',
-      location_label: 'اتاق مجازی کلاس‌ها',
-      capacity_info: 'ظرفیت باقی‌مانده: ۸ نفر',
-      description: 'بررسی هزارتوی فراروایت در آثار ایتالو کالوینو.',
-      is_reserved: 1,
-      sort_order: 6,
-    },
-    {
-      id: 7,
-      title: 'نشست پنجم و جمع‌بندی «صد سال تنهایی»',
-      event_type: 'نشست نقد و بررسی',
-      day_of_month: '۲۳',
-      month_name: 'آبان ۱۴۰۵',
-      weekday_name: 'چهارشنبه',
-      time_range: '۱۸:۰۰ تا ۲۰:۳۰',
-      host_name: 'دکتر سهراب رستگار',
-      location_label: 'تالار فردوسی خانه بوک‌میت',
-      capacity_info: 'ظرفیت باقی‌مانده: ۹ نفر',
-      description: 'خوانش فصل‌های پایانی، رمزگشایی از دست‌نوشته‌های ملکیادس و گفت‌وگوی آزاد اعضا درباره تجربه یک ماه زندگی در جهان مارکز.',
-      is_reserved: 0,
-      sort_order: 7,
-    },
-    {
-      id: 8,
-      title: 'نشست ویژه چالش‌های ترجمه ادبیات کلاسیک',
-      event_type: 'نشست ویژه با مترجم',
-      day_of_month: '۲۸',
-      month_name: 'آبان ۱۴۰۵',
-      weekday_name: 'دوشنبه',
-      time_range: '۱۷:۳۰ تا ۱۹:۳۰',
-      host_name: 'نیلوفر فرهادی و مهمان ویژه',
-      location_label: 'تالار فردوسی و پخش زنده',
-      capacity_info: 'ظرفیت باقی‌مانده: ۱۴ نفر',
-      description: 'بررسی ظرایف معادل‌یابی، حفظ لحن و موسیقی متن اصلی در ترجمه‌های ماندگار ادبیات داستانی قرن نوزدهم و بیستم.',
-      is_reserved: 0,
-      sort_order: 8,
-    },
-    {
-      id: 9,
-      title: 'معارفه و فصل اول «بلندی‌های بادگیر»',
-      event_type: 'هم‌خوانی هفتگی',
-      day_of_month: '۷',
-      month_name: 'آذر ۱۴۰۵',
-      weekday_name: 'چهارشنبه',
-      time_range: '۱۸:۰۰ تا ۲۰:۰۰',
-      host_name: 'دکتر سهراب رستگار',
-      location_label: 'تالار فردوسی خانه بوک‌میت',
-      capacity_info: 'ظرفیت باقی‌مانده: ۱۵ نفر',
-      description: 'ورود به فضای گوتیک و رازآلود یورکشایر، بررسی راوی اول‌شخص و زاویه دید لاک‌وود در مواجهه با عمارت بلندی‌های بادگیر.',
-      is_reserved: 0,
-      sort_order: 9,
-    },
-    {
-      id: 10,
-      title: 'حلقه نقد جستارهای اعضا و کتاب ماه',
-      event_type: 'کارگاه خوانش',
-      day_of_month: '۱۴',
-      month_name: 'آذر ۱۴۰۵',
-      weekday_name: 'شنبه',
-      time_range: '۱۸:۳۰ تا ۲۰:۰۰',
-      host_name: 'شورای علمی باشگاه بوک‌میت',
-      location_label: 'اتاق مجازی باشگاه',
-      capacity_info: 'ظرفیت باقی‌مانده: ۱۸ نفر',
-      description: 'خوانش و نقد دوستانه یادداشت‌های ارسالی اعضا برای انتشار در وبلاگ رسمی بوک‌میت و اهدای کتاب به جستارهای برگزیده.',
-      is_reserved: 0,
-      sort_order: 10,
-    },
-  ],
-  club_announcements: [
-    {
-      id: 1,
-      title: 'انتشار برنامه کامل نشست‌های هم‌خوانی نیمه دوم آبان‌ماه ۱۴۰۵',
-      category: 'جلسات کتابخوانی',
-      published_date: '۱۴ آبان ۱۴۰۵',
-      summary: 'جدول زمان‌بندی جلسات چهارم و پنجم حلقه «صد سال تنهایی» و لینک‌های ورود به اتاق‌های گفت‌وگو در پنل اعضا بروزرسانی شد.',
-      content: 'به اطلاع اعضای گرامی باشگاه کتابخوانی بوک‌میت می‌رساند که جلسات چهارم و پنجم حلقه مطالعاتی «صد سال تنهایی» در روزهای چهارشنبه ۱۶ و ۲۳ آبان‌ماه رأس ساعت ۱۸:۰۰ برگزار خواهد شد. لطفاً پیش از آغاز جلسه، صفحات تعیین‌شده را مطالعه فرمایید و پرسش‌های تحلیلی خود را در صفحه جلسه ثبت کنید.',
-      is_important: 1,
-      is_read: 0,
-      sort_order: 1,
-    },
-    {
-      id: 2,
-      title: 'آغاز رأی‌گیری انتخاب کتاب محوری دوره آذرماه باشگاه',
-      category: 'جلسات کتابخوانی',
-      published_date: '۱۲ آبان ۱۴۰۵',
-      summary: 'اعضای باشگاه می‌توانند از میان سه شاهکار کلاسیک پیشنهادی شورای علمی، اثر منتخب خود را برای هم‌خوانی ماه آینده ثبت نمایند.',
-      content: 'فهرست نامزدهای دوره آذرماه شامل «بلندی‌های بادگیر» اثر امیلی برونته، «ابله» اثر فئودور داستایفسکی و «جستارهایی در باب عشق» اثر آلن دو باتن است. شما می‌توانید دیدگاه و پیشنهاد تکمیلی خود را از طریق بخش تیکت‌ها (بخش پیشنهاد کتاب) برای دبیرخانه ارسال نمایید.',
-      is_important: 1,
-      is_read: 0,
-      sort_order: 2,
-    },
-    {
-      id: 3,
-      title: 'بارگذاری جزوه شجره‌نامه خاندان بوئندیا و فایل صوتی نشست سوم',
-      category: 'کلاس ها',
-      published_date: '۱۰ آبان ۱۴۰۵',
-      summary: 'نسخه گرافیکی شجره‌نامه کامل شخصیت‌های ماکوندو به همراه خلاصه نکات جلسه سوم در صفحه دوره قرار گرفت.',
-      content: 'پیرو درخواست اعضای حلقه هم‌خوانی، نمودار کامل هفت نسل خاندان بوئندیا و یادداشت‌های دسته‌بندی‌شده دکتر سهراب رستگار از مباحث جلسه سوم آماده بهره‌برداری است. از طریق منوی «جلسات من» و کلیک بر روی کارت دوره می‌توانید به جزئیات هر جلسه دسترسی داشته باشید.',
-      is_important: 0,
-      is_read: 1,
-      sort_order: 3,
-    },
-    {
-      id: 4,
-      title: 'فراخوان ارسال یادداشت‌ها و بروزرسانی سامانه اتاق‌های گفت‌وگوی آنلاین',
-      category: 'فنی',
-      published_date: '۵ آبان ۱۴۰۵',
-      summary: 'ارتقای کیفیت پخش صوتی و تصویری اتاق‌های مجازی باشگاه و امکان ارسال مستقیم یادداشت‌های اعضا.',
-      content: 'به اطلاع اعضا می‌رسد زیرساخت فنی اتاق‌های گفت‌وگوی آنلاین باشگاه بوک‌میت ارتقا یافته و اکنون بدون نیاز به نصب نرم‌افزار جانبی از طریق مرورگر در دسترس است.',
-      is_important: 0,
-      is_read: 1,
-      sort_order: 4,
-    },
-  ],
-  user_comments: [
-    {
-      id: 1,
-      author_name: 'پرنیا فرهمند',
-      author_phone: '۰۹۱۲۳۴۵۶۷۸۹',
-      target_title: 'نگاهی به رئالیسم جادویی؛ از تنهایی ماکوندو تا هزارتوهای روایت معاصر',
-      target_type: 'مقاله وبلاگ',
-      rating: 5,
-      comment_text: 'جستار بسیار دقیقی بود. به‌ویژه بخشی که به تفاوت نگاه اسطوره‌ای مارکز با فانتزی غربی پرداخته بودید، به درک بهتر فصل‌های میانی صد سال تنهایی کمک زیادی کرد.',
-      admin_reply: 'پرنیا عزیز، از دقت نظر و همراهی همیشگی شما در حلقه‌های هم‌خوانی سپاسگزاریم.',
-      status: 'تایید شده',
-      created_date: '۱۳ آبان ۱۴۰۵',
-      sort_order: 1,
-    },
-    {
-      id: 2,
-      author_name: 'کیانوش معتمدی',
-      author_phone: '۰۹۱۲۱۱۱۲۲۳۳',
-      target_title: 'چگونه خواندنِ آهسته و گروهی درک ما از رمان‌های کلاسیک را دگرگون می‌کند؟',
-      target_type: 'مقاله وبلاگ',
-      rating: 5,
-      comment_text: 'تجربه خوانش آهسته در نشست‌های چهارشنبه باشگاه بوک‌میت به من آموخت که چگونه جزئیات معماری روایت را که در خوانش شتاب‌زده نادیده می‌ماند کشف کنم.',
-      admin_reply: 'کیانوش گرامی، دیدگاه‌های فلسفی شما در نشست‌ها همیشه غنای گفت‌وگوها را دوچندان می‌کند.',
-      status: 'تایید شده',
-      created_date: '۱۱ آبان ۱۴۰۵',
-      sort_order: 2,
-    },
-    {
-      id: 3,
-      author_name: 'مهسا تاجیک',
-      author_phone: '۰۹۳۵۴۴۴۵۵۶۶',
-      target_title: 'راهنمای نوشتن حاشیه‌نویسی و یادداشت‌برداری خلاق هنگام مطالعه رمان',
-      target_type: 'کارگاه و مقاله',
-      rating: 4,
-      comment_text: 'روش سه محور کلیدی در پایان هر فصل فوق‌العاده کاربردی است. پیشنهاد می‌کنم یک نمونه دفترچه خوانش اعضای باشگاه را هم به صورت تصویری در سایت قرار دهید.',
-      admin_reply: '',
-      status: 'در انتظار تایید',
-      created_date: '۱۴ آبان ۱۴۰۵',
-      sort_order: 3,
-    },
-  ],
-  gallery_images: [
-    {
-      id: 1,
-      title: 'کاور کتاب صد سال تنهایی',
-      url: '/assets/book-current.png',
-      category: 'کاور کتاب',
-      created_at: '۱۴ آبان ۱۴۰۵',
-    },
-    {
-      id: 2,
-      title: 'کاور کتاب مرشد و مارگاریتا',
-      url: '/assets/book-recent-1.png',
-      category: 'کاور کتاب',
-      created_at: '۱۲ آبان ۱۴۰۵',
-    },
-    {
-      id: 3,
-      title: 'کاور کتاب کوری',
-      url: '/assets/book-recent-2.png',
-      category: 'کاور کتاب',
-      created_at: '۱۰ آبان ۱۴۰۵',
-    },
-    {
-      id: 4,
-      title: 'کاور کتاب بوف کور و ادبیات مدرن',
-      url: '/assets/book-recent-3.png',
-      category: 'کاور کتاب',
-      created_at: '۹ آبان ۱۴۰۵',
-    },
-    {
-      id: 5,
-      title: 'کاور کتاب جنایت و مکافات',
-      url: '/assets/book-recent-4.png',
-      category: 'کاور کتاب',
-      created_at: '۸ آبان ۱۴۰۵',
-    },
-    {
-      id: 6,
-      title: 'تصویر مقاله خوانش آهسته و گروهی',
-      url: '/assets/blog-1.png',
-      category: 'وبلاگ و کلاس‌ها',
-      created_at: '۷ آبان ۱۴۰۵',
-    },
-    {
-      id: 7,
-      title: 'تصویر مقاله رئالیسم جادویی',
-      url: '/assets/blog-2.png',
-      category: 'وبلاگ و کلاس‌ها',
-      created_at: '۶ آبان ۱۴۰۵',
-    },
-    {
-      id: 8,
-      title: 'تصویر کارگاه حاشیه‌نویسی خلاق',
-      url: '/assets/blog-3.png',
-      category: 'وبلاگ و کلاس‌ها',
-      created_at: '۵ آبان ۱۴۰۵',
-    },
-    {
-      id: 9,
-      title: 'فضای نشست‌های باشگاه بوک‌میت',
-      url: '/assets/about-club.png',
-      category: 'تصاویر باشگاه',
-      created_at: '۳ آبان ۱۴۰۵',
-    },
-    {
-      id: 10,
-      title: 'پرتره مدیر باشگاه',
-      url: '/assets/manager-portrait.png',
-      category: 'تصاویر باشگاه',
-      created_at: '۲ آبان ۱۴۰۵',
-    },
-    {
-      id: 11,
-      title: 'کتابخانه کلاسیک بوک‌میت',
-      url: '/assets/hero-bookshelf.png',
-      category: 'تصاویر باشگاه',
-      created_at: '۱ آبان ۱۴۰۵',
-    },
-  ],
+const EMPTY_HERO_SETTINGS: HeroSettingsRow = {
+  id: 1,
+  headline: 'به باشگاه کتابخوانی بوک میت خوش آمدید',
+  subtitle_line_1:
+    'بعضی جهان‌ها تنها زمانی جان می‌گیرند که از خواندن دست بکشید و به تماشا بنشینید.',
+  subtitle_line_2:
+    'این روایت‌ها برگرفته از کتاب‌هایی هستند که هرگز ما را رها نکرده‌اند.',
+  nav_cta_text: 'ورود به باشگاه',
+  nav_cta_target: '#login-club',
+  hero_image_url: '/assets/hero-bookshelf.png',
+  audio_progress_percent: 100,
 };
 
+const EMPTY_ABOUT_CLUB: AboutClubRow = {
+  id: 1,
+  section_kicker: '۰۱ · درباره باشگاه کتابخوانی بوک‌میت',
+  title: 'جایی برای زیستن در جهانِ کتاب‌هایی که فراموش نمی‌شوند',
+  paragraph_1:
+    'باشگاه کتابخوانی بوک‌میت با هدف شکل‌دادن به فضایی صمیمی، عمیق و اندیشه‌ورز برای علاقه‌مندان به ادبیات داستانی و آثار ماندگار جهان راه‌اندازی شده است.',
+  paragraph_2:
+    'در نشست‌های دوره‌ای و حلقه‌های مطالعاتی بوک‌میت، اعضا گرد هم می‌آیند تا ضمن واکاوی ساختار، شخصیت‌پردازی و درون‌مایه‌های فلسفی آثار برگزیده، تجربه‌های زیسته خود را به اشتراک بگذارند.',
+  image_url: '/assets/about-club.png',
+  image_caption: 'نشست‌های هم‌خوانی و بررسی نسخه‌های ماندگار ادبی در باشگاه بوک‌میت',
+  stat_1_value: '۰',
+  stat_1_label: 'نشست نقد و هم‌خوانی',
+  stat_2_value: '۰',
+  stat_2_label: 'عضو فعال باشگاه',
+  stat_3_value: '۰',
+  stat_3_label: 'شاهکار ادبی بررسی‌شده',
+};
+
+const EMPTY_ABOUT_MANAGER: AboutManagerRow = {
+  id: 1,
+  section_kicker: '۰۲ · معرفی مدیر و بنیان‌گذار باشگاه',
+  full_name: 'سهراب رستگار',
+  role_title: 'پژوهشگر ادبیات تطبیقی، منتقد ادبی و بنیان‌گذار باشگاه کتابخوانی بوک‌میت',
+  bio_paragraph_1:
+    'سهراب رستگار در حوزه نقد ادبی، روایت‌شناسی و برگزاری کارگاه‌های تخصصی خوانش خلاق فعالیت می‌کند.',
+  bio_paragraph_2:
+    'دغدغه اصلی او در بوک‌میت، احیای فرهنگ خواندنِ دقیق و آهسته و ایجاد پیوندی پایدار میان دوستداران کتاب است.',
+  quote_text:
+    '«کتاب‌ها زمانی به راستی آغاز می‌شوند که آخرین صفحه‌شان را می‌بندیم و درباره آنچه در ما دگرگون کرده‌اند با یکدیگر سخن می‌گوییم.»',
+  image_url: '/assets/manager-portrait.png',
+  credentials_line: 'دکتری ادبیات تطبیقی · تسهیل‌گر نشست‌های کتاب · پژوهشگر روایت',
+};
+
+const EMPTY_CONTACT_INFO: ContactInfoRow = {
+  id: 1,
+  section_kicker: '۰۵ · ارتباط با ما و عضویت در حلقه‌های مطالعاتی',
+  title: 'صدای شما، آغازگر گفت‌وگوهای تازه در باشگاه بوک‌میت است',
+  description:
+    'اگر درباره شیوه برگزاری نشست‌های هفتگی، پیشنهاد کتاب برای دوره‌های آینده یا عضویت در حلقه‌های مطالعاتی بوک‌میت پرسشی دارید، پیام خود را برای ما ارسال کنید.',
+  address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات بوک‌میت',
+  meeting_hours: 'نشست‌های حضوری: چهارشنبه‌ها ساعت ۱۸ تا ۲۰ · نشست‌های برخط: جمعه‌ها ساعت ۱۹',
+  email: 'hello@bookmeet.ir',
+  phone: '۰۲۱-۸۸۹۴۳۲۱۰',
+  telegram_handle: '@BookmeetClub',
+};
+
+export function normalizeIdentifierDigits(input: string): string {
+  return String(input || '')
+    .trim()
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632));
+}
+
+export function toPersianDigitsServer(input: string | number): string {
+  const persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+  return String(input ?? '').replace(/\d/g, (d) => persian[Number(d)] || d);
+}
+
+function safeJsonParse<T>(raw: unknown, fallback: T): T {
+  if (!raw) return fallback;
+  if (typeof raw === 'object') return raw as T;
+  try {
+    return JSON.parse(String(raw)) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function stripPassword(row: ClubMemberRow): PublicClubMember {
+  const { password_hash: _removed, ...rest } = row;
+  return {
+    ...rest,
+    role: row.role === 'admin' ? 'admin' : 'member',
+    status: row.status || 'فعال',
+  };
+}
+
+function translateMySqlToSqlite(sql: string): string {
+  const trimmed = sql.trim();
+  if (/^CREATE\s+TABLE/i.test(trimmed)) {
+    return trimmed
+      .replace(/INT\s+AUTO_INCREMENT\s+PRIMARY\s+KEY/gi, 'INTEGER PRIMARY KEY AUTOINCREMENT')
+      .replace(/TINYINT\(\d+\)/gi, 'INTEGER')
+      .replace(/LONGTEXT/gi, 'TEXT')
+      .replace(/DATETIME/gi, 'TEXT')
+      .replace(/ENUM\([^)]+\)/gi, 'TEXT')
+      .replace(/\s+ON\s+UPDATE\s+CURRENT_TIMESTAMP/gi, '')
+      .replace(/,\s*INDEX\s+\w+\s*\([^)]+\)/gi, '')
+      .replace(/UNIQUE\s+KEY\s+\w+\s*\(([^)]+)\)/gi, 'UNIQUE ($1)')
+      .replace(/\)\s*ENGINE=InnoDB[^;]*$/i, ')');
+  }
+
+  return trimmed
+    .replace(
+      /ON\s+DUPLICATE\s+KEY\s+UPDATE\s+status\s*=\s*'غیرفعال',\s*member_name\s*=\s*VALUES\(member_name\),\s*registered_at\s*=\s*'ثبت‌نام مجدد'/gi,
+      "ON CONFLICT(target_type, target_id, member_phone) DO UPDATE SET status = 'غیرفعال', member_name = excluded.member_name, registered_at = 'ثبت‌نام مجدد'"
+    )
+    .replace(/NOW\(\)/gi, "datetime('now')");
+}
+
 class MySQLDatabaseManager {
-  private pool: Pool | null = null;
-  private isExternalMySQLConnected = false;
-  private store: MySQLStoreSchema;
+  private mysqlPool: Pool;
+  private memorySqlDb: DatabaseSync | null = null;
+  private mysqlAvailable = true;
+  private pool: {
+    execute: <T extends RowDataPacket[] | ResultSetHeader>(
+      sql: string,
+      values?: unknown[]
+    ) => Promise<[T, unknown]>;
+  };
 
   constructor() {
-    this.store = this.loadDiskStore();
-    this.initMySQLPool();
-  }
+    this.mysqlPool = mysql.createPool({
+      host: process.env.MYSQL_HOST || 'localhost',
+      port: Number(process.env.MYSQL_PORT || 3306),
+      user: process.env.MYSQL_USER || 'root',
+      password: process.env.MYSQL_PASSWORD || '',
+      database: process.env.MYSQL_DATABASE || 'bookmeet_db',
+      charset: 'utf8mb4',
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      connectTimeout: 2500,
+    });
 
-  private loadDiskStore(): MySQLStoreSchema {
-    try {
-      if (fs.existsSync(STORAGE_FILE)) {
-        const raw = fs.readFileSync(STORAGE_FILE, 'utf-8');
-        const parsed = JSON.parse(raw) as MySQLStoreSchema;
-        if (parsed.schema_version === CURRENT_SCHEMA_VERSION) {
-          return parsed;
+    this.pool = {
+      execute: async <T extends RowDataPacket[] | ResultSetHeader>(
+        sql: string,
+        values: unknown[] = []
+      ): Promise<[T, unknown]> => {
+        if (this.mysqlAvailable) {
+          try {
+            const [res, meta] = await this.mysqlPool.execute(
+              sql,
+              values as (string | number | null | Date)[]
+            );
+            return [res as T, meta];
+          } catch (err: unknown) {
+            const code = (err as { code?: string })?.code || '';
+            if (
+              code === 'ECONNREFUSED' ||
+              code === 'ENOTFOUND' ||
+              code === 'ETIMEDOUT' ||
+              code === 'PROTOCOL_CONNECTION_LOST' ||
+              code === 'ER_BAD_DB_ERROR'
+            ) {
+              this.mysqlAvailable = false;
+            } else {
+              throw err;
+            }
+          }
         }
-      }
-    } catch {
-      // Fallback to fresh seed data
-    }
-    this.saveDiskStore(SEED_DATA);
-    return JSON.parse(JSON.stringify(SEED_DATA));
-  }
-
-  private saveDiskStore(data: MySQLStoreSchema = this.store): void {
-    try {
-      const dir = path.dirname(STORAGE_FILE);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(STORAGE_FILE, JSON.stringify(data, null, 2), 'utf-8');
-    } catch {
-      // Ignore write errors in read-only filesystems
-    }
-  }
-
-  private initMySQLPool(): void {
-    if (!process.env.MYSQL_HOST) {
-      return;
-    }
-    try {
-      this.pool = mysql.createPool({
-        host: process.env.MYSQL_HOST,
-        port: Number(process.env.MYSQL_PORT || 3306),
-        user: process.env.MYSQL_USER || 'root',
-        password: process.env.MYSQL_PASSWORD || '',
-        database: process.env.MYSQL_DATABASE || 'bookmeet_db',
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0,
-        connectTimeout: 2500,
-      });
-    } catch {
-      this.pool = null;
-    }
-  }
-
-  public async getNavigationLinks(): Promise<NavigationLinkRow[]> {
-    const hasEventsAndCourses =
-      Array.isArray(this.store.navigation_links) &&
-      this.store.navigation_links.some((n) => n.href === '#events') &&
-      this.store.navigation_links.some((n) => n.href === '#courses');
-    if (!hasEventsAndCourses) {
-      this.store.navigation_links = JSON.parse(
-        JSON.stringify(SEED_DATA.navigation_links)
-      );
-      this.saveDiskStore();
-    }
-    return [...this.store.navigation_links]
-      .filter((item) => item.is_active === 1)
-      .sort((a, b) => a.sort_order - b.sort_order);
-  }
-
-  public async getHeroSettings(): Promise<HeroSettingsRow> {
-    if (this.pool && this.isExternalMySQLConnected) {
-      try {
-        const [rows] = await this.pool.query('SELECT * FROM hero_settings LIMIT 1');
-        const list = rows as HeroSettingsRow[];
-        if (list.length > 0) return list[0];
-      } catch {
-        this.isExternalMySQLConnected = false;
-      }
-    }
-    return {
-      ...this.store.hero_settings[0],
-      hero_image_url: '/assets/hero-bookshelf.png',
+        return this.executeInMemorySql<T>(sql, values);
+      },
     };
   }
 
-  public async getFeaturedBooks(): Promise<FeaturedBookRow[]> {
-    if (this.pool && this.isExternalMySQLConnected) {
-      try {
-        const [rows] = await this.pool.query('SELECT * FROM featured_books ORDER BY id ASC');
-        return rows as FeaturedBookRow[];
-      } catch {
-        this.isExternalMySQLConnected = false;
-      }
+  private getMemorySqlDb(): DatabaseSync {
+    if (!this.memorySqlDb) {
+      this.memorySqlDb = new DatabaseSync(':memory:');
     }
-    return [...this.store.featured_books];
+    return this.memorySqlDb;
+  }
+
+  private executeInMemorySql<T extends RowDataPacket[] | ResultSetHeader>(
+    sql: string,
+    values: unknown[] = []
+  ): [T, unknown] {
+    const db = this.getMemorySqlDb();
+    const translatedSql = translateMySqlToSqlite(sql);
+    const normalizedParams = values.map((v) => {
+      if (v === undefined) return null;
+      if (v instanceof Date) return v.toISOString().slice(0, 19).replace('T', ' ');
+      return v as string | number | null;
+    });
+
+    const stmt = db.prepare(translatedSql);
+    if (/^\s*SELECT\b/i.test(translatedSql)) {
+      const rows = stmt.all(...normalizedParams) as unknown as T;
+      return [rows, []];
+    }
+
+    const res = stmt.run(...normalizedParams);
+    const header = {
+      insertId: Number(res.lastInsertRowid || 0),
+      affectedRows: Number(res.changes || 0),
+    } as unknown as T;
+    return [header, []];
+  }
+
+  public getPool(): Pool {
+    return this.mysqlPool;
+  }
+
+  public isConnectedToMySQL(): boolean {
+    return this.mysqlAvailable;
+  }
+
+  public async verifyConnection(): Promise<void> {
+    try {
+      const conn = await this.mysqlPool.getConnection();
+      try {
+        await conn.ping();
+        this.mysqlAvailable = true;
+      } finally {
+        conn.release();
+      }
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code || '';
+      if (
+        code === 'ECONNREFUSED' ||
+        code === 'ENOTFOUND' ||
+        code === 'ETIMEDOUT' ||
+        code === 'ER_BAD_DB_ERROR'
+      ) {
+        this.mysqlAvailable = false;
+        this.getMemorySqlDb();
+        return;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Ensures all required MySQL tables exist (without inserting any demo or seed data).
+   * If ADMIN_PASSWORD is provided in .env and no admin exists yet, creates the single initial admin.
+   */
+  public async initializeDatabase(): Promise<void> {
+    await this.verifyConnection();
+
+    const tableStatements = [
+      `CREATE TABLE IF NOT EXISTS navigation_links (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        label VARCHAR(100) NOT NULL,
+        href VARCHAR(255) NOT NULL,
+        sort_order INT NOT NULL DEFAULT 0,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS hero_settings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        headline VARCHAR(255) NOT NULL,
+        subtitle_line_1 VARCHAR(255) NOT NULL,
+        subtitle_line_2 VARCHAR(255) NOT NULL,
+        nav_cta_text VARCHAR(100) NOT NULL,
+        nav_cta_target VARCHAR(255) NOT NULL,
+        hero_image_url VARCHAR(255) NOT NULL,
+        audio_progress_percent INT NOT NULL DEFAULT 100,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS featured_books (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(150) NOT NULL,
+        persian_title VARCHAR(150) NOT NULL,
+        author VARCHAR(150) NOT NULL,
+        publication_year INT NOT NULL DEFAULT 2000,
+        synopsis TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS about_club (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        section_kicker VARCHAR(120) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        paragraph_1 TEXT NOT NULL,
+        paragraph_2 TEXT NOT NULL,
+        image_url VARCHAR(255) NOT NULL,
+        image_caption VARCHAR(255) NOT NULL,
+        stat_1_value VARCHAR(50) NOT NULL,
+        stat_1_label VARCHAR(120) NOT NULL,
+        stat_2_value VARCHAR(50) NOT NULL,
+        stat_2_label VARCHAR(120) NOT NULL,
+        stat_3_value VARCHAR(50) NOT NULL,
+        stat_3_label VARCHAR(120) NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS about_manager (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        section_kicker VARCHAR(120) NOT NULL,
+        full_name VARCHAR(150) NOT NULL,
+        role_title VARCHAR(200) NOT NULL,
+        bio_paragraph_1 TEXT NOT NULL,
+        bio_paragraph_2 TEXT NOT NULL,
+        quote_text TEXT NOT NULL,
+        image_url VARCHAR(255) NOT NULL,
+        credentials_line VARCHAR(255) NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS library_books (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        is_current TINYINT(1) NOT NULL DEFAULT 0,
+        title VARCHAR(180) NOT NULL,
+        original_title VARCHAR(180) NOT NULL DEFAULT '',
+        author VARCHAR(150) NOT NULL,
+        translator VARCHAR(150) NOT NULL DEFAULT '',
+        category VARCHAR(80) NOT NULL DEFAULT 'کلاسیک',
+        publication_year INT NOT NULL DEFAULT 1400,
+        pages_count INT NOT NULL DEFAULT 300,
+        reading_progress_percent INT NOT NULL DEFAULT 0,
+        session_schedule VARCHAR(180) NOT NULL DEFAULT '',
+        cover_url LONGTEXT NOT NULL,
+        short_description TEXT NOT NULL,
+        sort_order INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS blog_posts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(220) NOT NULL,
+        slug VARCHAR(220) NOT NULL DEFAULT '',
+        category VARCHAR(100) NOT NULL DEFAULT 'یادداشت ادبی',
+        author VARCHAR(150) NOT NULL,
+        published_date VARCHAR(80) NOT NULL,
+        reading_time VARCHAR(60) NOT NULL DEFAULT '۵ دقیقه مطالعه',
+        cover_url LONGTEXT NOT NULL,
+        excerpt TEXT NOT NULL,
+        full_content LONGTEXT NOT NULL,
+        tags VARCHAR(255) NOT NULL DEFAULT '',
+        status VARCHAR(40) NOT NULL DEFAULT 'منتشر شده',
+        sort_order INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS gallery_images (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(180) NOT NULL,
+        url LONGTEXT NOT NULL,
+        category VARCHAR(80) NOT NULL DEFAULT 'عمومی',
+        created_at VARCHAR(80) NOT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS contact_info (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        section_kicker VARCHAR(120) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT NOT NULL,
+        address VARCHAR(255) NOT NULL,
+        meeting_hours VARCHAR(180) NOT NULL,
+        email VARCHAR(150) NOT NULL,
+        phone VARCHAR(80) NOT NULL,
+        telegram_handle VARCHAR(100) NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS contact_messages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        full_name VARCHAR(150) NOT NULL,
+        email VARCHAR(150) NOT NULL,
+        subject VARCHAR(200) NOT NULL,
+        message TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS club_members (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        first_name VARCHAR(100) NOT NULL,
+        last_name VARCHAR(100) NOT NULL,
+        phone VARCHAR(60) NOT NULL,
+        role ENUM('member', 'admin') NOT NULL DEFAULT 'member',
+        status VARCHAR(40) NOT NULL DEFAULT 'فعال',
+        education VARCHAR(120) NOT NULL DEFAULT '',
+        favorite_genre VARCHAR(120) NOT NULL DEFAULT 'ادبیات داستانی و رمان کلاسیک',
+        email VARCHAR(150) NOT NULL DEFAULT '',
+        city VARCHAR(100) NOT NULL DEFAULT 'تهران',
+        avatar_url LONGTEXT,
+        bio TEXT NOT NULL,
+        membership_code VARCHAR(60) NOT NULL DEFAULT '',
+        joined_date VARCHAR(60) NOT NULL DEFAULT '',
+        password_hash VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_club_members_phone (phone)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS auth_tokens (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        token VARCHAR(128) NOT NULL,
+        member_id INT NOT NULL,
+        expires_at DATETIME NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_auth_tokens_token (token),
+        INDEX idx_auth_tokens_member (member_id),
+        CONSTRAINT fk_auth_tokens_member
+          FOREIGN KEY (member_id) REFERENCES club_members (id)
+          ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS user_comments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        author_name VARCHAR(150) NOT NULL,
+        author_phone VARCHAR(60) NOT NULL DEFAULT '',
+        target_title VARCHAR(220) NOT NULL,
+        target_type VARCHAR(60) NOT NULL DEFAULT 'مقاله وبلاگ',
+        rating INT NOT NULL DEFAULT 5,
+        comment_text TEXT NOT NULL,
+        admin_reply TEXT NOT NULL,
+        status VARCHAR(40) NOT NULL DEFAULT 'در انتظار تایید',
+        created_date VARCHAR(80) NOT NULL,
+        sort_order INT NOT NULL DEFAULT 0
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS member_sessions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        member_phone VARCHAR(60) NOT NULL DEFAULT 'all',
+        title VARCHAR(220) NOT NULL,
+        book_title VARCHAR(180) NOT NULL,
+        book_author VARCHAR(150) NOT NULL DEFAULT '',
+        pages_count INT NOT NULL DEFAULT 300,
+        publisher VARCHAR(150) NOT NULL DEFAULT '',
+        mentor_name VARCHAR(150) NOT NULL,
+        session_date VARCHAR(100) NOT NULL,
+        session_time VARCHAR(100) NOT NULL,
+        cover_url LONGTEXT NOT NULL,
+        location_type VARCHAR(80) NOT NULL DEFAULT 'حضوری و آنلاین',
+        meeting_link_or_room VARCHAR(255) NOT NULL DEFAULT '',
+        status VARCHAR(60) NOT NULL DEFAULT 'فعال',
+        member_note TEXT NOT NULL,
+        sub_sessions_json LONGTEXT NOT NULL,
+        sort_order INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS member_classes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        member_phone VARCHAR(60) NOT NULL DEFAULT 'all',
+        title VARCHAR(220) NOT NULL,
+        book_title VARCHAR(180) NOT NULL DEFAULT '',
+        instructor_name VARCHAR(150) NOT NULL,
+        schedule_summary VARCHAR(150) NOT NULL,
+        level_label VARCHAR(80) NOT NULL DEFAULT 'مبتدی',
+        cover_url LONGTEXT NOT NULL,
+        status VARCHAR(60) NOT NULL DEFAULT 'فعال',
+        description TEXT NOT NULL,
+        sub_sessions_json LONGTEXT NOT NULL,
+        sort_order INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS session_enrollments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        target_type ENUM('session', 'class') NOT NULL DEFAULT 'session',
+        target_id INT NOT NULL,
+        member_id INT DEFAULT NULL,
+        member_phone VARCHAR(60) NOT NULL,
+        member_name VARCHAR(150) NOT NULL,
+        status VARCHAR(40) NOT NULL DEFAULT 'غیرفعال',
+        attendance_status VARCHAR(40) NOT NULL DEFAULT 'ثبت‌نام‌شده',
+        member_note TEXT,
+        registered_at VARCHAR(80) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_enrollment_target_member (target_type, target_id, member_phone),
+        INDEX idx_enrollment_member_phone (member_phone),
+        INDEX idx_enrollment_target (target_type, target_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS member_library (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        member_phone VARCHAR(60) NOT NULL,
+        book_title VARCHAR(180) NOT NULL,
+        author VARCHAR(150) NOT NULL,
+        translator VARCHAR(150) NOT NULL DEFAULT '',
+        cover_url LONGTEXT NOT NULL,
+        reading_status VARCHAR(60) NOT NULL DEFAULT 'در حال مطالعه',
+        progress_percent INT NOT NULL DEFAULT 0,
+        pages_read INT NOT NULL DEFAULT 0,
+        pages_count INT NOT NULL DEFAULT 300,
+        personal_note TEXT NOT NULL,
+        updated_at VARCHAR(80) NOT NULL,
+        INDEX idx_member_library_phone (member_phone)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS member_tickets (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        member_phone VARCHAR(60) NOT NULL,
+        ticket_code VARCHAR(40) NOT NULL,
+        subject VARCHAR(220) NOT NULL,
+        department VARCHAR(100) NOT NULL,
+        priority VARCHAR(40) NOT NULL DEFAULT 'عادی',
+        status VARCHAR(60) NOT NULL DEFAULT 'در انتظار بررسی',
+        message TEXT NOT NULL,
+        attachment_name VARCHAR(255) NOT NULL DEFAULT '',
+        admin_reply TEXT NOT NULL,
+        admin_replies_json LONGTEXT,
+        created_at VARCHAR(80) NOT NULL,
+        INDEX idx_member_tickets_phone (member_phone, status)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS club_calendar_events (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(220) NOT NULL,
+        event_type VARCHAR(100) NOT NULL,
+        day_of_month VARCHAR(20) NOT NULL,
+        month_name VARCHAR(60) NOT NULL,
+        weekday_name VARCHAR(60) NOT NULL,
+        time_range VARCHAR(80) NOT NULL,
+        host_name VARCHAR(150) NOT NULL,
+        location_label VARCHAR(180) NOT NULL,
+        capacity_info VARCHAR(100) NOT NULL,
+        description TEXT NOT NULL,
+        is_reserved TINYINT(1) NOT NULL DEFAULT 0,
+        reserved_by_phones_json LONGTEXT,
+        sort_order INT NOT NULL DEFAULT 0
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS club_announcements (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(220) NOT NULL,
+        category VARCHAR(80) NOT NULL,
+        published_date VARCHAR(80) NOT NULL,
+        summary TEXT NOT NULL,
+        content TEXT NOT NULL,
+        is_important TINYINT(1) NOT NULL DEFAULT 0,
+        is_read TINYINT(1) NOT NULL DEFAULT 0,
+        target_user_phone VARCHAR(60) DEFAULT NULL,
+        target_user_name VARCHAR(150) DEFAULT NULL,
+        sort_order INT NOT NULL DEFAULT 0
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    ];
+
+    for (const stmt of tableStatements) {
+      await this.pool.execute(stmt);
+    }
+
+    await this.ensureInitialAdminFromEnv();
+  }
+
+  /**
+   * Creates the single initial administrator account ONLY if no admin exists yet
+   * and a strong ADMIN_PASSWORD is provided in environment variables.
+   */
+  public async ensureInitialAdminFromEnv(): Promise<void> {
+    const rawPassword = String(process.env.ADMIN_PASSWORD || '').trim();
+    const forbiddenPasswords = new Set([
+      '',
+      'CHANGE_THIS_TO_A_STRONG_PASSWORD',
+      'admin1234',
+      '1234',
+      'admin',
+      'password',
+      '123456',
+      '12345678',
+    ]);
+
+    if (forbiddenPasswords.has(rawPassword) || rawPassword.length < 8) {
+      return;
+    }
+
+    const [existingAdmins] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT id FROM club_members WHERE role = ? LIMIT 1',
+      ['admin']
+    );
+
+    if (existingAdmins.length > 0) {
+      return;
+    }
+
+    const fullName = String(process.env.ADMIN_NAME || 'سهراب رستگار').trim();
+    const nameParts = fullName.split(/\s+/);
+    const firstName = nameParts[0] || 'مدیر';
+    const lastName = nameParts.slice(1).join(' ') || 'باشگاه';
+    const username = normalizeIdentifierDigits(
+      String(process.env.ADMIN_USERNAME || 'admin').trim()
+    );
+    const email = String(process.env.ADMIN_EMAIL || 'admin@bookmeet.ir').trim();
+    const passwordHash = await bcrypt.hash(rawPassword, 12);
+
+    await this.pool.execute(
+      `INSERT INTO club_members
+        (first_name, last_name, phone, role, status, education, favorite_genre, email, city, avatar_url, bio, membership_code, joined_date, password_hash)
+       VALUES (?, ?, ?, 'admin', 'فعال', 'دکتری', 'ادبیات تطبیقی و نقد ادبی', ?, 'تهران', '/assets/manager-portrait.png', 'مدیر باشگاه کتابخوانی بوک‌میت', 'BM-ADMIN-۰۰۱', '۱۴۰۵', ?)`,
+      [firstName, lastName, username, email, passwordHash]
+    );
+  }
+
+  /**
+   * Used by `npm run init-admin` CLI script to securely initialize the single administrator.
+   */
+  public async initializeSingleAdminAccount(input: {
+    firstName: string;
+    lastName: string;
+    username: string;
+    email: string;
+    passwordPlain: string;
+  }): Promise<PublicClubMember> {
+    const cleanPass = String(input.passwordPlain || '').trim();
+    if (
+      cleanPass.length < 8 ||
+      ['admin1234', '1234', 'admin', 'password', 'CHANGE_THIS_TO_A_STRONG_PASSWORD'].includes(
+        cleanPass
+      )
+    ) {
+      throw new Error(
+        'رمز عبور مدیر باید حداقل ۸ کاراکتر باشد و از رمزهای پیش‌فرض و ضعیف استفاده نشود.'
+      );
+    }
+
+    const [existingAdmins] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM club_members WHERE role = ? LIMIT 1',
+      ['admin']
+    );
+
+    if (existingAdmins.length > 0) {
+      throw new Error(
+        'حساب مدیر اولیه قبلاً در دیتابیس ایجاد شده است. سیستم فقط یک مدیر می‌تواند داشته باشد.'
+      );
+    }
+
+    const username = normalizeIdentifierDigits(input.username || 'admin');
+    const passwordHash = await bcrypt.hash(cleanPass, 12);
+
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      `INSERT INTO club_members
+        (first_name, last_name, phone, role, status, education, favorite_genre, email, city, avatar_url, bio, membership_code, joined_date, password_hash)
+       VALUES (?, ?, ?, 'admin', 'فعال', 'دکتری', 'ادبیات تطبیقی و نقد ادبی', ?, 'تهران', '/assets/manager-portrait.png', 'مدیر باشگاه کتابخوانی بوک‌میت', 'BM-ADMIN-۰۰۱', '۱۴۰۵', ?)`,
+      [
+        input.firstName.trim(),
+        input.lastName.trim(),
+        username,
+        input.email.trim(),
+        passwordHash,
+      ]
+    );
+
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM club_members WHERE id = ? LIMIT 1',
+      [result.insertId]
+    );
+    return stripPassword(rows[0] as ClubMemberRow);
+  }
+
+  // ==================== AUTH SESSION TOKENS ====================
+
+  public async createAuthSession(memberId: number): Promise<string> {
+    const token = crypto.randomBytes(48).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    await this.pool.execute(
+      'INSERT INTO auth_tokens (token, member_id, expires_at) VALUES (?, ?, ?)',
+      [token, memberId, expiresAt]
+    );
+    return token;
+  }
+
+  public async verifyAuthToken(token: string): Promise<PublicClubMember | null> {
+    if (!token || typeof token !== 'string') return null;
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT m.*
+       FROM auth_tokens t
+       INNER JOIN club_members m ON m.id = t.member_id
+       WHERE t.token = ? AND t.expires_at > NOW()
+       LIMIT 1`,
+      [token.trim()]
+    );
+    if (rows.length === 0) return null;
+    const member = rows[0] as ClubMemberRow;
+    if (member.status === 'غیرفعال') return null;
+    return stripPassword(member);
+  }
+
+  public async revokeAuthToken(token: string): Promise<void> {
+    if (!token) return;
+    await this.pool.execute('DELETE FROM auth_tokens WHERE token = ?', [token.trim()]);
+  }
+
+  // ==================== PUBLIC WEBSITE QUERIES ====================
+
+  public async getNavigationLinks(): Promise<NavigationLinkRow[]> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT id, label, href, sort_order, is_active FROM navigation_links WHERE is_active = 1 ORDER BY sort_order ASC'
+    );
+    if (rows.length === 0) {
+      return DEFAULT_NAVIGATION_LINKS;
+    }
+    return rows as NavigationLinkRow[];
+  }
+
+  public async getHeroSettings(): Promise<HeroSettingsRow> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM hero_settings ORDER BY id ASC LIMIT 1'
+    );
+    if (rows.length === 0) {
+      return EMPTY_HERO_SETTINGS;
+    }
+    return rows[0] as HeroSettingsRow;
+  }
+
+  public async getFeaturedBooks(): Promise<FeaturedBookRow[]> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM featured_books ORDER BY id ASC'
+    );
+    return rows as FeaturedBookRow[];
   }
 
   public async getAboutClub(): Promise<AboutClubRow> {
-    if (this.pool && this.isExternalMySQLConnected) {
-      try {
-        const [rows] = await this.pool.query('SELECT * FROM about_club LIMIT 1');
-        const list = rows as AboutClubRow[];
-        if (list.length > 0) return list[0];
-      } catch {
-        this.isExternalMySQLConnected = false;
-      }
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM about_club ORDER BY id ASC LIMIT 1'
+    );
+    if (rows.length === 0) {
+      return EMPTY_ABOUT_CLUB;
     }
-    return this.store.about_club[0];
+    return rows[0] as AboutClubRow;
   }
 
   public async getAboutManager(): Promise<AboutManagerRow> {
-    if (this.pool && this.isExternalMySQLConnected) {
-      try {
-        const [rows] = await this.pool.query('SELECT * FROM about_manager LIMIT 1');
-        const list = rows as AboutManagerRow[];
-        if (list.length > 0) return list[0];
-      } catch {
-        this.isExternalMySQLConnected = false;
-      }
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM about_manager ORDER BY id ASC LIMIT 1'
+    );
+    if (rows.length === 0) {
+      return EMPTY_ABOUT_MANAGER;
     }
-    return this.store.about_manager[0];
+    return rows[0] as AboutManagerRow;
   }
 
   public async getLibraryBooks(): Promise<LibraryBookRow[]> {
-    if (this.pool && this.isExternalMySQLConnected) {
-      try {
-        const [rows] = await this.pool.query(
-          'SELECT * FROM library_books ORDER BY sort_order ASC'
-        );
-        return rows as LibraryBookRow[];
-      } catch {
-        this.isExternalMySQLConnected = false;
-      }
-    }
-    return [...this.store.library_books].sort((a, b) => a.sort_order - b.sort_order);
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM library_books ORDER BY sort_order ASC, id DESC'
+    );
+    return rows as LibraryBookRow[];
   }
 
   public async getBlogPosts(): Promise<BlogPostRow[]> {
-    if (this.pool && this.isExternalMySQLConnected) {
-      try {
-        const [rows] = await this.pool.query(
-          'SELECT * FROM blog_posts ORDER BY sort_order ASC'
-        );
-        return rows as BlogPostRow[];
-      } catch {
-        this.isExternalMySQLConnected = false;
-      }
-    }
-    return [...(this.store.blog_posts || [])].sort((a, b) => a.sort_order - b.sort_order);
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM blog_posts ORDER BY sort_order ASC, id DESC'
+    );
+    return rows as BlogPostRow[];
   }
 
   public async getContactInfo(): Promise<ContactInfoRow> {
-    if (this.pool && this.isExternalMySQLConnected) {
-      try {
-        const [rows] = await this.pool.query('SELECT * FROM contact_info LIMIT 1');
-        const list = rows as ContactInfoRow[];
-        if (list.length > 0) return list[0];
-      } catch {
-        this.isExternalMySQLConnected = false;
-      }
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM contact_info ORDER BY id ASC LIMIT 1'
+    );
+    if (rows.length === 0) {
+      return EMPTY_CONTACT_INFO;
     }
-    return this.store.contact_info[0];
+    return rows[0] as ContactInfoRow;
   }
 
   public async createContactMessage(input: {
@@ -1694,41 +1047,21 @@ class MySQLDatabaseManager {
     subject: string;
     message: string;
   }): Promise<ContactMessageRow> {
-    if (this.pool && this.isExternalMySQLConnected) {
-      try {
-        const [result] = await this.pool.execute(
-          'INSERT INTO contact_messages (full_name, email, subject, message) VALUES (?, ?, ?, ?)',
-          [input.full_name, input.email, input.subject, input.message]
-        );
-        const insertId = (result as { insertId?: number }).insertId || Date.now();
-        return {
-          id: insertId,
-          ...input,
-          created_at: new Date().toISOString(),
-        };
-      } catch {
-        this.isExternalMySQLConnected = false;
-      }
-    }
-    if (!this.store.contact_messages) {
-      this.store.contact_messages = [];
-    }
-    const nextId =
-      this.store.contact_messages.length > 0
-        ? Math.max(...this.store.contact_messages.map((m) => m.id)) + 1
-        : 1;
-    const row: ContactMessageRow = {
-      id: nextId,
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      'INSERT INTO contact_messages (full_name, email, subject, message) VALUES (?, ?, ?, ?)',
+      [input.full_name, input.email, input.subject, input.message]
+    );
+    return {
+      id: result.insertId,
       full_name: input.full_name,
       email: input.email,
       subject: input.subject,
       message: input.message,
       created_at: new Date().toISOString(),
     };
-    this.store.contact_messages.push(row);
-    this.saveDiskStore();
-    return row;
   }
+
+  // ==================== REGISTRATION & LOGIN ====================
 
   public async registerClubMember(input: {
     first_name: string;
@@ -1736,177 +1069,226 @@ class MySQLDatabaseManager {
     phone: string;
     education: string;
     favorite_genre: string;
-    password_hash: string;
-  }): Promise<Omit<ClubMemberRow, 'password_hash'>> {
-    if (this.pool && this.isExternalMySQLConnected) {
-      try {
-        const [existing] = await this.pool.query(
-          'SELECT id FROM club_members WHERE phone = ? LIMIT 1',
-          [input.phone]
-        );
-        if ((existing as ClubMemberRow[]).length > 0) {
-          throw new Error('این شماره تلفن پیش‌تر در باشگاه ثبت‌نام شده است.');
-        }
-        const [result] = await this.pool.execute(
-          'INSERT INTO club_members (first_name, last_name, phone, education, favorite_genre, password_hash) VALUES (?, ?, ?, ?, ?, ?)',
-          [
-            input.first_name,
-            input.last_name,
-            input.phone,
-            input.education,
-            input.favorite_genre,
-            input.password_hash,
-          ]
-        );
-        const insertId = (result as { insertId?: number }).insertId || Date.now();
-        return {
-          id: insertId,
-          first_name: input.first_name,
-          last_name: input.last_name,
-          phone: input.phone,
-          education: input.education,
-          favorite_genre: input.favorite_genre,
-          email: '',
-          city: 'تهران',
-          bio: 'عضو جدید باشگاه کتابخوانی بوک‌میت و علاقه‌مند به مطالعه عمیق و گفت‌وگوهای ادبی.',
-          membership_code: `BM-۱۴۰۵-${insertId + 100}`,
-          joined_date: 'آبان ۱۴۰۵',
-          created_at: new Date().toISOString(),
-        };
-      } catch (err) {
-        if (err instanceof Error && err.message.includes('ثبت‌نام شده است')) {
-          throw err;
-        }
-        this.isExternalMySQLConnected = false;
-      }
+    password_plain: string;
+  }): Promise<{ member: PublicClubMember; token: string }> {
+    const normalizedPhone = normalizeIdentifierDigits(input.phone);
+    if (!normalizedPhone || normalizedPhone.length < 4) {
+      throw new Error('شماره تلفن واردشده معتبر نیست.');
     }
 
-    if (!this.store.club_members) {
-      this.store.club_members = [];
+    const lowerPhone = normalizedPhone.toLowerCase();
+    if (lowerPhone === 'admin' || lowerPhone === 'مدیر' || lowerPhone === 'root') {
+      throw new Error('استفاده از این شناسه برای ثبت‌نام کاربران مجاز نیست.');
     }
-    const duplicate = this.store.club_members.find((m) => m.phone === input.phone);
-    if (duplicate) {
+
+    if (!input.password_plain || input.password_plain.length < 4) {
+      throw new Error('رمز عبور باید حداقل ۴ کاراکتر باشد.');
+    }
+
+    const persianPhone = toPersianDigitsServer(normalizedPhone);
+
+    const [existing] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT id FROM club_members WHERE phone = ? OR phone = ? LIMIT 1',
+      [normalizedPhone, persianPhone]
+    );
+
+    if (existing.length > 0) {
       throw new Error('این شماره تلفن پیش‌تر در باشگاه ثبت‌نام شده است.');
     }
 
-    const nextId =
-      this.store.club_members.length > 0
-        ? Math.max(...this.store.club_members.map((m) => m.id)) + 1
-        : 1;
-    const row: ClubMemberRow = {
-      id: nextId,
-      first_name: input.first_name,
-      last_name: input.last_name,
-      phone: input.phone,
-      education: input.education,
-      favorite_genre: input.favorite_genre || 'ادبیات داستانی و رمان کلاسیک',
-      email: '',
-      city: 'تهران',
-      bio: 'عضو باشگاه کتابخوانی بوک‌میت و علاقه‌مند به مطالعه گروهی و نقد ادبی.',
-      membership_code: `BM-۱۴۰۵-${100 + nextId}`,
-      joined_date: 'آبان ۱۴۰۵',
-      password_hash: input.password_hash,
-      created_at: new Date().toISOString(),
+    const passwordHash = await bcrypt.hash(input.password_plain, 12);
+    const joinedDate = '۱۴۰۵';
+    const tempCode = `BM-۱۴۰۵-${toPersianDigitsServer(Math.floor(100 + Math.random() * 900))}`;
+
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      `INSERT INTO club_members
+        (first_name, last_name, phone, role, status, education, favorite_genre, email, city, avatar_url, bio, membership_code, joined_date, password_hash)
+       VALUES (?, ?, ?, 'member', 'فعال', ?, ?, '', 'تهران', '', 'عضو باشگاه کتابخوانی بوک‌میت', ?, ?, ?)`,
+      [
+        input.first_name.trim(),
+        input.last_name.trim(),
+        persianPhone,
+        input.education.trim(),
+        (input.favorite_genre || 'ادبیات داستانی و رمان کلاسیک').trim(),
+        tempCode,
+        joinedDate,
+        passwordHash,
+      ]
+    );
+
+    const finalCode = `BM-۱۴۰۵-${toPersianDigitsServer(100 + result.insertId)}`;
+    await this.pool.execute(
+      'UPDATE club_members SET membership_code = ? WHERE id = ?',
+      [finalCode, result.insertId]
+    );
+
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM club_members WHERE id = ? LIMIT 1',
+      [result.insertId]
+    );
+
+    const memberRow = rows[0] as ClubMemberRow;
+    const token = await this.createAuthSession(memberRow.id);
+
+    return {
+      member: stripPassword(memberRow),
+      token,
     };
-    this.store.club_members.push(row);
-    this.saveDiskStore();
-    const { password_hash: _removed, ...publicMember } = row;
-    return publicMember;
   }
 
   public async loginClubMember(input: {
     phone: string;
-    password_hash: string;
-  }): Promise<Omit<ClubMemberRow, 'password_hash'>> {
-    if (!this.store.club_members || this.store.club_members.length === 0) {
-      this.store.club_members = JSON.parse(JSON.stringify(SEED_DATA.club_members));
-    }
-
+    password_plain: string;
+  }): Promise<{ member: PublicClubMember; token: string }> {
     const rawIdentifier = String(input.phone || '').trim();
-    const rawPassword = String(input.password_hash || '').trim();
-    const normalizedIdentifier = rawIdentifier
-      .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
-      .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
-      .toLowerCase();
-    const normalizedPassword = rawPassword
-      .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
-      .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632));
+    const normalizedIdentifier = normalizeIdentifierDigits(rawIdentifier);
+    const persianIdentifier = toPersianDigitsServer(normalizedIdentifier);
 
-    // Check special Admin credentials first (admin / admin1234, or مدیر / admin1234, or 09120000000 / admin1234)
-    const isAdminUsername =
-      normalizedIdentifier === 'admin' ||
-      rawIdentifier === 'مدیر' ||
-      normalizedIdentifier === '09120000000' ||
-      normalizedIdentifier === 'sohrab';
-
-    if (isAdminUsername) {
-      const existingAdmin =
-        this.store.club_members.find((m) => m.role === 'admin' || m.phone === 'admin') ||
-        SEED_DATA.club_members.find((m) => m.role === 'admin')!;
-      const expectedAdminPass = (existingAdmin.password_hash || 'admin1234')
-        .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776));
-      if (
-        normalizedPassword !== expectedAdminPass &&
-        normalizedPassword !== 'admin1234' &&
-        normalizedPassword !== '1234' &&
-        normalizedPassword !== 'admin'
-      ) {
-        throw new Error('رمز عبور مدیر نادرست است. (رمز پیش‌فرض مدیر: admin1234)');
-      }
-      const { password_hash: _removed, ...publicAdmin } = existingAdmin;
-      return {
-        ...publicAdmin,
-        role: 'admin',
-      };
-    }
-
-    const found = this.store.club_members.find((m) => {
-      const mPhoneNorm = String(m.phone || '')
-        .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
-        .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
-        .toLowerCase();
-      return m.phone === rawIdentifier || mPhoneNorm === normalizedIdentifier;
-    });
-
-    if (!found) {
-      const defaultSeed =
-        this.store.club_members.find((m) => m.role !== 'admin') ||
-        this.store.club_members[0];
-      return {
-        id: Date.now(),
-        first_name: defaultSeed ? defaultSeed.first_name : 'پرنیا',
-        last_name: defaultSeed ? defaultSeed.last_name : 'فرهمند',
-        phone: input.phone,
-        role: 'member',
-        education: defaultSeed ? defaultSeed.education : 'کارشناسی ارشد',
-        favorite_genre: defaultSeed
-          ? defaultSeed.favorite_genre
-          : 'ادبیات داستانی و رمان کلاسیک',
-        email: defaultSeed ? defaultSeed.email : 'member@bookmeet.ir',
-        city: defaultSeed ? defaultSeed.city : 'تهران',
-        bio: defaultSeed
-          ? defaultSeed.bio
-          : 'علاقه‌مند به ادبیات کلاسیک جهان و شرکت در حلقه‌های مطالعاتی هفتگی باشگاه بوک‌میت.',
-        membership_code: 'BM-۱۴۰۵-۱۰۸',
-        joined_date: 'مهر ۱۴۰۵',
-        created_at: new Date().toISOString(),
-      };
-    }
-    const foundPassNorm = String(found.password_hash || '').replace(/[۰-۹]/g, (d) =>
-      String(d.charCodeAt(0) - 1776)
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT * FROM club_members
+       WHERE phone = ? OR phone = ? OR email = ? OR (role = 'admin' AND ? IN ('admin', 'مدیر'))
+       LIMIT 1`,
+      [rawIdentifier, normalizedIdentifier, normalizedIdentifier, normalizedIdentifier.toLowerCase()]
     );
-    if (found.password_hash !== rawPassword && foundPassNorm !== normalizedPassword) {
-      throw new Error('رمز عبور واردشده نادرست است.');
+
+    let foundRow: ClubMemberRow | undefined = rows[0] as ClubMemberRow | undefined;
+
+    if (!foundRow && persianIdentifier !== rawIdentifier) {
+      const [persianRows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM club_members WHERE phone = ? LIMIT 1',
+        [persianIdentifier]
+      );
+      foundRow = persianRows[0] as ClubMemberRow | undefined;
     }
-    const { password_hash: _removed, ...publicMember } = found;
+
+    if (!foundRow) {
+      throw new Error('کاربری با این مشخصات یافت نشد.');
+    }
+
+    if (foundRow.status === 'غیرفعال') {
+      throw new Error('حساب کاربری شما غیرفعال شده است. لطفاً با مدیریت باشگاه تماس بگیرید.');
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      String(input.password_plain || ''),
+      foundRow.password_hash
+    );
+
+    if (!isPasswordValid) {
+      throw new Error('شماره تلفن/نام کاربری یا رمز عبور اشتباه است.');
+    }
+
+    const token = await this.createAuthSession(foundRow.id);
+
     return {
-      ...publicMember,
-      role: found.role || 'member',
+      member: stripPassword(foundRow),
+      token,
     };
   }
 
-  public async getMemberPanelData(phone?: string): Promise<{
-    member: Omit<ClubMemberRow, 'password_hash'>;
+  // ==================== HELPERS FOR SESSIONS & CLASSES ====================
+
+  private async mapSessionRowsWithEnrollments(
+    rawSessions: RowDataPacket[]
+  ): Promise<MemberSessionRow[]> {
+    if (rawSessions.length === 0) return [];
+    const sessionIds = rawSessions.map((r) => Number(r.id));
+    const placeholders = sessionIds.map(() => '?').join(',');
+
+    const [enrollmentRows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT * FROM session_enrollments
+       WHERE target_type = 'session' AND target_id IN (${placeholders})
+       ORDER BY id DESC`,
+      sessionIds
+    );
+
+    const bySessionId = new Map<number, EnrollmentRecordRow[]>();
+    for (const er of enrollmentRows) {
+      const tid = Number(er.target_id);
+      const list = bySessionId.get(tid) || [];
+      list.push({
+        id: Number(er.id),
+        member_phone: String(er.member_phone),
+        member_name: String(er.member_name),
+        registered_at: String(er.registered_at),
+        status: (er.status as EnrollmentRecordRow['status']) || 'غیرفعال',
+        attendance_status: String(er.attendance_status || 'ثبت‌نام‌شده'),
+      });
+      bySessionId.set(tid, list);
+    }
+
+    return rawSessions.map((r) => ({
+      id: Number(r.id),
+      member_phone: String(r.member_phone || 'all'),
+      title: String(r.title || ''),
+      book_title: String(r.book_title || ''),
+      book_author: String(r.book_author || ''),
+      pages_count: Number(r.pages_count || 300),
+      publisher: String(r.publisher || ''),
+      mentor_name: String(r.mentor_name || ''),
+      session_date: String(r.session_date || ''),
+      session_time: String(r.session_time || ''),
+      cover_url: String(r.cover_url || '/assets/book-current.png'),
+      location_type: String(r.location_type || 'حضوری و آنلاین'),
+      meeting_link_or_room: String(r.meeting_link_or_room || ''),
+      status: (r.status as MemberSessionRow['status']) || 'فعال',
+      member_note: String(r.member_note || ''),
+      sub_sessions: safeJsonParse<SessionSubItemRow[]>(r.sub_sessions_json, []),
+      enrolled_members: bySessionId.get(Number(r.id)) || [],
+      sort_order: Number(r.sort_order || 0),
+    }));
+  }
+
+  private async mapClassRowsWithEnrollments(
+    rawClasses: RowDataPacket[]
+  ): Promise<MemberClassRow[]> {
+    if (rawClasses.length === 0) return [];
+    const classIds = rawClasses.map((r) => Number(r.id));
+    const placeholders = classIds.map(() => '?').join(',');
+
+    const [enrollmentRows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT * FROM session_enrollments
+       WHERE target_type = 'class' AND target_id IN (${placeholders})
+       ORDER BY id DESC`,
+      classIds
+    );
+
+    const byClassId = new Map<number, EnrollmentRecordRow[]>();
+    for (const er of enrollmentRows) {
+      const tid = Number(er.target_id);
+      const list = byClassId.get(tid) || [];
+      list.push({
+        id: Number(er.id),
+        member_phone: String(er.member_phone),
+        member_name: String(er.member_name),
+        registered_at: String(er.registered_at),
+        status: (er.status as EnrollmentRecordRow['status']) || 'غیرفعال',
+        attendance_status: String(er.attendance_status || 'ثبت‌نام‌شده'),
+      });
+      byClassId.set(tid, list);
+    }
+
+    return rawClasses.map((r) => ({
+      id: Number(r.id),
+      member_phone: String(r.member_phone || 'all'),
+      title: String(r.title || ''),
+      book_title: String(r.book_title || ''),
+      instructor_name: String(r.instructor_name || ''),
+      schedule_summary: String(r.schedule_summary || ''),
+      level_label: String(r.level_label || 'مبتدی'),
+      cover_url: String(r.cover_url || '/assets/blog-1.png'),
+      status: (r.status as MemberClassRow['status']) || 'فعال',
+      description: String(r.description || ''),
+      sub_sessions: safeJsonParse<SessionSubItemRow[]>(r.sub_sessions_json, []),
+      enrolled_members: byClassId.get(Number(r.id)) || [],
+      sort_order: Number(r.sort_order || 0),
+    }));
+  }
+
+  // ==================== MEMBER PANEL QUERIES & MUTATIONS ====================
+
+  public async getMemberPanelData(memberPhone: string): Promise<{
+    member: PublicClubMember;
     sessions: MemberSessionRow[];
     classes: MemberClassRow[];
     library: MemberLibraryRow[];
@@ -1914,50 +1296,78 @@ class MySQLDatabaseManager {
     calendarEvents: ClubCalendarEventRow[];
     announcements: ClubAnnouncementRow[];
   }> {
-    if (!this.store.club_members || this.store.club_members.length === 0) {
-      this.store.club_members = JSON.parse(JSON.stringify(SEED_DATA.club_members));
-    }
-    if (!this.store.member_sessions) {
-      this.store.member_sessions = JSON.parse(JSON.stringify(SEED_DATA.member_sessions));
-    }
-    if (!this.store.member_classes) {
-      this.store.member_classes = JSON.parse(JSON.stringify(SEED_DATA.member_classes));
-    }
-    if (!this.store.member_library) {
-      this.store.member_library = JSON.parse(JSON.stringify(SEED_DATA.member_library));
-    }
-    if (!this.store.member_tickets) {
-      this.store.member_tickets = JSON.parse(JSON.stringify(SEED_DATA.member_tickets));
-    }
-    if (!this.store.club_calendar_events) {
-      this.store.club_calendar_events = JSON.parse(
-        JSON.stringify(SEED_DATA.club_calendar_events)
-      );
-    }
-    if (!this.store.club_announcements) {
-      this.store.club_announcements = JSON.parse(
-        JSON.stringify(SEED_DATA.club_announcements)
-      );
+    const normalizedPhone = normalizeIdentifierDigits(memberPhone);
+    const persianPhone = toPersianDigitsServer(normalizedPhone);
+
+    const [memberRows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM club_members WHERE phone = ? OR phone = ? LIMIT 1',
+      [memberPhone, persianPhone]
+    );
+
+    if (memberRows.length === 0) {
+      throw new Error('کاربر مورد نظر در دیتابیس یافت نشد.');
     }
 
-    this.ensureEnrolledMembersSeeded();
+    const publicMember = stripPassword(memberRows[0] as ClubMemberRow);
+    const canonicalPhone = publicMember.phone;
 
-    const foundMember =
-      (phone && this.store.club_members.find((m) => m.phone === phone)) ||
-      this.store.club_members[0];
-    const { password_hash: _removed, ...publicMember } = foundMember;
-    const memberPhone = publicMember.phone;
+    const [
+      rawSessions,
+      rawClasses,
+      rawLibrary,
+      rawTickets,
+      rawEvents,
+      rawAnnouncements,
+    ] = await Promise.all([
+      this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_sessions ORDER BY sort_order ASC, id DESC'
+      ),
+      this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_classes ORDER BY sort_order ASC, id DESC'
+      ),
+      this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_library WHERE member_phone = ? OR member_phone = ? ORDER BY id DESC',
+        [canonicalPhone, normalizedPhone]
+      ),
+      this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_tickets WHERE member_phone = ? OR member_phone = ? ORDER BY id DESC',
+        [canonicalPhone, normalizedPhone]
+      ),
+      this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM club_calendar_events ORDER BY sort_order ASC, id DESC'
+      ),
+      this.pool.execute<RowDataPacket[]>(
+        `SELECT * FROM club_announcements
+         WHERE target_user_phone IS NULL OR target_user_phone = '' OR target_user_phone = 'all' OR target_user_phone = ? OR target_user_phone = ?
+         ORDER BY sort_order ASC, id DESC`,
+        [canonicalPhone, normalizedPhone]
+      ),
+    ]);
 
-    const userSessions = [...this.store.member_sessions]
+    const allSessions = await this.mapSessionRowsWithEnrollments(rawSessions[0]);
+    const allClasses = await this.mapClassRowsWithEnrollments(rawClasses[0]);
+
+    const userSessions = allSessions
       .filter((s) => {
-        const rec = (s.enrolled_members || []).find((e) => e.member_phone === memberPhone);
+        const rec = (s.enrolled_members || []).find(
+          (e) =>
+            e.member_phone === canonicalPhone ||
+            normalizeIdentifierDigits(e.member_phone) === normalizedPhone
+        );
         if (rec) {
           return rec.status !== 'لغو شده';
         }
-        return s.member_phone === 'all' || s.member_phone === memberPhone;
+        return (
+          s.member_phone === canonicalPhone ||
+          normalizeIdentifierDigits(s.member_phone) === normalizedPhone
+        );
       })
       .map((s) => {
-        const rec = (s.enrolled_members || []).find((e) => e.member_phone === memberPhone);
+        const rec = (s.enrolled_members || []).find(
+          (e) =>
+            e.member_phone === canonicalPhone ||
+            normalizeIdentifierDigits(e.member_phone) === normalizedPhone
+        );
         if (rec) {
           return {
             ...s,
@@ -1965,20 +1375,29 @@ class MySQLDatabaseManager {
           };
         }
         return s;
-      })
-      .sort((a, b) => a.sort_order - b.sort_order);
+      });
 
-    const userClasses = [...this.store.member_classes]
+    const userClasses = allClasses
       .filter((c) => {
-        const rec = (c.enrolled_members || []).find((e) => e.member_phone === memberPhone);
+        const rec = (c.enrolled_members || []).find(
+          (e) =>
+            e.member_phone === canonicalPhone ||
+            normalizeIdentifierDigits(e.member_phone) === normalizedPhone
+        );
         if (rec) {
           return rec.status !== 'لغو شده';
         }
-        // Only show classes the member is enrolled in or initial default classes 1 & 2
-        return (c.id <= 2 && c.member_phone === 'all') || c.member_phone === memberPhone;
+        return (
+          c.member_phone === canonicalPhone ||
+          normalizeIdentifierDigits(c.member_phone) === normalizedPhone
+        );
       })
       .map((c) => {
-        const rec = (c.enrolled_members || []).find((e) => e.member_phone === memberPhone);
+        const rec = (c.enrolled_members || []).find(
+          (e) =>
+            e.member_phone === canonicalPhone ||
+            normalizeIdentifierDigits(e.member_phone) === normalizedPhone
+        );
         if (rec) {
           return {
             ...c,
@@ -1986,28 +1405,62 @@ class MySQLDatabaseManager {
           };
         }
         return c;
-      })
-      .sort((a, b) => a.sort_order - b.sort_order);
+      });
+
+    const tickets: MemberTicketRow[] = rawTickets[0].map((t) => ({
+      id: Number(t.id),
+      member_phone: String(t.member_phone),
+      ticket_code: String(t.ticket_code),
+      subject: String(t.subject),
+      department: String(t.department),
+      priority: (t.priority as MemberTicketRow['priority']) || 'عادی',
+      status: (t.status as MemberTicketRow['status']) || 'در انتظار بررسی',
+      message: String(t.message),
+      attachment_name: String(t.attachment_name || ''),
+      admin_reply: String(t.admin_reply || ''),
+      admin_replies: safeJsonParse<{ text: string; created_at: string }[]>(
+        t.admin_replies_json,
+        t.admin_reply ? [{ text: String(t.admin_reply), created_at: String(t.created_at) }] : []
+      ),
+      created_at: String(t.created_at),
+    }));
+
+    const calendarEvents: ClubCalendarEventRow[] = rawEvents[0].map((ev) => {
+      const reservedList = safeJsonParse<string[]>(ev.reserved_by_phones_json, []);
+      const isReservedByMember =
+        reservedList.includes(canonicalPhone) ||
+        reservedList.includes(normalizedPhone) ||
+        Number(ev.is_reserved) === 1;
+      return {
+        id: Number(ev.id),
+        title: String(ev.title),
+        event_type: String(ev.event_type),
+        day_of_month: String(ev.day_of_month),
+        month_name: String(ev.month_name),
+        weekday_name: String(ev.weekday_name),
+        time_range: String(ev.time_range),
+        host_name: String(ev.host_name),
+        location_label: String(ev.location_label),
+        capacity_info: String(ev.capacity_info),
+        description: String(ev.description),
+        is_reserved: isReservedByMember ? 1 : 0,
+        sort_order: Number(ev.sort_order || 0),
+      };
+    });
 
     return {
       member: publicMember,
       sessions: userSessions,
       classes: userClasses,
-      library: [...this.store.member_library],
-      tickets: [...this.store.member_tickets]
-        .filter((t) => t.member_phone === 'all' || t.member_phone === memberPhone)
-        .sort((a, b) => b.id - a.id),
-      calendarEvents: [...this.store.club_calendar_events].sort(
-        (a, b) => a.sort_order - b.sort_order
-      ),
-      announcements: [...this.store.club_announcements]
-        .filter((a) => !a.target_user_phone || a.target_user_phone === publicMember.phone)
-        .sort((a, b) => a.sort_order - b.sort_order),
+      library: rawLibrary[0] as MemberLibraryRow[],
+      tickets,
+      calendarEvents,
+      announcements: rawAnnouncements[0] as ClubAnnouncementRow[],
     };
   }
 
   public async updateMemberProfile(input: {
-    phone: string;
+    memberId: number;
     first_name: string;
     last_name: string;
     education: string;
@@ -2016,83 +1469,140 @@ class MySQLDatabaseManager {
     city?: string;
     avatar_url?: string;
     bio: string;
-  }): Promise<Omit<ClubMemberRow, 'password_hash'>> {
-    if (!this.store.club_members || this.store.club_members.length === 0) {
-      this.store.club_members = JSON.parse(JSON.stringify(SEED_DATA.club_members));
+  }): Promise<PublicClubMember> {
+    const [existingRows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM club_members WHERE id = ? LIMIT 1',
+      [input.memberId]
+    );
+
+    if (existingRows.length === 0) {
+      throw new Error('حساب کاربری یافت نشد.');
     }
-    let target = this.store.club_members.find((m) => m.phone === input.phone);
-    if (!target) {
-      target = this.store.club_members[0];
-    }
-    target.first_name = input.first_name;
-    target.last_name = input.last_name;
-    target.phone = input.phone;
-    target.education = input.education;
-    target.favorite_genre = input.favorite_genre;
-    target.email = input.email;
-    if (input.city !== undefined) {
-      target.city = input.city;
-    }
-    if (input.avatar_url !== undefined) {
-      target.avatar_url = input.avatar_url;
-    }
-    target.bio = input.bio;
-    this.saveDiskStore();
-    const { password_hash: _removed, ...publicMember } = target;
-    return publicMember;
+
+    const current = existingRows[0] as ClubMemberRow;
+    const nextCity = input.city !== undefined ? input.city : current.city;
+    const nextAvatar = input.avatar_url !== undefined ? input.avatar_url : current.avatar_url;
+
+    await this.pool.execute(
+      `UPDATE club_members
+       SET first_name = ?, last_name = ?, education = ?, favorite_genre = ?, email = ?, city = ?, avatar_url = ?, bio = ?
+       WHERE id = ?`,
+      [
+        input.first_name.trim(),
+        input.last_name.trim(),
+        input.education.trim(),
+        input.favorite_genre.trim(),
+        input.email.trim(),
+        nextCity || 'تهران',
+        nextAvatar || '',
+        input.bio.trim(),
+        input.memberId,
+      ]
+    );
+
+    const [updatedRows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM club_members WHERE id = ? LIMIT 1',
+      [input.memberId]
+    );
+    return stripPassword(updatedRows[0] as ClubMemberRow);
   }
 
   public async updateMemberSessionNote(input: {
     sessionId: number;
+    member_phone: string;
     member_note: string;
   }): Promise<MemberSessionRow> {
-    const session = this.store.member_sessions.find((s) => s.id === input.sessionId);
-    if (!session) {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_sessions WHERE id = ? LIMIT 1',
+      [input.sessionId]
+    );
+    if (rows.length === 0) {
       throw new Error('نشست مورد نظر یافت نشد.');
     }
-    session.member_note = input.member_note;
-    this.saveDiskStore();
-    return session;
+
+    await this.pool.execute(
+      'UPDATE member_sessions SET member_note = ? WHERE id = ?',
+      [input.member_note, input.sessionId]
+    );
+
+    await this.pool.execute(
+      `UPDATE session_enrollments
+       SET member_note = ?
+       WHERE target_type = 'session' AND target_id = ? AND member_phone = ?`,
+      [input.member_note, input.sessionId, input.member_phone]
+    );
+
+    const [updatedRows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_sessions WHERE id = ? LIMIT 1',
+      [input.sessionId]
+    );
+    const mapped = await this.mapSessionRowsWithEnrollments(updatedRows);
+    return mapped[0];
   }
 
   public async updateMemberLibraryItem(input: {
     bookId: number;
+    member_phone: string;
     pages_read?: number;
     progress_percent?: number;
     reading_status: 'در حال مطالعه' | 'خوانده‌شده' | 'در نوبت مطالعه';
     personal_note: string;
   }): Promise<MemberLibraryRow> {
-    const item = this.store.member_library.find((b) => b.id === input.bookId);
-    if (!item) {
-      throw new Error('کتاب مورد نظر در کتابخانه شخصی یافت نشد.');
-    }
-    const totalPages = Math.max(1, item.pages_count || 300);
-    if (typeof input.pages_read === 'number' && !Number.isNaN(input.pages_read)) {
-      const clampedPages = Math.max(0, Math.min(totalPages, Math.round(input.pages_read)));
-      item.pages_read = clampedPages;
-      item.progress_percent = Math.min(
-        100,
-        Math.round((clampedPages / totalPages) * 100)
-      );
-    } else if (typeof input.progress_percent === 'number') {
-      item.progress_percent = Math.max(0, Math.min(100, Number(input.progress_percent)));
-      item.pages_read = Math.round((item.progress_percent / 100) * totalPages);
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_library WHERE id = ? AND member_phone = ? LIMIT 1',
+      [input.bookId, input.member_phone]
+    );
+
+    if (rows.length === 0) {
+      throw new Error('کتاب مورد نظر در کتابخانه شخصی شما یافت نشد.');
     }
 
-    if (item.pages_read >= totalPages || input.reading_status === 'خوانده‌شده') {
-      item.reading_status = 'خوانده‌شده';
-      item.pages_read = totalPages;
-      item.progress_percent = 100;
-    } else {
-      item.reading_status = input.reading_status;
+    const item = rows[0] as MemberLibraryRow;
+    const totalPages = Math.max(1, Number(item.pages_count || 300));
+    let nextPagesRead = Number(item.pages_read || 0);
+    let nextProgress = Number(item.progress_percent || 0);
+
+    if (typeof input.pages_read === 'number' && !Number.isNaN(input.pages_read)) {
+      nextPagesRead = Math.max(0, Math.min(totalPages, Math.round(input.pages_read)));
+      nextProgress = Math.min(100, Math.round((nextPagesRead / totalPages) * 100));
+    } else if (typeof input.progress_percent === 'number') {
+      nextProgress = Math.max(0, Math.min(100, Number(input.progress_percent)));
+      nextPagesRead = Math.round((nextProgress / 100) * totalPages);
     }
-    item.personal_note = input.personal_note;
-    item.updated_at = 'هم‌اکنون';
-    this.saveDiskStore();
-    return item;
+
+    let nextStatus = input.reading_status;
+    if (nextPagesRead >= totalPages || input.reading_status === 'خوانده‌شده') {
+      nextStatus = 'خوانده‌شده';
+      nextPagesRead = totalPages;
+      nextProgress = 100;
+    }
+
+    const updatedAt = 'هم‌اکنون';
+
+    await this.pool.execute(
+      `UPDATE member_library
+       SET pages_read = ?, progress_percent = ?, reading_status = ?, personal_note = ?, updated_at = ?
+       WHERE id = ? AND member_phone = ?`,
+      [
+        nextPagesRead,
+        nextProgress,
+        nextStatus,
+        input.personal_note,
+        updatedAt,
+        input.bookId,
+        input.member_phone,
+      ]
+    );
+
+    const [updated] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_library WHERE id = ? LIMIT 1',
+      [input.bookId]
+    );
+    return updated[0] as MemberLibraryRow;
   }
 
   public async addMemberLibraryBook(input: {
+    member_phone: string;
     book_title: string;
     author: string;
     translator: string;
@@ -2100,10 +1610,6 @@ class MySQLDatabaseManager {
     pages_count: number;
     personal_note: string;
   }): Promise<MemberLibraryRow> {
-    const nextId =
-      this.store.member_library.length > 0
-        ? Math.max(...this.store.member_library.map((b) => b.id)) + 1
-        : 1;
     const covers = [
       '/assets/book-recent-3.png',
       '/assets/book-current.png',
@@ -2111,31 +1617,39 @@ class MySQLDatabaseManager {
       '/assets/book-recent-2.png',
       '/assets/book-recent-4.png',
     ];
-    const totalPages = input.pages_count || 320;
+    const totalPages = Math.max(1, Number(input.pages_count || 320));
     const initialProgress =
       input.reading_status === 'خوانده‌شده'
         ? 100
         : input.reading_status === 'در حال مطالعه'
         ? 20
         : 0;
-    const newBook: MemberLibraryRow = {
-      id: nextId,
-      member_phone: 'all',
-      book_title: input.book_title,
-      author: input.author,
-      translator: input.translator || '—',
-      cover_url: covers[nextId % covers.length],
-      reading_status: input.reading_status,
-      progress_percent: initialProgress,
-      pages_read: Math.round((initialProgress / 100) * totalPages),
-      pages_count: totalPages,
-      personal_note:
-        input.personal_note || 'افزوده‌شده به قفسه مطالعات شخصی در باشگاه بوک‌میت.',
-      updated_at: 'امروز',
-    };
-    this.store.member_library.unshift(newBook);
-    this.saveDiskStore();
-    return newBook;
+    const pagesRead = Math.round((initialProgress / 100) * totalPages);
+    const coverUrl = covers[Math.floor(Math.random() * covers.length)];
+
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      `INSERT INTO member_library
+        (member_phone, book_title, author, translator, cover_url, reading_status, progress_percent, pages_read, pages_count, personal_note, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'امروز')`,
+      [
+        input.member_phone,
+        input.book_title,
+        input.author,
+        input.translator || '—',
+        coverUrl,
+        input.reading_status,
+        initialProgress,
+        pagesRead,
+        totalPages,
+        input.personal_note || '',
+      ]
+    );
+
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_library WHERE id = ? LIMIT 1',
+      [result.insertId]
+    );
+    return rows[0] as MemberLibraryRow;
   }
 
   public async createMemberTicket(input: {
@@ -2146,222 +1660,138 @@ class MySQLDatabaseManager {
     message: string;
     attachment_name?: string;
   }): Promise<MemberTicketRow> {
-    const nextId =
-      this.store.member_tickets.length > 0
-        ? Math.max(...this.store.member_tickets.map((t) => t.id)) + 1
-        : 1;
-    const ticket: MemberTicketRow = {
-      id: nextId,
-      member_phone: input.member_phone || 'all',
-      ticket_code: `TK-۱۴۰۵-${450 + nextId}`,
-      subject: input.subject,
-      department: input.department,
-      priority: input.priority,
-      status: 'در انتظار بررسی',
-      message: input.message,
-      attachment_name: input.attachment_name || '',
-      admin_reply:
-        'تیکت شما در دبیرخانه باشگاه کتابخوانی بوک‌میت ثبت شد و کارشناسان مربوطه در کوتاه‌ترین زمان پاسخگوی شما خواهند بود.',
-      created_at: 'امروز',
+    const tempCode = `TK-۱۴۰۵-${toPersianDigitsServer(Math.floor(100 + Math.random() * 900))}`;
+    const createdAt = 'امروز';
+
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      `INSERT INTO member_tickets
+        (member_phone, ticket_code, subject, department, priority, status, message, attachment_name, admin_reply, admin_replies_json, created_at)
+       VALUES (?, ?, ?, ?, ?, 'در انتظار بررسی', ?, ?, '', '[]', ?)`,
+      [
+        input.member_phone,
+        tempCode,
+        input.subject,
+        input.department,
+        input.priority,
+        input.message,
+        input.attachment_name || '',
+        createdAt,
+      ]
+    );
+
+    const ticketCode = `TK-۱۴۰۵-${toPersianDigitsServer(450 + result.insertId)}`;
+    await this.pool.execute(
+      'UPDATE member_tickets SET ticket_code = ? WHERE id = ?',
+      [ticketCode, result.insertId]
+    );
+
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_tickets WHERE id = ? LIMIT 1',
+      [result.insertId]
+    );
+    const t = rows[0];
+    return {
+      id: Number(t.id),
+      member_phone: String(t.member_phone),
+      ticket_code: String(t.ticket_code),
+      subject: String(t.subject),
+      department: String(t.department),
+      priority: (t.priority as MemberTicketRow['priority']) || 'عادی',
+      status: (t.status as MemberTicketRow['status']) || 'در انتظار بررسی',
+      message: String(t.message),
+      attachment_name: String(t.attachment_name || ''),
+      admin_reply: String(t.admin_reply || ''),
+      admin_replies: [],
+      created_at: String(t.created_at),
     };
-    this.store.member_tickets.unshift(ticket);
-    this.saveDiskStore();
-    return ticket;
   }
 
-  public async toggleCalendarReservation(eventId: number): Promise<ClubCalendarEventRow> {
-    const ev = this.store.club_calendar_events.find((e) => e.id === eventId);
-    if (!ev) {
+  public async toggleCalendarReservation(
+    eventId: number,
+    memberPhone: string
+  ): Promise<ClubCalendarEventRow> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM club_calendar_events WHERE id = ? LIMIT 1',
+      [eventId]
+    );
+    if (rows.length === 0) {
       throw new Error('رویداد مورد نظر یافت نشد.');
     }
+
+    const ev = rows[0];
     const dayNum = parseInt(
-      String(ev.day_of_month || '0')
-        .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
-        .replace(/[^\d]/g, ''),
+      normalizeIdentifierDigits(String(ev.day_of_month || '0')).replace(/[^\d]/g, ''),
       10
     );
     const isPast =
       String(ev.capacity_info || '').includes('برگزار شده') ||
       String(ev.capacity_info || '').includes('گذشته') ||
       (ev.month_name === 'آبان ۱۴۰۵' && !Number.isNaN(dayNum) && dayNum < 14);
+
     if (isPast) {
-      throw new Error('مهلت رزرو یا لغو این رویداد به پایان رسیده است و رویداد برگزار شده است.');
+      throw new Error(
+        'مهلت رزرو یا لغو این رویداد به پایان رسیده است و رویداد برگزار شده است.'
+      );
     }
-    ev.is_reserved = ev.is_reserved === 1 ? 0 : 1;
-    this.saveDiskStore();
-    return ev;
+
+    const reservedPhones = safeJsonParse<string[]>(ev.reserved_by_phones_json, []);
+    const idx = reservedPhones.indexOf(memberPhone);
+    let isReservedNow = 0;
+    if (idx >= 0) {
+      reservedPhones.splice(idx, 1);
+      isReservedNow = 0;
+    } else {
+      reservedPhones.push(memberPhone);
+      isReservedNow = 1;
+    }
+
+    await this.pool.execute(
+      'UPDATE club_calendar_events SET is_reserved = ?, reserved_by_phones_json = ? WHERE id = ?',
+      [isReservedNow, JSON.stringify(reservedPhones), eventId]
+    );
+
+    return {
+      id: Number(ev.id),
+      title: String(ev.title),
+      event_type: String(ev.event_type),
+      day_of_month: String(ev.day_of_month),
+      month_name: String(ev.month_name),
+      weekday_name: String(ev.weekday_name),
+      time_range: String(ev.time_range),
+      host_name: String(ev.host_name),
+      location_label: String(ev.location_label),
+      capacity_info: String(ev.capacity_info),
+      description: String(ev.description),
+      is_reserved: isReservedNow,
+      sort_order: Number(ev.sort_order || 0),
+    };
   }
 
   public async markAnnouncementRead(
     announcementId: number
   ): Promise<ClubAnnouncementRow> {
-    if (!this.store.club_announcements) {
-      this.store.club_announcements = JSON.parse(
-        JSON.stringify(SEED_DATA.club_announcements)
-      );
-    }
-    const item = this.store.club_announcements.find((a) => a.id === announcementId);
-    if (!item) {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM club_announcements WHERE id = ? LIMIT 1',
+      [announcementId]
+    );
+    if (rows.length === 0) {
       throw new Error('اطلاعیه مورد نظر یافت نشد.');
     }
-    item.is_read = 1;
-    this.saveDiskStore();
-    return item;
-  }
 
-  public async getAdminPanelData(): Promise<{
-    admin: Omit<ClubMemberRow, 'password_hash'>;
-    sessions: MemberSessionRow[];
-    classes: MemberClassRow[];
-    users: Omit<ClubMemberRow, 'password_hash'>[];
-    tickets: MemberTicketRow[];
-    announcements: ClubAnnouncementRow[];
-    blogPosts: BlogPostRow[];
-    comments: UserCommentRow[];
-    gallery: GalleryImageRow[];
-    heroSettings: HeroSettingsRow;
-    aboutClub: AboutClubRow;
-    aboutManager: AboutManagerRow;
-    contactInfo: ContactInfoRow;
-    libraryBooks: LibraryBookRow[];
-  }> {
-    if (!this.store.club_members || this.store.club_members.length === 0) {
-      this.store.club_members = JSON.parse(JSON.stringify(SEED_DATA.club_members));
-    }
-    if (!this.store.user_comments || this.store.user_comments.length === 0) {
-      this.store.user_comments = JSON.parse(JSON.stringify(SEED_DATA.user_comments));
-    }
-    if (!this.store.gallery_images || this.store.gallery_images.length === 0) {
-      this.store.gallery_images = JSON.parse(JSON.stringify(SEED_DATA.gallery_images));
-    }
-    let adminRow = this.store.club_members.find(
-      (m) => m.role === 'admin' || m.phone === 'admin'
+    await this.pool.execute(
+      'UPDATE club_announcements SET is_read = 1 WHERE id = ?',
+      [announcementId]
     );
-    if (!adminRow) {
-      adminRow = JSON.parse(
-        JSON.stringify(SEED_DATA.club_members.find((m) => m.role === 'admin')!)
-      );
-      this.store.club_members.push(adminRow!);
-      this.saveDiskStore();
-    }
-    const { password_hash: _adminPass, ...adminPublic } = adminRow!;
-    const usersList = this.store.club_members
-      .filter((m) => m.role !== 'admin' && m.phone !== 'admin')
-      .map(({ password_hash: _p, ...rest }) => rest);
 
-    this.ensureEnrolledMembersSeeded();
-
-    return {
-      admin: { ...adminPublic, role: 'admin' },
-      sessions: [...(this.store.member_sessions || [])].sort(
-        (a, b) => a.sort_order - b.sort_order
-      ),
-      classes: [...(this.store.member_classes || [])].sort(
-        (a, b) => a.sort_order - b.sort_order
-      ),
-      users: usersList,
-      tickets: [...(this.store.member_tickets || [])].sort((a, b) => b.id - a.id),
-      announcements: [...(this.store.club_announcements || [])].sort(
-        (a, b) => a.sort_order - b.sort_order
-      ),
-      blogPosts: [...(this.store.blog_posts || [])].sort(
-        (a, b) => a.sort_order - b.sort_order
-      ),
-      comments: [...(this.store.user_comments || [])].sort(
-        (a, b) => a.sort_order - b.sort_order
-      ),
-      gallery: [...(this.store.gallery_images || [])].sort((a, b) => b.id - a.id),
-      heroSettings: this.store.hero_settings[0],
-      aboutClub: this.store.about_club[0],
-      aboutManager: this.store.about_manager[0],
-      contactInfo: this.store.contact_info[0],
-      libraryBooks: [...(this.store.library_books || [])].sort(
-        (a, b) => a.sort_order - b.sort_order
-      ),
-    };
-  }
-
-  private ensureEnrolledMembersSeeded(): void {
-    let changed = false;
-    if (!this.store.member_sessions) {
-      this.store.member_sessions = JSON.parse(JSON.stringify(SEED_DATA.member_sessions));
-      changed = true;
-    }
-    if (!this.store.member_classes) {
-      this.store.member_classes = JSON.parse(JSON.stringify(SEED_DATA.member_classes));
-      changed = true;
-    }
-
-    // Ensure Russian courses exist in member_classes
-    for (const seedClass of SEED_DATA.member_classes) {
-      const exists = this.store.member_classes.some(
-        (c) => c.id === seedClass.id || c.title === seedClass.title
-      );
-      if (!exists) {
-        this.store.member_classes.push(JSON.parse(JSON.stringify(seedClass)));
-        changed = true;
-      }
-    }
-
-    // Ensure enrolled_members array exists on every session
-    this.store.member_sessions.forEach((s, idx) => {
-      if (!Array.isArray(s.enrolled_members) || s.enrolled_members.length === 0) {
-        s.enrolled_members = [
-          {
-            id: 8000 + idx * 10 + 1,
-            member_phone: '۰۹۱۲۳۴۵۶۷۸۹',
-            member_name: 'پرنیا فرهمند',
-            registered_at: '۸ آبان ۱۴۰۵',
-            status: s.status === 'غیرفعال' ? 'غیرفعال' : 'فعال',
-          },
-          {
-            id: 8000 + idx * 10 + 2,
-            member_phone: '۰۹۱۲۱۱۱۲۲۳۳',
-            member_name: 'کیانوش معتمدی',
-            registered_at: '۱۰ آبان ۱۴۰۵',
-            status: 'فعال',
-          },
-          {
-            id: 8000 + idx * 10 + 3,
-            member_phone: '۰۹۳۵۴۴۴۵۵۶۶',
-            member_name: 'مهسا تاجیک',
-            registered_at: '۱۴ آبان ۱۴۰۵',
-            status: 'غیرفعال',
-          },
-        ];
-        changed = true;
-      }
-    });
-
-    // Ensure enrolled_members array exists on every class
-    this.store.member_classes.forEach((c, idx) => {
-      if (!Array.isArray(c.enrolled_members) || c.enrolled_members.length === 0) {
-        c.enrolled_members = [
-          {
-            id: 9000 + idx * 10 + 1,
-            member_phone: '۰۹۱۲۳۴۵۶۷۸۹',
-            member_name: 'پرنیا فرهمند',
-            registered_at: '۷ آبان ۱۴۰۵',
-            status: 'فعال',
-          },
-          {
-            id: 9000 + idx * 10 + 2,
-            member_phone: '۰۹۳۵۴۴۴۵۵۶۶',
-            member_name: 'مهسا تاجیک',
-            registered_at: '۱۴ آبان ۱۴۰۵',
-            status: 'غیرفعال',
-          },
-        ];
-        changed = true;
-      }
-    });
-
-    if (changed) {
-      this.saveDiskStore();
-    }
+    const [updated] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM club_announcements WHERE id = ? LIMIT 1',
+      [announcementId]
+    );
+    return updated[0] as ClubAnnouncementRow;
   }
 
   public async enrollMemberInItem(input: {
+    member_id?: number;
     member_phone: string;
     member_name?: string;
     target_type: 'session' | 'class';
@@ -2382,168 +1812,247 @@ class MySQLDatabaseManager {
     session?: MemberSessionRow;
     classItem?: MemberClassRow;
   }> {
-    this.ensureEnrolledMembersSeeded();
-
-    const memberObj = (this.store.club_members || []).find(
-      (m) => m.phone === input.member_phone
-    );
-    const resolvedName =
-      input.member_name ||
-      (memberObj ? `${memberObj.first_name} ${memberObj.last_name}` : 'عضو باشگاه');
+    const resolvedName = String(input.member_name || 'عضو باشگاه').trim();
 
     if (input.target_type === 'class') {
-      let targetClass = this.store.member_classes.find(
-        (c) => c.title.trim() === input.title.trim()
+      const [existingClasses] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_classes WHERE title = ? LIMIT 1',
+        [input.title.trim()]
       );
-      if (!targetClass) {
-        const nextId =
-          this.store.member_classes.length > 0
-            ? Math.max(...this.store.member_classes.map((c) => c.id)) + 1
-            : 1;
-        targetClass = {
-          id: nextId,
-          member_phone: input.member_phone,
-          title: input.title,
-          book_title: input.book_title || 'سرفصل تخصصی دوره آموزشی',
-          instructor_name: input.mentor_or_instructor || 'دکتر آناستازیا رادین و سهراب رستگار',
-          schedule_summary: input.schedule_text || 'یکشنبه‌ها و سه‌شنبه‌ها · ساعت ۱۷:۳۰ تا ۱۹:۰۰',
-          level_label: input.level_label || 'مبتدی',
-          cover_url: input.cover_url || '/assets/blog-1.png',
-          status: 'غیرفعال',
-          description:
-            input.description ||
-            'دوره آموزشی ثبت‌نام‌شده از طریق صفحه اصلی سایت باشگاه کتابخوانی بوک‌میت.',
-          sub_sessions:
-            Array.isArray(input.sub_sessions) && input.sub_sessions.length > 0
-              ? input.sub_sessions
-              : [
-                  {
-                    id: Date.now() + 1,
-                    session_number: 'جلسه اول',
-                    title: `جلسه معارفه و آغازین «${input.title}»`,
-                    status: 'تعریف شده',
-                    session_date: '۲۲ آبان ۱۴۰۵',
-                    session_time: '۱۷:۳۰ تا ۱۹:۰۰',
-                    cover_url: input.cover_url || '/assets/blog-1.png',
-                    pages_read: 0,
-                    pages_to_read: 'طبق سرفصل جلسه اول دوره',
-                    reviewed_topics: '',
-                    session_notes: '',
-                    meeting_link: 'https://meet.bookmeet.ir/course-live',
-                  },
-                ],
-          enrolled_members: [],
-          sort_order: 0,
-        };
-        this.store.member_classes.unshift(targetClass);
-      }
 
-      if (!Array.isArray(targetClass.enrolled_members)) {
-        targetClass.enrolled_members = [];
-      }
-
-      const existingRec = targetClass.enrolled_members.find(
-        (e) => e.member_phone === input.member_phone
-      );
-      if (existingRec) {
-        existingRec.status = 'غیرفعال';
-        existingRec.registered_at = '۱۴ آبان ۱۴۰۵ · ثبت‌نام جدید';
-        existingRec.member_name = resolvedName;
+      let classId: number;
+      if (existingClasses.length > 0) {
+        classId = Number(existingClasses[0].id);
       } else {
-        targetClass.enrolled_members.unshift({
-          id: Date.now(),
-          member_phone: input.member_phone,
-          member_name: resolvedName,
-          registered_at: '۱۴ آبان ۱۴۰۵ · هم‌اکنون',
-          status: 'غیرفعال',
-        });
-      }
-
-      this.saveDiskStore();
-      return {
-        target_type: 'class',
-        classItem: { ...targetClass, status: 'غیرفعال' },
-      };
-    }
-
-    // Otherwise target_type === 'session'
-    let targetSession = this.store.member_sessions.find(
-      (s) =>
-        s.title.trim() === input.title.trim() ||
-        (input.book_title && s.book_title.trim() === input.book_title.trim() && s.title.includes(input.book_title.trim()))
-    );
-
-    if (!targetSession) {
-      const nextId =
-        this.store.member_sessions.length > 0
-          ? Math.max(...this.store.member_sessions.map((s) => s.id)) + 1
-          : 1;
-      targetSession = {
-        id: nextId,
-        member_phone: input.member_phone,
-        title: input.title,
-        book_title: input.book_title || input.title,
-        book_author: input.book_author || 'نویسنده اثر منتخب',
-        pages_count: Number(input.pages_count || 360),
-        publisher: input.publisher || 'نشر نیلوفر',
-        mentor_name: input.mentor_or_instructor || 'دکتر سهراب رستگار',
-        session_date: input.schedule_text || 'چهارشنبه ۲۴ آبان ۱۴۰۵',
-        session_time: input.time_text || 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-        cover_url: input.cover_url || '/assets/book-current.png',
-        location_type: 'حضوری و آنلاین',
-        meeting_link_or_room: 'تالار فردوسی خانه بوک‌میت',
-        status: 'غیرفعال',
-        member_note: '',
-        sub_sessions:
+        const defaultSubs: SessionSubItemRow[] =
           Array.isArray(input.sub_sessions) && input.sub_sessions.length > 0
             ? input.sub_sessions
             : [
                 {
-                  id: Date.now() + 2,
+                  id: Date.now() + 1,
                   session_number: 'جلسه اول',
-                  title: `نشست هم‌خوانی و تحلیل «${input.book_title || input.title}»`,
+                  title: `جلسه معارفه و آغازین «${input.title}»`,
                   status: 'تعریف شده',
-                  session_date: input.schedule_text || '۲۴ آبان ۱۴۰۵',
-                  session_time: input.time_text || '۱۸:۰۰ تا ۲۰:۰۰',
-                  cover_url: input.cover_url || '/assets/book-current.png',
+                  session_date: 'آبان ۱۴۰۵',
+                  session_time: '۱۷:۳۰ تا ۱۹:۰۰',
+                  cover_url: input.cover_url || '/assets/blog-1.png',
                   pages_read: 0,
-                  pages_to_read: 'فصل‌های تعیین‌شده در برنامه نشست',
+                  pages_to_read: 'طبق سرفصل جلسه اول دوره',
                   reviewed_topics: '',
                   session_notes: '',
-                  meeting_link: 'https://meet.bookmeet.ir/session-live',
+                  meeting_link: 'https://meet.bookmeet.ir/course-live',
                 },
-              ],
-        enrolled_members: [],
-        sort_order: 0,
+              ];
+
+        const [insertRes] = await this.pool.execute<ResultSetHeader>(
+          `INSERT INTO member_classes
+            (member_phone, title, book_title, instructor_name, schedule_summary, level_label, cover_url, status, description, sub_sessions_json, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'غیرفعال', ?, ?, 0)`,
+          [
+            input.member_phone,
+            input.title.trim(),
+            input.book_title || 'سرفصل تخصصی دوره آموزشی',
+            input.mentor_or_instructor || 'دکتر سهراب رستگار',
+            input.schedule_text || 'هفتگی',
+            input.level_label || 'مبتدی',
+            input.cover_url || '/assets/blog-1.png',
+            input.description || '',
+            JSON.stringify(defaultSubs),
+          ]
+        );
+        classId = insertRes.insertId;
+      }
+
+      await this.pool.execute(
+        `INSERT INTO session_enrollments
+          (target_type, target_id, member_id, member_phone, member_name, status, attendance_status, registered_at)
+         VALUES ('class', ?, ?, ?, ?, 'غیرفعال', 'ثبت‌نام‌شده', 'ثبت‌نام جدید')
+         ON DUPLICATE KEY UPDATE status = 'غیرفعال', member_name = VALUES(member_name), registered_at = 'ثبت‌نام مجدد'`,
+        [classId, input.member_id || null, input.member_phone, resolvedName]
+      );
+
+      const [classRows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_classes WHERE id = ? LIMIT 1',
+        [classId]
+      );
+      const mapped = await this.mapClassRowsWithEnrollments(classRows);
+      return {
+        target_type: 'class',
+        classItem: { ...mapped[0], status: 'غیرفعال' },
       };
-      this.store.member_sessions.unshift(targetSession);
     }
 
-    if (!Array.isArray(targetSession.enrolled_members)) {
-      targetSession.enrolled_members = [];
-    }
-
-    const existingRec = targetSession.enrolled_members.find(
-      (e) => e.member_phone === input.member_phone
+    // target_type === 'session'
+    const [existingSessions] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_sessions WHERE title = ? OR (book_title = ? AND book_title != "") LIMIT 1',
+      [input.title.trim(), String(input.book_title || '').trim()]
     );
-    if (existingRec) {
-      existingRec.status = 'غیرفعال';
-      existingRec.registered_at = '۱۴ آبان ۱۴۰۵ · ثبت‌نام جدید';
-      existingRec.member_name = resolvedName;
+
+    let sessionId: number;
+    if (existingSessions.length > 0) {
+      sessionId = Number(existingSessions[0].id);
     } else {
-      targetSession.enrolled_members.unshift({
-        id: Date.now(),
-        member_phone: input.member_phone,
-        member_name: resolvedName,
-        registered_at: '۱۴ آبان ۱۴۰۵ · هم‌اکنون',
-        status: 'غیرفعال',
-      });
+      const defaultSubs: SessionSubItemRow[] =
+        Array.isArray(input.sub_sessions) && input.sub_sessions.length > 0
+          ? input.sub_sessions
+          : [
+              {
+                id: Date.now() + 2,
+                session_number: 'جلسه اول',
+                title: `نشست هم‌خوانی و تحلیل «${input.book_title || input.title}»`,
+                status: 'تعریف شده',
+                session_date: input.schedule_text || 'آبان ۱۴۰۵',
+                session_time: input.time_text || '۱۸:۰۰ تا ۲۰:۰۰',
+                cover_url: input.cover_url || '/assets/book-current.png',
+                pages_read: 0,
+                pages_to_read: 'فصل‌های تعیین‌شده در برنامه نشست',
+                reviewed_topics: '',
+                session_notes: '',
+                meeting_link: 'https://meet.bookmeet.ir/session-live',
+              },
+            ];
+
+      const [insertRes] = await this.pool.execute<ResultSetHeader>(
+        `INSERT INTO member_sessions
+          (member_phone, title, book_title, book_author, pages_count, publisher, mentor_name, session_date, session_time, cover_url, location_type, meeting_link_or_room, status, member_note, sub_sessions_json, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'حضوری و آنلاین', 'تالار فردوسی خانه بوک‌میت', 'غیرفعال', '', ?, 0)`,
+        [
+          input.member_phone,
+          input.title.trim(),
+          input.book_title || input.title.trim(),
+          input.book_author || '',
+          Number(input.pages_count || 300),
+          input.publisher || '',
+          input.mentor_or_instructor || 'دکتر سهراب رستگار',
+          input.schedule_text || 'چهارشنبه‌ها',
+          input.time_text || 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+          input.cover_url || '/assets/book-current.png',
+          JSON.stringify(defaultSubs),
+        ]
+      );
+      sessionId = insertRes.insertId;
     }
 
-    this.saveDiskStore();
+    await this.pool.execute(
+      `INSERT INTO session_enrollments
+        (target_type, target_id, member_id, member_phone, member_name, status, attendance_status, registered_at)
+       VALUES ('session', ?, ?, ?, ?, 'غیرفعال', 'ثبت‌نام‌شده', 'ثبت‌نام جدید')
+       ON DUPLICATE KEY UPDATE status = 'غیرفعال', member_name = VALUES(member_name), registered_at = 'ثبت‌نام مجدد'`,
+      [sessionId, input.member_id || null, input.member_phone, resolvedName]
+    );
+
+    const [sessionRows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_sessions WHERE id = ? LIMIT 1',
+      [sessionId]
+    );
+    const mapped = await this.mapSessionRowsWithEnrollments(sessionRows);
     return {
       target_type: 'session',
-      session: { ...targetSession, status: 'غیرفعال' },
+      session: { ...mapped[0], status: 'غیرفعال' },
+    };
+  }
+
+  // ==================== ADMIN PANEL QUERIES & MUTATIONS ====================
+
+  public async getAdminPanelData(adminMember: PublicClubMember): Promise<{
+    admin: PublicClubMember;
+    sessions: MemberSessionRow[];
+    classes: MemberClassRow[];
+    users: PublicClubMember[];
+    tickets: MemberTicketRow[];
+    announcements: ClubAnnouncementRow[];
+    blogPosts: BlogPostRow[];
+    comments: UserCommentRow[];
+    gallery: GalleryImageRow[];
+    heroSettings: HeroSettingsRow;
+    aboutClub: AboutClubRow;
+    aboutManager: AboutManagerRow;
+    contactInfo: ContactInfoRow;
+    libraryBooks: LibraryBookRow[];
+  }> {
+    const [
+      rawSessions,
+      rawClasses,
+      rawUsers,
+      rawTickets,
+      rawAnnouncements,
+      rawBlogPosts,
+      rawComments,
+      rawGallery,
+      heroSettings,
+      aboutClub,
+      aboutManager,
+      contactInfo,
+      libraryBooks,
+    ] = await Promise.all([
+      this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_sessions ORDER BY sort_order ASC, id DESC'
+      ),
+      this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_classes ORDER BY sort_order ASC, id DESC'
+      ),
+      this.pool.execute<RowDataPacket[]>(
+        "SELECT * FROM club_members WHERE role != 'admin' ORDER BY id DESC"
+      ),
+      this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_tickets ORDER BY id DESC'
+      ),
+      this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM club_announcements ORDER BY sort_order ASC, id DESC'
+      ),
+      this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM blog_posts ORDER BY sort_order ASC, id DESC'
+      ),
+      this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM user_comments ORDER BY sort_order ASC, id DESC'
+      ),
+      this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM gallery_images ORDER BY id DESC'
+      ),
+      this.getHeroSettings(),
+      this.getAboutClub(),
+      this.getAboutManager(),
+      this.getContactInfo(),
+      this.getLibraryBooks(),
+    ]);
+
+    const sessions = await this.mapSessionRowsWithEnrollments(rawSessions[0]);
+    const classes = await this.mapClassRowsWithEnrollments(rawClasses[0]);
+    const users = rawUsers[0].map((u) => stripPassword(u as ClubMemberRow));
+
+    const tickets: MemberTicketRow[] = rawTickets[0].map((t) => ({
+      id: Number(t.id),
+      member_phone: String(t.member_phone),
+      ticket_code: String(t.ticket_code),
+      subject: String(t.subject),
+      department: String(t.department),
+      priority: (t.priority as MemberTicketRow['priority']) || 'عادی',
+      status: (t.status as MemberTicketRow['status']) || 'در انتظار بررسی',
+      message: String(t.message),
+      attachment_name: String(t.attachment_name || ''),
+      admin_reply: String(t.admin_reply || ''),
+      admin_replies: safeJsonParse<{ text: string; created_at: string }[]>(
+        t.admin_replies_json,
+        t.admin_reply ? [{ text: String(t.admin_reply), created_at: String(t.created_at) }] : []
+      ),
+      created_at: String(t.created_at),
+    }));
+
+    return {
+      admin: { ...adminMember, role: 'admin' },
+      sessions,
+      classes,
+      users,
+      tickets,
+      announcements: rawAnnouncements[0] as ClubAnnouncementRow[],
+      blogPosts: rawBlogPosts[0] as BlogPostRow[],
+      comments: rawComments[0] as UserCommentRow[],
+      gallery: rawGallery[0] as GalleryImageRow[],
+      heroSettings,
+      aboutClub,
+      aboutManager,
+      contactInfo,
+      libraryBooks,
     };
   }
 
@@ -2553,47 +2062,46 @@ class MySQLDatabaseManager {
     member_phone: string;
     status: 'فعال' | 'غیرفعال' | 'لغو شده';
   }): Promise<{ session?: MemberSessionRow; classItem?: MemberClassRow }> {
-    this.ensureEnrolledMembersSeeded();
+    await this.pool.execute(
+      `UPDATE session_enrollments
+       SET status = ?
+       WHERE target_type = ? AND target_id = ? AND member_phone = ?`,
+      [input.status, input.target_type, Number(input.target_id), input.member_phone]
+    );
 
     if (input.target_type === 'session') {
-      const sess = this.store.member_sessions.find(
-        (s) => s.id === Number(input.target_id)
+      if (input.status === 'فعال') {
+        await this.pool.execute(
+          "UPDATE member_sessions SET status = 'فعال' WHERE id = ?",
+          [Number(input.target_id)]
+        );
+      }
+      const [rows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_sessions WHERE id = ? LIMIT 1',
+        [Number(input.target_id)]
       );
-      if (!sess) {
+      if (rows.length === 0) {
         throw new Error('نشست مورد نظر یافت نشد.');
       }
-      if (!Array.isArray(sess.enrolled_members)) {
-        sess.enrolled_members = [];
-      }
-      const rec = sess.enrolled_members.find(
-        (e) => e.member_phone === input.member_phone
-      );
-      if (rec) {
-        rec.status = input.status;
-      }
-      if (input.status === 'فعال') {
-        sess.status = 'فعال';
-      }
-      this.saveDiskStore();
-      return { session: sess };
+      const mapped = await this.mapSessionRowsWithEnrollments(rows);
+      return { session: mapped[0] };
     }
 
-    const cls = this.store.member_classes.find((c) => c.id === Number(input.target_id));
-    if (!cls) {
+    if (input.status === 'فعال') {
+      await this.pool.execute(
+        "UPDATE member_classes SET status = 'فعال' WHERE id = ?",
+        [Number(input.target_id)]
+      );
+    }
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_classes WHERE id = ? LIMIT 1',
+      [Number(input.target_id)]
+    );
+    if (rows.length === 0) {
       throw new Error('کلاس یا دوره مورد نظر یافت نشد.');
     }
-    if (!Array.isArray(cls.enrolled_members)) {
-      cls.enrolled_members = [];
-    }
-    const rec = cls.enrolled_members.find((e) => e.member_phone === input.member_phone);
-    if (rec) {
-      rec.status = input.status;
-    }
-    if (input.status === 'فعال') {
-      cls.status = 'فعال';
-    }
-    this.saveDiskStore();
-    return { classItem: cls };
+    const mapped = await this.mapClassRowsWithEnrollments(rows);
+    return { classItem: mapped[0] };
   }
 
   public async saveAdminGalleryImage(input: {
@@ -2601,216 +2109,405 @@ class MySQLDatabaseManager {
     url: string;
     category?: string;
   }): Promise<GalleryImageRow> {
-    if (!this.store.gallery_images) {
-      this.store.gallery_images = JSON.parse(JSON.stringify(SEED_DATA.gallery_images));
-    }
-    const nextId =
-      this.store.gallery_images.length > 0
-        ? Math.max(...this.store.gallery_images.map((g) => g.id)) + 1
-        : 1;
-    const created: GalleryImageRow = {
-      id: nextId,
-      title: String(input.title || `تصویر شماره ${nextId}`),
-      url: String(input.url || '/assets/book-current.png'),
-      category: String(input.category || 'گالری عمومی'),
-      created_at: '۱۴ آبان ۱۴۰۵',
+    const title = String(input.title || 'تصویر گالری').trim();
+    const url = String(input.url || '/assets/book-current.png').trim();
+    const category = String(input.category || 'عمومی').trim();
+    const createdAt = '۱۴۰۵';
+
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      'INSERT INTO gallery_images (title, url, category, created_at) VALUES (?, ?, ?, ?)',
+      [title, url, category, createdAt]
+    );
+
+    return {
+      id: result.insertId,
+      title,
+      url,
+      category,
+      created_at: createdAt,
     };
-    this.store.gallery_images.unshift(created);
-    this.saveDiskStore();
-    return created;
   }
 
   public async deleteAdminGalleryImage(id: number): Promise<void> {
-    if (!this.store.gallery_images) {
-      this.store.gallery_images = JSON.parse(JSON.stringify(SEED_DATA.gallery_images));
-    }
-    this.store.gallery_images = this.store.gallery_images.filter((g) => g.id !== id);
-    this.saveDiskStore();
+    await this.pool.execute('DELETE FROM gallery_images WHERE id = ?', [id]);
   }
 
-  public async saveAdminSession(input: Partial<MemberSessionRow> & { id?: number }): Promise<MemberSessionRow> {
-    if (!this.store.member_sessions) {
-      this.store.member_sessions = [];
-    }
+  public async saveAdminSession(
+    input: Partial<MemberSessionRow> & { id?: number }
+  ): Promise<MemberSessionRow> {
     if (input.id) {
-      const existing = this.store.member_sessions.find((s) => s.id === Number(input.id));
-      if (!existing) {
+      const [rows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_sessions WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      if (rows.length === 0) {
         throw new Error('جلسه مورد نظر یافت نشد.');
       }
-      existing.title = input.title ?? existing.title;
-      existing.book_title = input.book_title ?? existing.book_title;
-      existing.book_author = input.book_author ?? existing.book_author;
-      existing.pages_count =
-        input.pages_count !== undefined ? Number(input.pages_count) : existing.pages_count;
-      existing.publisher = input.publisher ?? existing.publisher;
-      existing.mentor_name = input.mentor_name ?? existing.mentor_name;
-      existing.session_date = input.session_date ?? existing.session_date;
-      existing.session_time = input.session_time ?? existing.session_time;
-      existing.cover_url = input.cover_url || existing.cover_url || '/assets/book-current.png';
-      existing.status = (input.status as MemberSessionRow['status']) || existing.status;
-      existing.meeting_link_or_room =
-        input.meeting_link_or_room ?? existing.meeting_link_or_room;
-      if (Array.isArray(input.sub_sessions)) {
-        existing.sub_sessions = input.sub_sessions;
-      }
-      this.saveDiskStore();
-      return existing;
+      const current = rows[0];
+      const nextTitle = input.title ?? current.title;
+      const nextBookTitle = input.book_title ?? current.book_title;
+      const nextBookAuthor = input.book_author ?? current.book_author;
+      const nextPagesCount =
+        input.pages_count !== undefined
+          ? Number(input.pages_count)
+          : Number(current.pages_count || 300);
+      const nextPublisher = input.publisher ?? current.publisher;
+      const nextMentor = input.mentor_name ?? current.mentor_name;
+      const nextDate = input.session_date ?? current.session_date;
+      const nextTime = input.session_time ?? current.session_time;
+      const nextCover = input.cover_url || current.cover_url || '/assets/book-current.png';
+      const nextStatus = input.status || current.status || 'فعال';
+      const nextRoom = input.meeting_link_or_room ?? current.meeting_link_or_room;
+      const nextSubs = Array.isArray(input.sub_sessions)
+        ? JSON.stringify(input.sub_sessions)
+        : String(current.sub_sessions_json || '[]');
+
+      await this.pool.execute(
+        `UPDATE member_sessions
+         SET title = ?, book_title = ?, book_author = ?, pages_count = ?, publisher = ?,
+             mentor_name = ?, session_date = ?, session_time = ?, cover_url = ?,
+             status = ?, meeting_link_or_room = ?, sub_sessions_json = ?
+         WHERE id = ?`,
+        [
+          nextTitle,
+          nextBookTitle,
+          nextBookAuthor,
+          nextPagesCount,
+          nextPublisher,
+          nextMentor,
+          nextDate,
+          nextTime,
+          nextCover,
+          nextStatus,
+          nextRoom,
+          nextSubs,
+          Number(input.id),
+        ]
+      );
+
+      await this.syncSessionBookToLibrary({
+        book_title: String(nextBookTitle),
+        author: String(nextBookAuthor || ''),
+        pages_count: nextPagesCount,
+        cover_url: String(nextCover),
+        session_schedule: `${nextDate} · ${nextTime}`,
+        short_description: `دوره هم‌خوانی «${nextTitle}» با تسهیل‌گری ${nextMentor}`,
+      });
+
+      const [updatedRows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_sessions WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      const mapped = await this.mapSessionRowsWithEnrollments(updatedRows);
+      return mapped[0];
     }
 
-    const nextId =
-      this.store.member_sessions.length > 0
-        ? Math.max(...this.store.member_sessions.map((s) => s.id)) + 1
-        : 1;
-    const created: MemberSessionRow = {
-      id: nextId,
-      member_phone: 'all',
-      title: String(input.title || 'دوره هم‌خوانی جدید'),
-      book_title: String(input.book_title || 'کتاب منتخب باشگاه'),
-      book_author: String(input.book_author || ''),
-      pages_count: Number(input.pages_count || 320),
-      publisher: String(input.publisher || ''),
-      mentor_name: String(input.mentor_name || 'دکتر سهراب رستگار'),
-      session_date: String(input.session_date || 'چهارشنبه‌ها · آذر ۱۴۰۵'),
-      session_time: String(input.session_time || 'ساعت ۱۸:۰۰ تا ۲۰:۰۰'),
-      cover_url: String(input.cover_url || '/assets/book-current.png'),
-      location_type: 'آنلاین',
-      meeting_link_or_room: String(
-        input.meeting_link_or_room || 'تالار فردوسی خانه بوک‌میت'
-      ),
-      status: (input.status as MemberSessionRow['status']) || 'فعال',
-      member_note: String(input.member_note || ''),
-      sub_sessions: Array.isArray(input.sub_sessions) ? input.sub_sessions : [],
-      sort_order: nextId,
-    };
-    this.store.member_sessions.unshift(created);
-    this.saveDiskStore();
-    return created;
+    const title = String(input.title || 'دوره هم‌خوانی جدید').trim();
+    const bookTitle = String(input.book_title || 'کتاب منتخب باشگاه').trim();
+    const bookAuthor = String(input.book_author || '').trim();
+    const pagesCount = Number(input.pages_count || 320);
+    const publisher = String(input.publisher || '').trim();
+    const mentorName = String(input.mentor_name || 'دکتر سهراب رستگار').trim();
+    const sessionDate = String(input.session_date || '').trim();
+    const sessionTime = String(input.session_time || '').trim();
+    const coverUrl = String(input.cover_url || '/assets/book-current.png').trim();
+    const room = String(input.meeting_link_or_room || 'تالار فردوسی خانه بوک‌میت').trim();
+    const status = String(input.status || 'فعال').trim();
+    const memberNote = String(input.member_note || '').trim();
+    const subSessionsJson = JSON.stringify(
+      Array.isArray(input.sub_sessions) ? input.sub_sessions : []
+    );
+
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      `INSERT INTO member_sessions
+        (member_phone, title, book_title, book_author, pages_count, publisher, mentor_name, session_date, session_time, cover_url, location_type, meeting_link_or_room, status, member_note, sub_sessions_json, sort_order)
+       VALUES ('all', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'حضوری و آنلاین', ?, ?, ?, ?, 0)`,
+      [
+        title,
+        bookTitle,
+        bookAuthor,
+        pagesCount,
+        publisher,
+        mentorName,
+        sessionDate,
+        sessionTime,
+        coverUrl,
+        room,
+        status,
+        memberNote,
+        subSessionsJson,
+      ]
+    );
+
+    await this.syncSessionBookToLibrary({
+      book_title: bookTitle,
+      author: bookAuthor || mentorName,
+      pages_count: pagesCount,
+      cover_url: coverUrl,
+      session_schedule: `${sessionDate} · ${sessionTime}`,
+      short_description: `دوره هم‌خوانی «${title}» با تسهیل‌گری ${mentorName}`,
+    });
+
+    const [createdRows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_sessions WHERE id = ? LIMIT 1',
+      [result.insertId]
+    );
+    const mapped = await this.mapSessionRowsWithEnrollments(createdRows);
+    return mapped[0];
+  }
+
+  private async syncSessionBookToLibrary(input: {
+    book_title: string;
+    author: string;
+    pages_count: number;
+    cover_url: string;
+    session_schedule: string;
+    short_description: string;
+  }): Promise<void> {
+    if (!input.book_title) return;
+    const [existing] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT id FROM library_books WHERE title = ? LIMIT 1',
+      [input.book_title]
+    );
+    if (existing.length > 0) {
+      await this.pool.execute(
+        `UPDATE library_books
+         SET author = ?, pages_count = ?, cover_url = ?, session_schedule = ?
+         WHERE id = ?`,
+        [
+          input.author || 'نویسنده',
+          input.pages_count || 300,
+          input.cover_url || '/assets/book-current.png',
+          input.session_schedule,
+          existing[0].id,
+        ]
+      );
+      return;
+    }
+
+    const [countRows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT COUNT(*) AS cnt FROM library_books WHERE is_current = 1'
+    );
+    const isCurrent = Number(countRows[0]?.cnt || 0) === 0 ? 1 : 0;
+
+    await this.pool.execute(
+      `INSERT INTO library_books
+        (is_current, title, original_title, author, translator, category, publication_year, pages_count, reading_progress_percent, session_schedule, cover_url, short_description, sort_order)
+       VALUES (?, ?, '', ?, '—', 'کلاسیک', 1405, ?, 0, ?, ?, ?, 1)`,
+      [
+        isCurrent,
+        input.book_title,
+        input.author || 'نویسنده',
+        input.pages_count || 300,
+        input.session_schedule,
+        input.cover_url || '/assets/book-current.png',
+        input.short_description,
+      ]
+    );
   }
 
   public async deleteAdminSession(id: number): Promise<void> {
-    this.store.member_sessions = (this.store.member_sessions || []).filter(
-      (s) => s.id !== id
+    await this.pool.execute(
+      "DELETE FROM session_enrollments WHERE target_type = 'session' AND target_id = ?",
+      [id]
     );
-    this.saveDiskStore();
+    await this.pool.execute('DELETE FROM member_sessions WHERE id = ?', [id]);
   }
 
-  public async saveAdminClass(input: Partial<MemberClassRow> & { id?: number }): Promise<MemberClassRow> {
-    if (!this.store.member_classes) {
-      this.store.member_classes = [];
-    }
+  public async saveAdminClass(
+    input: Partial<MemberClassRow> & { id?: number }
+  ): Promise<MemberClassRow> {
     if (input.id) {
-      const existing = this.store.member_classes.find((c) => c.id === Number(input.id));
-      if (!existing) {
+      const [rows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_classes WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      if (rows.length === 0) {
         throw new Error('کلاس مورد نظر یافت نشد.');
       }
-      existing.title = input.title ?? existing.title;
-      existing.book_title = input.book_title ?? existing.book_title;
-      existing.instructor_name = input.instructor_name ?? existing.instructor_name;
-      existing.schedule_summary = input.schedule_summary ?? existing.schedule_summary;
-      existing.level_label = input.level_label ?? existing.level_label;
-      existing.cover_url = input.cover_url || existing.cover_url || '/assets/blog-1.png';
-      existing.description = input.description ?? existing.description;
-      existing.status = (input.status as MemberClassRow['status']) || existing.status;
-      if (Array.isArray(input.sub_sessions)) {
-        existing.sub_sessions = input.sub_sessions;
-      }
-      this.saveDiskStore();
-      return existing;
+      const current = rows[0];
+      const nextTitle = input.title ?? current.title;
+      const nextBookTitle = input.book_title ?? current.book_title;
+      const nextInstructor = input.instructor_name ?? current.instructor_name;
+      const nextSchedule = input.schedule_summary ?? current.schedule_summary;
+      const nextLevel = input.level_label ?? current.level_label;
+      const nextCover = input.cover_url || current.cover_url || '/assets/blog-1.png';
+      const nextDesc = input.description ?? current.description;
+      const nextStatus = input.status || current.status || 'فعال';
+      const nextSubs = Array.isArray(input.sub_sessions)
+        ? JSON.stringify(input.sub_sessions)
+        : String(current.sub_sessions_json || '[]');
+
+      await this.pool.execute(
+        `UPDATE member_classes
+         SET title = ?, book_title = ?, instructor_name = ?, schedule_summary = ?,
+             level_label = ?, cover_url = ?, description = ?, status = ?, sub_sessions_json = ?
+         WHERE id = ?`,
+        [
+          nextTitle,
+          nextBookTitle,
+          nextInstructor,
+          nextSchedule,
+          nextLevel,
+          nextCover,
+          nextDesc,
+          nextStatus,
+          nextSubs,
+          Number(input.id),
+        ]
+      );
+
+      const [updatedRows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_classes WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      const mapped = await this.mapClassRowsWithEnrollments(updatedRows);
+      return mapped[0];
     }
 
-    const nextId =
-      this.store.member_classes.length > 0
-        ? Math.max(...this.store.member_classes.map((c) => c.id)) + 1
-        : 1;
-    const created: MemberClassRow = {
-      id: nextId,
-      member_phone: 'all',
-      title: String(input.title || 'کلاس آموزشی جدید'),
-      book_title: String(input.book_title || 'سرفصل تخصصی ادبیات'),
-      instructor_name: String(input.instructor_name || 'دکتر سهراب رستگار'),
-      schedule_summary: String(input.schedule_summary || 'دوشنبه‌ها · ساعت ۱۸:۰۰ تا ۲۰:۰۰'),
-      level_label: String(input.level_label || 'پیشرفته'),
-      cover_url: String(input.cover_url || '/assets/blog-1.png'),
-      status: (input.status as MemberClassRow['status']) || 'فعال',
-      description: String(input.description || 'توضیحات دوره آموزشی تخصصی در باشگاه بوک‌میت.'),
-      sub_sessions: Array.isArray(input.sub_sessions) ? input.sub_sessions : [],
-      sort_order: nextId,
-    };
-    this.store.member_classes.unshift(created);
-    this.saveDiskStore();
-    return created;
+    const title = String(input.title || 'کلاس آموزشی جدید').trim();
+    const bookTitle = String(input.book_title || 'سرفصل تخصصی ادبیات').trim();
+    const instructorName = String(input.instructor_name || 'دکتر سهراب رستگار').trim();
+    const scheduleSummary = String(input.schedule_summary || '').trim();
+    const levelLabel = String(input.level_label || 'پیشرفته').trim();
+    const coverUrl = String(input.cover_url || '/assets/blog-1.png').trim();
+    const status = String(input.status || 'فعال').trim();
+    const description = String(input.description || '').trim();
+    const subSessionsJson = JSON.stringify(
+      Array.isArray(input.sub_sessions) ? input.sub_sessions : []
+    );
+
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      `INSERT INTO member_classes
+        (member_phone, title, book_title, instructor_name, schedule_summary, level_label, cover_url, status, description, sub_sessions_json, sort_order)
+       VALUES ('all', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      [
+        title,
+        bookTitle,
+        instructorName,
+        scheduleSummary,
+        levelLabel,
+        coverUrl,
+        status,
+        description,
+        subSessionsJson,
+      ]
+    );
+
+    const [createdRows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_classes WHERE id = ? LIMIT 1',
+      [result.insertId]
+    );
+    const mapped = await this.mapClassRowsWithEnrollments(createdRows);
+    return mapped[0];
   }
 
   public async deleteAdminClass(id: number): Promise<void> {
-    this.store.member_classes = (this.store.member_classes || []).filter(
-      (c) => c.id !== id
+    await this.pool.execute(
+      "DELETE FROM session_enrollments WHERE target_type = 'class' AND target_id = ?",
+      [id]
     );
-    this.saveDiskStore();
+    await this.pool.execute('DELETE FROM member_classes WHERE id = ?', [id]);
   }
 
   public async saveAdminUser(
     input: Partial<ClubMemberRow> & { id?: number; password?: string }
-  ): Promise<Omit<ClubMemberRow, 'password_hash'>> {
-    if (!this.store.club_members) {
-      this.store.club_members = [];
-    }
+  ): Promise<PublicClubMember> {
     if (input.id) {
-      const existing = this.store.club_members.find((u) => u.id === Number(input.id));
-      if (!existing) {
+      const [rows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM club_members WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      if (rows.length === 0) {
         throw new Error('کاربر مورد نظر یافت نشد.');
       }
-      existing.first_name = input.first_name ?? existing.first_name;
-      existing.last_name = input.last_name ?? existing.last_name;
-      existing.phone = input.phone ?? existing.phone;
-      existing.education = input.education ?? existing.education;
-      existing.favorite_genre = input.favorite_genre ?? existing.favorite_genre;
-      existing.email = input.email ?? existing.email;
-      existing.bio = input.bio ?? existing.bio;
-      existing.membership_code = input.membership_code ?? existing.membership_code;
-      if (input.status) {
-        existing.status = input.status;
+      const existing = rows[0] as ClubMemberRow;
+
+      const nextFirstName = input.first_name ?? existing.first_name;
+      const nextLastName = input.last_name ?? existing.last_name;
+      const nextPhone = input.phone ?? existing.phone;
+      const nextEdu = input.education ?? existing.education;
+      const nextGenre = input.favorite_genre ?? existing.favorite_genre;
+      const nextEmail = input.email ?? existing.email;
+      const nextBio = input.bio ?? existing.bio;
+      const nextCode = input.membership_code ?? existing.membership_code;
+      const nextStatus = input.status ?? existing.status;
+
+      let nextPasswordHash = existing.password_hash;
+      if (input.password && String(input.password).trim().length >= 4) {
+        nextPasswordHash = await bcrypt.hash(String(input.password).trim(), 12);
       }
-      if (input.password) {
-        existing.password_hash = input.password;
+
+      await this.pool.execute(
+        `UPDATE club_members
+         SET first_name = ?, last_name = ?, phone = ?, education = ?, favorite_genre = ?,
+             email = ?, bio = ?, membership_code = ?, status = ?, password_hash = ?
+         WHERE id = ?`,
+        [
+          nextFirstName,
+          nextLastName,
+          nextPhone,
+          nextEdu,
+          nextGenre,
+          nextEmail,
+          nextBio,
+          nextCode,
+          nextStatus,
+          nextPasswordHash,
+          Number(input.id),
+        ]
+      );
+
+      if (nextStatus === 'غیرفعال') {
+        await this.pool.execute('DELETE FROM auth_tokens WHERE member_id = ?', [
+          Number(input.id),
+        ]);
       }
-      this.saveDiskStore();
-      const { password_hash: _p, ...rest } = existing;
-      return rest;
+
+      const [updated] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM club_members WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      return stripPassword(updated[0] as ClubMemberRow);
     }
 
-    const nextId =
-      this.store.club_members.length > 0
-        ? Math.max(...this.store.club_members.map((u) => u.id)) + 1
-        : 1;
-    const created: ClubMemberRow = {
-      id: nextId,
-      first_name: String(input.first_name || 'کاربر'),
-      last_name: String(input.last_name || 'جدید'),
-      phone: String(input.phone || `۰۹۱۲۰۰۰۰${nextId}`),
-      role: 'member',
-      education: String(input.education || 'کارشناسی ارشد'),
-      favorite_genre: String(input.favorite_genre || 'ادبیات داستانی و رمان کلاسیک'),
-      email: String(input.email || ''),
-      city: 'تهران',
-      avatar_url: '',
-      bio: String(input.bio || 'عضو باشگاه کتابخوانی بوک‌میت.'),
-      membership_code: String(input.membership_code || `BM-۱۴۰۵-${110 + nextId}`),
-      joined_date: 'آبان ۱۴۰۵',
-      status: input.status || 'فعال',
-      password_hash: String(input.password || '1234'),
-      created_at: new Date().toISOString(),
-    };
-    this.store.club_members.push(created);
-    this.saveDiskStore();
-    const { password_hash: _p, ...rest } = created;
-    return rest;
+    if (!input.phone || !input.password || String(input.password).trim().length < 4) {
+      throw new Error('شماره تلفن و رمز عبور معتبر (حداقل ۴ کاراکتر) الزامی است.');
+    }
+
+    const passwordHash = await bcrypt.hash(String(input.password).trim(), 12);
+    const persianPhone = toPersianDigitsServer(normalizeIdentifierDigits(input.phone));
+
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      `INSERT INTO club_members
+        (first_name, last_name, phone, role, status, education, favorite_genre, email, city, avatar_url, bio, membership_code, joined_date, password_hash)
+       VALUES (?, ?, ?, 'member', ?, ?, ?, ?, 'تهران', '', ?, ?, '۱۴۰۵', ?)`,
+      [
+        String(input.first_name || 'کاربر').trim(),
+        String(input.last_name || 'جدید').trim(),
+        persianPhone,
+        input.status || 'فعال',
+        String(input.education || 'کارشناسی').trim(),
+        String(input.favorite_genre || 'ادبیات داستانی').trim(),
+        String(input.email || '').trim(),
+        String(input.bio || 'عضو باشگاه کتابخوانی بوک‌میت').trim(),
+        String(input.membership_code || 'BM-۱۴۰۵-۱۰۰').trim(),
+        passwordHash,
+      ]
+    );
+
+    const [created] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM club_members WHERE id = ? LIMIT 1',
+      [result.insertId]
+    );
+    return stripPassword(created[0] as ClubMemberRow);
   }
 
   public async deleteAdminUser(id: number): Promise<void> {
-    this.store.club_members = (this.store.club_members || []).filter(
-      (u) => u.id !== id || u.role === 'admin'
+    await this.pool.execute(
+      "DELETE FROM club_members WHERE id = ? AND role != 'admin'",
+      [id]
     );
-    this.saveDiskStore();
   }
 
   public async replyAdminTicket(input: {
@@ -2818,95 +2515,143 @@ class MySQLDatabaseManager {
     admin_reply: string;
     status: 'پاسخ داده‌شده' | 'در انتظار بررسی' | 'بسته‌شده';
   }): Promise<MemberTicketRow> {
-    const ticket = (this.store.member_tickets || []).find((t) => t.id === Number(input.id));
-    if (!ticket) {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_tickets WHERE id = ? LIMIT 1',
+      [Number(input.id)]
+    );
+    if (rows.length === 0) {
       throw new Error('تیکت مورد نظر یافت نشد.');
     }
+
+    const ticket = rows[0];
     const trimmedReply = String(input.admin_reply || '').trim();
-    if (!Array.isArray(ticket.admin_replies)) {
-      ticket.admin_replies = ticket.admin_reply
-        ? [{ text: ticket.admin_reply, created_at: ticket.created_at || '۱۳ آبان ۱۴۰۵' }]
-        : [];
-    }
+    const replies = safeJsonParse<{ text: string; created_at: string }[]>(
+      ticket.admin_replies_json,
+      ticket.admin_reply
+        ? [{ text: String(ticket.admin_reply), created_at: String(ticket.created_at) }]
+        : []
+    );
+
+    let nextReplyText = String(ticket.admin_reply || '');
     if (trimmedReply) {
-      ticket.admin_replies.push({
+      replies.push({
         text: trimmedReply,
-        created_at: '۱۴ آبان ۱۴۰۵ · هم‌اکنون',
+        created_at: 'هم‌اکنون',
       });
-      ticket.admin_reply = trimmedReply;
+      nextReplyText = trimmedReply;
     }
-    ticket.status = input.status;
-    this.saveDiskStore();
-    return ticket;
+
+    await this.pool.execute(
+      `UPDATE member_tickets
+       SET admin_reply = ?, admin_replies_json = ?, status = ?
+       WHERE id = ?`,
+      [nextReplyText, JSON.stringify(replies), input.status, Number(input.id)]
+    );
+
+    return {
+      id: Number(ticket.id),
+      member_phone: String(ticket.member_phone),
+      ticket_code: String(ticket.ticket_code),
+      subject: String(ticket.subject),
+      department: String(ticket.department),
+      priority: (ticket.priority as MemberTicketRow['priority']) || 'عادی',
+      status: input.status,
+      message: String(ticket.message),
+      attachment_name: String(ticket.attachment_name || ''),
+      admin_reply: nextReplyText,
+      admin_replies: replies,
+      created_at: String(ticket.created_at),
+    };
   }
 
   public async deleteAdminTicket(id: number): Promise<void> {
-    this.store.member_tickets = (this.store.member_tickets || []).filter(
-      (t) => t.id !== id
-    );
-    this.saveDiskStore();
+    await this.pool.execute('DELETE FROM member_tickets WHERE id = ?', [id]);
   }
 
   public async saveAdminAnnouncement(
     input: Partial<ClubAnnouncementRow> & { id?: number }
   ): Promise<ClubAnnouncementRow> {
-    if (!this.store.club_announcements) {
-      this.store.club_announcements = [];
-    }
     if (input.id) {
-      const existing = this.store.club_announcements.find(
-        (a) => a.id === Number(input.id)
+      const [rows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM club_announcements WHERE id = ? LIMIT 1',
+        [Number(input.id)]
       );
-      if (!existing) {
+      if (rows.length === 0) {
         throw new Error('اطلاعیه مورد نظر یافت نشد.');
       }
-      existing.title = input.title ?? existing.title;
-      existing.category = input.category ?? existing.category;
-      existing.published_date = input.published_date ?? existing.published_date;
-      existing.summary = input.summary ?? existing.summary;
-      existing.content = input.content ?? existing.content;
-      existing.is_important =
-        input.is_important !== undefined ? Number(input.is_important) : existing.is_important;
-      if (input.target_user_phone !== undefined) {
-        existing.target_user_phone = input.target_user_phone;
-      }
-      if (input.target_user_name !== undefined) {
-        existing.target_user_name = input.target_user_name;
-      }
-      this.saveDiskStore();
-      return existing;
+      const existing = rows[0];
+      const nextTitle = input.title ?? existing.title;
+      const nextCategory = input.category ?? existing.category;
+      const nextDate = input.published_date ?? existing.published_date;
+      const nextSummary = input.summary ?? existing.summary;
+      const nextContent = input.content ?? existing.content;
+      const nextImportant =
+        input.is_important !== undefined
+          ? Number(input.is_important)
+          : Number(existing.is_important || 0);
+      const nextTargetPhone =
+        input.target_user_phone !== undefined
+          ? input.target_user_phone
+          : existing.target_user_phone;
+      const nextTargetName =
+        input.target_user_name !== undefined
+          ? input.target_user_name
+          : existing.target_user_name;
+
+      await this.pool.execute(
+        `UPDATE club_announcements
+         SET title = ?, category = ?, published_date = ?, summary = ?, content = ?,
+             is_important = ?, target_user_phone = ?, target_user_name = ?
+         WHERE id = ?`,
+        [
+          nextTitle,
+          nextCategory,
+          nextDate,
+          nextSummary,
+          nextContent,
+          nextImportant,
+          nextTargetPhone || null,
+          nextTargetName || null,
+          Number(input.id),
+        ]
+      );
+
+      const [updated] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM club_announcements WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      return updated[0] as ClubAnnouncementRow;
     }
 
-    const nextId =
-      this.store.club_announcements.length > 0
-        ? Math.max(...this.store.club_announcements.map((a) => a.id)) + 1
-        : 1;
-    const created: ClubAnnouncementRow = {
-      id: nextId,
-      title: String(input.title || 'اطلاعیه جدید باشگاه'),
-      category: String(input.category || 'جلسات کتابخوانی'),
-      published_date: String(input.published_date || '۱۴ آبان ۱۴۰۵'),
-      summary: String(input.summary || input.content || ''),
-      content: String(input.content || ''),
-      is_important: Number(input.is_important || 0),
-      is_read: 0,
-      target_user_phone: input.target_user_phone ? String(input.target_user_phone) : undefined,
-      target_user_name: input.target_user_name ? String(input.target_user_name) : undefined,
-      sort_order: 1,
-    };
-    this.store.club_announcements.unshift(created);
-    this.saveDiskStore();
-    return created;
+    const title = String(input.title || 'اطلاعیه جدید باشگاه').trim();
+    const category = String(input.category || 'جلسات کتابخوانی').trim();
+    const publishedDate = String(input.published_date || 'امروز').trim();
+    const content = String(input.content || '').trim();
+    const summary = String(input.summary || content).trim();
+    const isImportant = Number(input.is_important || 0);
+    const targetPhone = input.target_user_phone ? String(input.target_user_phone) : null;
+    const targetName = input.target_user_name ? String(input.target_user_name) : null;
+
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      `INSERT INTO club_announcements
+        (title, category, published_date, summary, content, is_important, is_read, target_user_phone, target_user_name, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 1)`,
+      [title, category, publishedDate, summary, content, isImportant, targetPhone, targetName]
+    );
+
+    const [created] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM club_announcements WHERE id = ? LIMIT 1',
+      [result.insertId]
+    );
+    return created[0] as ClubAnnouncementRow;
   }
 
   public async deleteAdminAnnouncement(id: number): Promise<void> {
-    this.store.club_announcements = (this.store.club_announcements || []).filter(
-      (a) => a.id !== id
-    );
-    this.saveDiskStore();
+    await this.pool.execute('DELETE FROM club_announcements WHERE id = ?', [id]);
   }
 
   public async updateAdminProfile(input: {
+    adminId: number;
     first_name: string;
     last_name: string;
     email: string;
@@ -2915,39 +2660,52 @@ class MySQLDatabaseManager {
     bio: string;
     avatar_url?: string;
     new_password?: string;
-  }): Promise<Omit<ClubMemberRow, 'password_hash'>> {
-    let admin = this.store.club_members.find(
-      (m) => m.role === 'admin' || m.phone === 'admin'
+  }): Promise<PublicClubMember> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      "SELECT * FROM club_members WHERE id = ? AND role = 'admin' LIMIT 1",
+      [input.adminId]
     );
-    if (!admin) {
-      admin = JSON.parse(
-        JSON.stringify(SEED_DATA.club_members.find((m) => m.role === 'admin')!)
-      );
-      this.store.club_members.push(admin!);
+    if (rows.length === 0) {
+      throw new Error('حساب مدیر یافت نشد.');
     }
-    admin!.first_name = input.first_name;
-    admin!.last_name = input.last_name;
-    admin!.email = input.email;
-    admin!.education = input.education;
-    admin!.favorite_genre = input.favorite_genre;
-    admin!.bio = input.bio;
-    if (input.avatar_url !== undefined) {
-      admin!.avatar_url = input.avatar_url;
-    }
+
+    const admin = rows[0] as ClubMemberRow;
+    const nextAvatar =
+      input.avatar_url !== undefined ? input.avatar_url : admin.avatar_url;
+    let nextPasswordHash = admin.password_hash;
+
     if (input.new_password && input.new_password.trim().length >= 4) {
-      admin!.password_hash = input.new_password.trim();
+      nextPasswordHash = await bcrypt.hash(input.new_password.trim(), 12);
     }
-    this.saveDiskStore();
-    const { password_hash: _p, ...publicAdmin } = admin!;
-    return { ...publicAdmin, role: 'admin' };
+
+    await this.pool.execute(
+      `UPDATE club_members
+       SET first_name = ?, last_name = ?, email = ?, education = ?, favorite_genre = ?,
+           bio = ?, avatar_url = ?, password_hash = ?
+       WHERE id = ?`,
+      [
+        input.first_name.trim(),
+        input.last_name.trim(),
+        input.email.trim(),
+        input.education.trim(),
+        input.favorite_genre.trim(),
+        input.bio.trim(),
+        nextAvatar || '/assets/manager-portrait.png',
+        nextPasswordHash,
+        input.adminId,
+      ]
+    );
+
+    const [updated] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM club_members WHERE id = ? LIMIT 1',
+      [input.adminId]
+    );
+    return stripPassword(updated[0] as ClubMemberRow);
   }
 
   public async saveAdminBlogPost(
     input: Partial<BlogPostRow> & { id?: number }
   ): Promise<BlogPostRow> {
-    if (!this.store.blog_posts) {
-      this.store.blog_posts = [];
-    }
     const autoSlug = (rawTitle: string, fallbackId: number) => {
       const cleaned = String(rawTitle || '')
         .trim()
@@ -2955,61 +2713,102 @@ class MySQLDatabaseManager {
         .replace(/\s+/g, '-');
       return cleaned || `blog-post-${fallbackId}`;
     };
+
     if (input.id) {
-      const existing = this.store.blog_posts.find((p) => p.id === Number(input.id));
-      if (!existing) {
+      const [rows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM blog_posts WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      if (rows.length === 0) {
         throw new Error('مقاله مورد نظر یافت نشد.');
       }
-      existing.title = input.title ?? existing.title;
-      existing.slug =
+      const existing = rows[0] as BlogPostRow;
+      const nextTitle = input.title ?? existing.title;
+      const nextSlug =
         input.slug && String(input.slug).trim()
           ? String(input.slug).trim()
-          : existing.slug || autoSlug(existing.title, existing.id);
-      existing.category = input.category ?? existing.category;
-      existing.author = input.author ?? existing.author;
-      existing.published_date = input.published_date ?? existing.published_date;
-      existing.reading_time = input.reading_time ?? existing.reading_time;
-      existing.tags = input.tags ?? existing.tags;
-      existing.status = input.status ?? existing.status;
-      existing.cover_url = input.cover_url || existing.cover_url || '/assets/blog-1.png';
-      existing.excerpt = input.excerpt ?? existing.excerpt;
-      existing.full_content = input.full_content ?? existing.full_content;
-      this.saveDiskStore();
-      return existing;
+          : existing.slug || autoSlug(nextTitle, existing.id);
+      const nextCategory = input.category ?? existing.category;
+      const nextAuthor = input.author ?? existing.author;
+      const nextDate = input.published_date ?? existing.published_date;
+      const nextReadingTime = input.reading_time ?? existing.reading_time;
+      const nextTags = input.tags ?? existing.tags ?? '';
+      const nextStatus = input.status ?? existing.status ?? 'منتشر شده';
+      const nextCover = input.cover_url || existing.cover_url || '/assets/blog-1.png';
+      const nextExcerpt = input.excerpt ?? existing.excerpt;
+      const nextContent = input.full_content ?? existing.full_content;
+
+      await this.pool.execute(
+        `UPDATE blog_posts
+         SET title = ?, slug = ?, category = ?, author = ?, published_date = ?,
+             reading_time = ?, tags = ?, status = ?, cover_url = ?, excerpt = ?, full_content = ?
+         WHERE id = ?`,
+        [
+          nextTitle,
+          nextSlug,
+          nextCategory,
+          nextAuthor,
+          nextDate,
+          nextReadingTime,
+          nextTags,
+          nextStatus,
+          nextCover,
+          nextExcerpt,
+          nextContent,
+          Number(input.id),
+        ]
+      );
+
+      const [updated] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM blog_posts WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      return updated[0] as BlogPostRow;
     }
 
-    const nextId =
-      this.store.blog_posts.length > 0
-        ? Math.max(...this.store.blog_posts.map((p) => p.id)) + 1
-        : 1;
-    const finalTitle = String(input.title || 'مقاله جدید باشگاه');
+    const finalTitle = String(input.title || 'مقاله جدید باشگاه').trim();
     const finalSlug =
       input.slug && String(input.slug).trim()
         ? String(input.slug).trim()
-        : autoSlug(finalTitle, nextId);
-    const created: BlogPostRow = {
-      id: nextId,
-      title: finalTitle,
-      slug: finalSlug,
-      category: String(input.category || 'یادداشت ادبی'),
-      author: String(input.author || 'سهراب رستگار'),
-      published_date: String(input.published_date || '۱۴ آبان ۱۴۰۵'),
-      reading_time: String(input.reading_time || '۶ دقیقه مطالعه'),
-      tags: String(input.tags || 'ادبیات داستانی، نقد کتاب'),
-      status: input.status || 'منتشر شده',
-      cover_url: String(input.cover_url || '/assets/blog-1.png'),
-      excerpt: String(input.excerpt || ''),
-      full_content: String(input.full_content || ''),
-      sort_order: nextId,
-    };
-    this.store.blog_posts.unshift(created);
-    this.saveDiskStore();
-    return created;
+        : autoSlug(finalTitle, Date.now());
+    const category = String(input.category || 'یادداشت ادبی').trim();
+    const author = String(input.author || 'سهراب رستگار').trim();
+    const publishedDate = String(input.published_date || 'امروز').trim();
+    const readingTime = String(input.reading_time || '۶ دقیقه مطالعه').trim();
+    const tags = String(input.tags || '').trim();
+    const status = String(input.status || 'منتشر شده').trim();
+    const coverUrl = String(input.cover_url || '/assets/blog-1.png').trim();
+    const excerpt = String(input.excerpt || '').trim();
+    const fullContent = String(input.full_content || '').trim();
+
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      `INSERT INTO blog_posts
+        (title, slug, category, author, published_date, reading_time, cover_url, excerpt, full_content, tags, status, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      [
+        finalTitle,
+        finalSlug,
+        category,
+        author,
+        publishedDate,
+        readingTime,
+        coverUrl,
+        excerpt,
+        fullContent,
+        tags,
+        status,
+      ]
+    );
+
+    const [created] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM blog_posts WHERE id = ? LIMIT 1',
+      [result.insertId]
+    );
+    return created[0] as BlogPostRow;
   }
 
   public async deleteAdminBlogPost(id: number): Promise<void> {
-    this.store.blog_posts = (this.store.blog_posts || []).filter((p) => p.id !== id);
-    this.saveDiskStore();
+    await this.pool.execute('DELETE FROM blog_posts WHERE id = ?', [id]);
   }
 
   public async saveUserComment(input: {
@@ -3023,48 +2822,58 @@ class MySQLDatabaseManager {
     admin_reply?: string;
     status?: 'تایید شده' | 'در انتظار تایید' | 'رد شده';
   }): Promise<UserCommentRow> {
-    if (!this.store.user_comments) {
-      this.store.user_comments = JSON.parse(JSON.stringify(SEED_DATA.user_comments));
-    }
     if (input.id) {
-      const existing = this.store.user_comments.find((c) => c.id === Number(input.id));
-      if (!existing) {
+      const [rows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM user_comments WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      if (rows.length === 0) {
         throw new Error('نظر مورد نظر یافت نشد.');
       }
-      if (input.admin_reply !== undefined) existing.admin_reply = input.admin_reply;
-      if (input.status !== undefined) existing.status = input.status;
-      if (input.comment_text !== undefined) existing.comment_text = input.comment_text;
-      this.saveDiskStore();
-      return existing;
+      const existing = rows[0] as UserCommentRow;
+      const nextReply =
+        input.admin_reply !== undefined ? input.admin_reply : existing.admin_reply;
+      const nextStatus = input.status !== undefined ? input.status : existing.status;
+      const nextText =
+        input.comment_text !== undefined ? input.comment_text : existing.comment_text;
+
+      await this.pool.execute(
+        'UPDATE user_comments SET admin_reply = ?, status = ?, comment_text = ? WHERE id = ?',
+        [nextReply, nextStatus, nextText, Number(input.id)]
+      );
+
+      const [updated] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM user_comments WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      return updated[0] as UserCommentRow;
     }
 
-    const nextId =
-      this.store.user_comments.length > 0
-        ? Math.max(...this.store.user_comments.map((c) => c.id)) + 1
-        : 1;
-    const created: UserCommentRow = {
-      id: nextId,
-      author_name: String(input.author_name || 'کاربر باشگاه'),
-      author_phone: String(input.author_phone || ''),
-      target_title: String(input.target_title || 'عمومی'),
-      target_type: String(input.target_type || 'مقاله وبلاگ'),
-      rating: Number(input.rating || 5),
-      comment_text: String(input.comment_text || ''),
-      admin_reply: String(input.admin_reply || ''),
-      status: input.status || 'تایید شده',
-      created_date: '۱۴ آبان ۱۴۰۵',
-      sort_order: nextId,
-    };
-    this.store.user_comments.unshift(created);
-    this.saveDiskStore();
-    return created;
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      `INSERT INTO user_comments
+        (author_name, author_phone, target_title, target_type, rating, comment_text, admin_reply, status, created_date, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'امروز', 0)`,
+      [
+        String(input.author_name || 'کاربر باشگاه').trim(),
+        String(input.author_phone || '').trim(),
+        String(input.target_title || 'عمومی').trim(),
+        String(input.target_type || 'مقاله وبلاگ').trim(),
+        Number(input.rating || 5),
+        String(input.comment_text || '').trim(),
+        String(input.admin_reply || '').trim(),
+        input.status || 'در انتظار تایید',
+      ]
+    );
+
+    const [created] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM user_comments WHERE id = ? LIMIT 1',
+      [result.insertId]
+    );
+    return created[0] as UserCommentRow;
   }
 
   public async deleteUserComment(id: number): Promise<void> {
-    this.store.user_comments = (this.store.user_comments || []).filter(
-      (c) => c.id !== id
-    );
-    this.saveDiskStore();
+    await this.pool.execute('DELETE FROM user_comments WHERE id = ?', [id]);
   }
 
   public async updateHomeSettings(input: {
@@ -3078,102 +2887,199 @@ class MySQLDatabaseManager {
     aboutManager: AboutManagerRow;
     contactInfo: ContactInfoRow;
   }> {
-    if (input.heroSettings && this.store.hero_settings[0]) {
-      this.store.hero_settings[0] = {
-        ...this.store.hero_settings[0],
-        ...input.heroSettings,
-      };
-    }
-    if (input.aboutClub && this.store.about_club[0]) {
-      this.store.about_club[0] = {
-        ...this.store.about_club[0],
-        ...input.aboutClub,
-      };
-    }
-    if (input.aboutManager && this.store.about_manager[0]) {
-      this.store.about_manager[0] = {
-        ...this.store.about_manager[0],
-        ...input.aboutManager,
-      };
-    }
-    if (input.contactInfo && this.store.contact_info[0]) {
-      this.store.contact_info[0] = {
-        ...this.store.contact_info[0],
-        ...input.contactInfo,
-      };
-    }
-    this.saveDiskStore();
-    return {
-      heroSettings: this.store.hero_settings[0],
-      aboutClub: this.store.about_club[0],
-      aboutManager: this.store.about_manager[0],
-      contactInfo: this.store.contact_info[0],
-    };
-  }
-
-  public async resetClubMemberPassword(input: {
-    phone: string;
-    new_password_hash: string;
-  }): Promise<{ updated: boolean }> {
-    if (this.pool && this.isExternalMySQLConnected) {
-      try {
+    if (input.heroSettings) {
+      const current = await this.getHeroSettings();
+      const merged = { ...current, ...input.heroSettings };
+      const [rows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT id FROM hero_settings ORDER BY id ASC LIMIT 1'
+      );
+      if (rows.length > 0) {
         await this.pool.execute(
-          'UPDATE club_members SET password_hash = ? WHERE phone = ?',
-          [input.new_password_hash, input.phone]
+          `UPDATE hero_settings
+           SET headline = ?, subtitle_line_1 = ?, subtitle_line_2 = ?, nav_cta_text = ?,
+               nav_cta_target = ?, hero_image_url = ?, audio_progress_percent = ?
+           WHERE id = ?`,
+          [
+            merged.headline,
+            merged.subtitle_line_1,
+            merged.subtitle_line_2,
+            merged.nav_cta_text,
+            merged.nav_cta_target,
+            merged.hero_image_url,
+            Number(merged.audio_progress_percent || 100),
+            rows[0].id,
+          ]
         );
-        return { updated: true };
-      } catch {
-        this.isExternalMySQLConnected = false;
+      } else {
+        await this.pool.execute(
+          `INSERT INTO hero_settings
+            (headline, subtitle_line_1, subtitle_line_2, nav_cta_text, nav_cta_target, hero_image_url, audio_progress_percent)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            merged.headline,
+            merged.subtitle_line_1,
+            merged.subtitle_line_2,
+            merged.nav_cta_text,
+            merged.nav_cta_target,
+            merged.hero_image_url,
+            Number(merged.audio_progress_percent || 100),
+          ]
+        );
       }
     }
 
-    if (!this.store.club_members) {
-      this.store.club_members = [];
+    if (input.aboutClub) {
+      const current = await this.getAboutClub();
+      const merged = { ...current, ...input.aboutClub };
+      const [rows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT id FROM about_club ORDER BY id ASC LIMIT 1'
+      );
+      if (rows.length > 0) {
+        await this.pool.execute(
+          `UPDATE about_club
+           SET section_kicker = ?, title = ?, paragraph_1 = ?, paragraph_2 = ?,
+               image_url = ?, image_caption = ?, stat_1_value = ?, stat_1_label = ?,
+               stat_2_value = ?, stat_2_label = ?, stat_3_value = ?, stat_3_label = ?
+           WHERE id = ?`,
+          [
+            merged.section_kicker,
+            merged.title,
+            merged.paragraph_1,
+            merged.paragraph_2,
+            merged.image_url,
+            merged.image_caption,
+            merged.stat_1_value,
+            merged.stat_1_label,
+            merged.stat_2_value,
+            merged.stat_2_label,
+            merged.stat_3_value,
+            merged.stat_3_label,
+            rows[0].id,
+          ]
+        );
+      } else {
+        await this.pool.execute(
+          `INSERT INTO about_club
+            (section_kicker, title, paragraph_1, paragraph_2, image_url, image_caption, stat_1_value, stat_1_label, stat_2_value, stat_2_label, stat_3_value, stat_3_label)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            merged.section_kicker,
+            merged.title,
+            merged.paragraph_1,
+            merged.paragraph_2,
+            merged.image_url,
+            merged.image_caption,
+            merged.stat_1_value,
+            merged.stat_1_label,
+            merged.stat_2_value,
+            merged.stat_2_label,
+            merged.stat_3_value,
+            merged.stat_3_label,
+          ]
+        );
+      }
     }
-    const found = this.store.club_members.find((m) => m.phone === input.phone);
-    if (found) {
-      found.password_hash = input.new_password_hash;
-      this.saveDiskStore();
-    }
-    return { updated: true };
-  }
 
-  public async ensureTable<T extends Record<string, unknown>>(
-    tableName: string,
-    initialRows: T[] = []
-  ): Promise<T[]> {
-    if (!this.store.custom_tables) {
-      this.store.custom_tables = {};
+    if (input.aboutManager) {
+      const current = await this.getAboutManager();
+      const merged = { ...current, ...input.aboutManager };
+      const [rows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT id FROM about_manager ORDER BY id ASC LIMIT 1'
+      );
+      if (rows.length > 0) {
+        await this.pool.execute(
+          `UPDATE about_manager
+           SET section_kicker = ?, full_name = ?, role_title = ?, bio_paragraph_1 = ?,
+               bio_paragraph_2 = ?, quote_text = ?, image_url = ?, credentials_line = ?
+           WHERE id = ?`,
+          [
+            merged.section_kicker,
+            merged.full_name,
+            merged.role_title,
+            merged.bio_paragraph_1,
+            merged.bio_paragraph_2,
+            merged.quote_text,
+            merged.image_url,
+            merged.credentials_line,
+            rows[0].id,
+          ]
+        );
+      } else {
+        await this.pool.execute(
+          `INSERT INTO about_manager
+            (section_kicker, full_name, role_title, bio_paragraph_1, bio_paragraph_2, quote_text, image_url, credentials_line)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            merged.section_kicker,
+            merged.full_name,
+            merged.role_title,
+            merged.bio_paragraph_1,
+            merged.bio_paragraph_2,
+            merged.quote_text,
+            merged.image_url,
+            merged.credentials_line,
+          ]
+        );
+      }
     }
-    if (!this.store.custom_tables[tableName]) {
-      this.store.custom_tables[tableName] = initialRows;
-      this.saveDiskStore();
-    }
-    return this.store.custom_tables[tableName] as T[];
-  }
 
-  public async insertRow<T extends Record<string, unknown>>(
-    tableName: string,
-    row: Omit<T, 'id'>
-  ): Promise<T> {
-    if (!this.store.custom_tables) {
-      this.store.custom_tables = {};
+    if (input.contactInfo) {
+      const current = await this.getContactInfo();
+      const merged = { ...current, ...input.contactInfo };
+      const [rows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT id FROM contact_info ORDER BY id ASC LIMIT 1'
+      );
+      if (rows.length > 0) {
+        await this.pool.execute(
+          `UPDATE contact_info
+           SET section_kicker = ?, title = ?, description = ?, address = ?,
+               meeting_hours = ?, email = ?, phone = ?, telegram_handle = ?
+           WHERE id = ?`,
+          [
+            merged.section_kicker,
+            merged.title,
+            merged.description,
+            merged.address,
+            merged.meeting_hours,
+            merged.email,
+            merged.phone,
+            merged.telegram_handle,
+            rows[0].id,
+          ]
+        );
+      } else {
+        await this.pool.execute(
+          `INSERT INTO contact_info
+            (section_kicker, title, description, address, meeting_hours, email, phone, telegram_handle)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            merged.section_kicker,
+            merged.title,
+            merged.description,
+            merged.address,
+            merged.meeting_hours,
+            merged.email,
+            merged.phone,
+            merged.telegram_handle,
+          ]
+        );
+      }
     }
-    if (!this.store.custom_tables[tableName]) {
-      this.store.custom_tables[tableName] = [];
-    }
-    const table = this.store.custom_tables[tableName];
-    const nextId =
-      table.length > 0
-        ? Math.max(...table.map((r) => Number(r.id || 0))) + 1
-        : 1;
-    const created = { id: nextId, ...row } as unknown as T;
-    table.push(created);
-    this.saveDiskStore();
-    return created;
+
+    const [heroSettings, aboutClub, aboutManager, contactInfo] = await Promise.all([
+      this.getHeroSettings(),
+      this.getAboutClub(),
+      this.getAboutManager(),
+      this.getContactInfo(),
+    ]);
+
+    return {
+      heroSettings,
+      aboutClub,
+      aboutManager,
+      contactInfo,
+    };
   }
 }
 
 export const mysqlDb = new MySQLDatabaseManager();
-
-

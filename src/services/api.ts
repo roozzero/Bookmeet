@@ -24,7 +24,77 @@ import type {
   UserComment,
 } from '../types/models.ts';
 
+const AUTH_TOKEN_STORAGE_KEY = 'bookmeet_auth_token';
+
+function getStoredAuthToken(): string | null {
+  try {
+    return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setStoredAuthToken(token: string | null): void {
+  try {
+    if (token) {
+      window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+    } else {
+      window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore localStorage restrictions
+  }
+}
+
+$.ajaxSetup({
+  beforeSend: (jqXHR) => {
+    const token = getStoredAuthToken();
+    if (token) {
+      jqXHR.setRequestHeader('Authorization', `Bearer ${token}`);
+    }
+  },
+});
+
 export const ApiService = {
+  getAuthToken(): string | null {
+    return getStoredAuthToken();
+  },
+
+  clearAuthToken(): void {
+    setStoredAuthToken(null);
+  },
+
+  fetchCurrentSessionMember(): Promise<{ success: boolean; member: ClubMember }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/auth/me',
+        method: 'GET',
+        dataType: 'json',
+        success: (data: { success: boolean; member: ClubMember }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) => {
+          if (jqXHR.status === 401) {
+            setStoredAuthToken(null);
+          }
+          reject(new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'Unauthorized'));
+        },
+      });
+    });
+  },
+
+  logoutClubMember(): Promise<{ success: boolean }> {
+    return new Promise((resolve) => {
+      $.ajax({
+        url: '/api/auth/logout',
+        method: 'POST',
+        dataType: 'json',
+        complete: () => {
+          setStoredAuthToken(null);
+          resolve({ success: true });
+        },
+      });
+    });
+  },
+
   fetchBootstrapData(): Promise<BootstrapPayload> {
     return new Promise((resolve, reject) => {
       $.ajax({
@@ -32,8 +102,10 @@ export const ApiService = {
         method: 'GET',
         dataType: 'json',
         success: (data: BootstrapPayload) => resolve(data),
-        error: (_jqXHR, textStatus, errorThrown) =>
-          reject(new Error(errorThrown || textStatus || 'Request failed')),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'Request failed')
+          ),
       });
     });
   },
@@ -45,8 +117,10 @@ export const ApiService = {
         method: 'GET',
         dataType: 'json',
         success: (data: { books: FeaturedBook[] }) => resolve(data),
-        error: (_jqXHR, textStatus, errorThrown) =>
-          reject(new Error(errorThrown || textStatus || 'Request failed')),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'Request failed')
+          ),
       });
     });
   },
@@ -62,15 +136,17 @@ export const ApiService = {
         data: JSON.stringify(payload),
         dataType: 'json',
         success: (data: { success: boolean }) => resolve(data),
-        error: (_jqXHR, textStatus, errorThrown) =>
-          reject(new Error(errorThrown || textStatus || 'Request failed')),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'Request failed')
+          ),
       });
     });
   },
 
   registerClubMember(
     payload: ClubRegisterInput
-  ): Promise<{ success: boolean; member: ClubMember }> {
+  ): Promise<{ success: boolean; member: ClubMember; token?: string }> {
     return new Promise((resolve, reject) => {
       $.ajax({
         url: '/api/auth/register',
@@ -78,7 +154,12 @@ export const ApiService = {
         contentType: 'application/json',
         data: JSON.stringify(payload),
         dataType: 'json',
-        success: (data: { success: boolean; member: ClubMember }) => resolve(data),
+        success: (data: { success: boolean; member: ClubMember; token?: string }) => {
+          if (data.token) {
+            setStoredAuthToken(data.token);
+          }
+          resolve(data);
+        },
         error: (jqXHR, textStatus, errorThrown) => {
           const serverError = jqXHR.responseJSON?.error;
           reject(new Error(serverError || errorThrown || textStatus || 'خطا در ثبت‌نام'));
@@ -89,7 +170,7 @@ export const ApiService = {
 
   loginClubMember(
     payload: ClubLoginInput
-  ): Promise<{ success: boolean; member: ClubMember }> {
+  ): Promise<{ success: boolean; member: ClubMember; token?: string }> {
     return new Promise((resolve, reject) => {
       $.ajax({
         url: '/api/auth/login',
@@ -97,7 +178,12 @@ export const ApiService = {
         contentType: 'application/json',
         data: JSON.stringify(payload),
         dataType: 'json',
-        success: (data: { success: boolean; member: ClubMember }) => resolve(data),
+        success: (data: { success: boolean; member: ClubMember; token?: string }) => {
+          if (data.token) {
+            setStoredAuthToken(data.token);
+          }
+          resolve(data);
+        },
         error: (jqXHR, textStatus, errorThrown) => {
           const serverError = jqXHR.responseJSON?.error;
           reject(new Error(serverError || errorThrown || textStatus || 'خطا در ورود'));
@@ -127,15 +213,19 @@ export const ApiService = {
     });
   },
 
-  fetchMemberPanelData(phone?: string): Promise<MemberPanelPayload> {
+  fetchMemberPanelData(_phone?: string): Promise<MemberPanelPayload> {
     return new Promise((resolve, reject) => {
       $.ajax({
-        url: phone ? `/api/panel?phone=${encodeURIComponent(phone)}` : '/api/panel',
+        url: '/api/panel',
         method: 'GET',
         dataType: 'json',
         success: (data: MemberPanelPayload) => resolve(data),
-        error: (_jqXHR, textStatus, errorThrown) =>
-          reject(new Error(errorThrown || textStatus || 'Failed to load panel')),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(
+              jqXHR.responseJSON?.error || errorThrown || textStatus || 'Failed to load panel'
+            )
+          ),
       });
     });
   },

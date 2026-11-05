@@ -7,10 +7,14 @@
     "dev": "tsx server.ts",
     "build": "vite build",
     "start": "tsx server.ts",
+    "init-admin": "tsx server/db/init-admin.ts",
     "lint": "tsc --noEmit",
     "preview": "vite preview --port=3000 --host=0.0.0.0"
   },
   "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^18.0.9",
     "express": "^5.3.0",
     "jquery": "^4.0.0",
     "mysql2": "^3.24.6"

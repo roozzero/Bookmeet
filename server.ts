@@ -1,15 +1,141 @@
-import express from 'express';
+import 'dotenv/config';
+import express, { NextFunction, Request, Response } from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { mysqlDb } from './server/db/mysql.ts';
+import { mysqlDb, PublicClubMember } from './server/db/mysql.ts';
+
+declare global {
+  namespace Express {
+    interface Request {
+      authUser?: PublicClubMember;
+      authToken?: string;
+    }
+  }
+}
+
+function parseCookies(cookieHeader?: string): Record<string, string> {
+  const list: Record<string, string> = {};
+  if (!cookieHeader) return list;
+  cookieHeader.split(';').forEach((cookie) => {
+    const parts = cookie.split('=');
+    const key = parts.shift()?.trim();
+    if (key) {
+      list[key] = decodeURIComponent(parts.join('=').trim());
+    }
+  });
+  return list;
+}
+
+function extractToken(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7).trim();
+    if (token) return token;
+  }
+  const cookies = parseCookies(req.headers.cookie);
+  if (cookies.bookmeet_token) {
+    return cookies.bookmeet_token;
+  }
+  return null;
+}
+
+function setAuthCookie(res: Response, token: string): void {
+  const isProd = process.env.NODE_ENV === 'production';
+  const maxAge = 7 * 24 * 60 * 60; // 7 days in seconds
+  const cookieParts = [
+    `bookmeet_token=${encodeURIComponent(token)}`,
+    'Path=/',
+    'HttpOnly',
+    `Max-Age=${maxAge}`,
+    isProd ? 'SameSite=Lax' : 'SameSite=Lax',
+  ];
+  res.setHeader('Set-Cookie', cookieParts.join('; '));
+}
+
+function clearAuthCookie(res: Response): void {
+  res.setHeader(
+    'Set-Cookie',
+    'bookmeet_token=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax'
+  );
+}
+
+async function requireAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const token = extractToken(req);
+    if (!token) {
+      res.status(401).json({ error: 'لطفاً ابتدا وارد حساب کاربری خود شوید.' });
+      return;
+    }
+    const member = await mysqlDb.verifyAuthToken(token);
+    if (!member) {
+      clearAuthCookie(res);
+      res.status(401).json({
+        error: 'نشست کاربری شما منقضی شده یا نامعتبر است. لطفاً مجدداً وارد شوید.',
+      });
+      return;
+    }
+    req.authUser = member;
+    req.authToken = token;
+    next();
+  } catch (error) {
+    console.error('Authentication check failed (MySQL error):', error);
+    res.status(503).json({
+      error: 'خطا در برقراری ارتباط با دیتابیس MySQL هنگام بررسی احراز هویت.',
+    });
+  }
+}
+
+async function requireAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  await requireAuth(req, res, async () => {
+    if (!req.authUser || req.authUser.role !== 'admin') {
+      res.status(403).json({
+        error: 'دسترسی غیرمجاز: این بخش فقط مخصوص مدیر باشگاه است.',
+      });
+      return;
+    }
+    next();
+  });
+}
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
 
   app.use(express.json({ limit: '10mb' }));
 
-  // MySQL-backed API endpoint for Navigation + Hero + About Club + Manager + Library + Blog + Contact
+  try {
+    await mysqlDb.initializeDatabase();
+    if (mysqlDb.isConnectedToMySQL()) {
+      console.log('✅ Connected to MySQL database and verified schema.');
+    } else {
+      console.log(
+        'ℹ️ Local MySQL daemon (127.0.0.1:3306) not detected in this container; running SQL schema in-memory until MySQL is available.'
+      );
+    }
+  } catch (err) {
+    console.warn(
+      'Database initialization notice:',
+      err instanceof Error ? err.message : err
+    );
+  }
+
+  // ==================== PUBLIC WEBSITE API ROUTES ====================
+
+  app.get('/api/health', (_req, res) => {
+    res.json({
+      status: 'ok',
+      mysqlConnected: mysqlDb.isConnectedToMySQL(),
+    });
+  });
+
   app.get('/api/bootstrap', async (_req, res) => {
     try {
       const [
@@ -43,8 +169,10 @@ async function startServer() {
         contactInfo,
       });
     } catch (error) {
-      console.error('Database fetch error:', error);
-      res.status(500).json({ error: 'Failed to load data from MySQL database' });
+      console.error('Database fetch error (/api/bootstrap):', error);
+      res.status(503).json({
+        error: 'خطا در اتصال به دیتابیس MySQL. لطفاً از روشن بودن سرویس MySQL اطمینان حاصل کنید.',
+      });
     }
   });
 
@@ -54,7 +182,7 @@ async function startServer() {
       res.json({ aboutClub });
     } catch (error) {
       console.error('Failed to fetch about_club:', error);
-      res.status(500).json({ error: 'Failed to fetch about_club data' });
+      res.status(503).json({ error: 'خطا در دریافت اطلاعات درباره باشگاه از MySQL' });
     }
   });
 
@@ -64,7 +192,7 @@ async function startServer() {
       res.json({ aboutManager });
     } catch (error) {
       console.error('Failed to fetch about_manager:', error);
-      res.status(500).json({ error: 'Failed to fetch about_manager data' });
+      res.status(503).json({ error: 'خطا در دریافت اطلاعات مدیر باشگاه از MySQL' });
     }
   });
 
@@ -74,7 +202,7 @@ async function startServer() {
       res.json({ libraryBooks });
     } catch (error) {
       console.error('Failed to fetch library_books:', error);
-      res.status(500).json({ error: 'Failed to fetch library_books data' });
+      res.status(503).json({ error: 'خطا در دریافت لیست کتاب‌ها از MySQL' });
     }
   });
 
@@ -84,7 +212,7 @@ async function startServer() {
       res.json({ blogPosts });
     } catch (error) {
       console.error('Failed to fetch blog_posts:', error);
-      res.status(500).json({ error: 'Failed to fetch blog_posts data' });
+      res.status(503).json({ error: 'خطا در دریافت مقالات وبلاگ از MySQL' });
     }
   });
 
@@ -94,7 +222,7 @@ async function startServer() {
       res.json({ contactInfo });
     } catch (error) {
       console.error('Failed to fetch contact_info:', error);
-      res.status(500).json({ error: 'Failed to fetch contact_info data' });
+      res.status(503).json({ error: 'خطا در دریافت اطلاعات تماس از MySQL' });
     }
   });
 
@@ -102,7 +230,7 @@ async function startServer() {
     try {
       const { full_name, email, subject, message } = req.body || {};
       if (!full_name || !email || !message) {
-        res.status(400).json({ error: 'لطفا تمامی فیلدهای ضروری را تکمیل نمایید.' });
+        res.status(400).json({ error: 'لطفاً تمامی فیلدهای ضروری را تکمیل نمایید.' });
         return;
       }
       const saved = await mysqlDb.createContactMessage({
@@ -114,7 +242,7 @@ async function startServer() {
       res.status(201).json({ success: true, messageRecord: saved });
     } catch (error) {
       console.error('Failed to store contact_message:', error);
-      res.status(500).json({ error: 'Failed to store contact message in MySQL' });
+      res.status(503).json({ error: 'خطا در ذخیره پیام در دیتابیس MySQL' });
     }
   });
 
@@ -124,9 +252,11 @@ async function startServer() {
       res.json({ books });
     } catch (error) {
       console.error('Failed to fetch books:', error);
-      res.status(500).json({ error: 'Failed to fetch books' });
+      res.status(503).json({ error: 'خطا در دریافت کتاب‌ها از MySQL' });
     }
   });
+
+  // ==================== AUTHENTICATION API ROUTES ====================
 
   app.post('/api/auth/register', async (req, res) => {
     try {
@@ -153,20 +283,23 @@ async function startServer() {
       }
 
       if (String(password) !== String(confirm_password)) {
-        res.status(400).json({ error: 'رمز عبور و تکرار رمز عبور با یکدیگر مطابقت ندارند.' });
+        res
+          .status(400)
+          .json({ error: 'رمز عبور و تکرار رمز عبور با یکدیگر مطابقت ندارند.' });
         return;
       }
 
-      const member = await mysqlDb.registerClubMember({
+      const { member, token } = await mysqlDb.registerClubMember({
         first_name: String(first_name).trim(),
         last_name: String(last_name).trim(),
         phone: String(phone).trim(),
         education: String(education).trim(),
-        favorite_genre: String(favorite_genre || 'عمومی').trim(),
-        password_hash: String(password),
+        favorite_genre: String(favorite_genre || 'ادبیات داستانی و رمان کلاسیک').trim(),
+        password_plain: String(password),
       });
 
-      res.status(201).json({ success: true, member });
+      setAuthCookie(res, token);
+      res.status(201).json({ success: true, member, token });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'خطا در ثبت‌نام عضو جدید در باشگاه';
@@ -178,21 +311,42 @@ async function startServer() {
     try {
       const { phone, password } = req.body || {};
       if (!phone || !password) {
-        res.status(400).json({ error: 'لطفاً شماره تلفن و رمز عبور خود را وارد نمایید.' });
+        res
+          .status(400)
+          .json({ error: 'لطفاً شماره تلفن و رمز عبور خود را وارد نمایید.' });
         return;
       }
 
-      const member = await mysqlDb.loginClubMember({
+      const { member, token } = await mysqlDb.loginClubMember({
         phone: String(phone).trim(),
-        password_hash: String(password),
+        password_plain: String(password),
       });
 
-      res.json({ success: true, member });
+      setAuthCookie(res, token);
+      res.json({ success: true, member, token });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'ورود به حساب کاربری انجام نشد.';
       res.status(400).json({ error: message });
     }
+  });
+
+  app.post('/api/auth/logout', async (req, res) => {
+    try {
+      const token = extractToken(req);
+      if (token) {
+        await mysqlDb.revokeAuthToken(token);
+      }
+      clearAuthCookie(res);
+      res.json({ success: true });
+    } catch {
+      clearAuthCookie(res);
+      res.json({ success: true });
+    }
+  });
+
+  app.get('/api/auth/me', requireAuth, async (req, res) => {
+    res.json({ success: true, member: req.authUser });
   });
 
   app.post('/api/auth/forgot-password', async (req, res) => {
@@ -214,21 +368,22 @@ async function startServer() {
     }
   });
 
-  app.get('/api/panel', async (req, res) => {
+  // ==================== MEMBER PANEL API ROUTES (AUTHENTICATED) ====================
+
+  app.get('/api/panel', requireAuth, async (req, res) => {
     try {
-      const phone = req.query.phone ? String(req.query.phone) : undefined;
-      const panelData = await mysqlDb.getMemberPanelData(phone);
+      const authenticatedPhone = req.authUser!.phone;
+      const panelData = await mysqlDb.getMemberPanelData(authenticatedPhone);
       res.json(panelData);
     } catch (error) {
       console.error('Failed to load member panel data:', error);
-      res.status(500).json({ error: 'خطا در دریافت اطلاعات پنل کاربری از دیتابیس' });
+      res.status(500).json({ error: 'خطا در دریافت اطلاعات پنل کاربری از دیتابیس MySQL' });
     }
   });
 
-  app.put('/api/panel/profile', async (req, res) => {
+  app.put('/api/panel/profile', requireAuth, async (req, res) => {
     try {
       const {
-        phone,
         first_name,
         last_name,
         education,
@@ -243,11 +398,13 @@ async function startServer() {
         return;
       }
       const member = await mysqlDb.updateMemberProfile({
-        phone: String(phone || '۰۹۱۲۳۴۵۶۷۸۹').trim(),
+        memberId: req.authUser!.id,
         first_name: String(first_name).trim(),
         last_name: String(last_name).trim(),
-        education: String(education || 'کارشناسی ارشد').trim(),
-        favorite_genre: String(favorite_genre || 'ادبیات داستانی و رمان کلاسیک').trim(),
+        education: String(education || req.authUser!.education || 'کارشناسی').trim(),
+        favorite_genre: String(
+          favorite_genre || req.authUser!.favorite_genre || 'ادبیات داستانی'
+        ).trim(),
         email: String(email || '').trim(),
         city: city !== undefined ? String(city).trim() : undefined,
         avatar_url: avatar_url !== undefined ? String(avatar_url) : undefined,
@@ -261,11 +418,12 @@ async function startServer() {
     }
   });
 
-  app.post('/api/panel/sessions/note', async (req, res) => {
+  app.post('/api/panel/sessions/note', requireAuth, async (req, res) => {
     try {
       const { sessionId, member_note } = req.body || {};
       const updated = await mysqlDb.updateMemberSessionNote({
         sessionId: Number(sessionId),
+        member_phone: req.authUser!.phone,
         member_note: String(member_note || '').trim(),
       });
       res.json({ success: true, session: updated });
@@ -276,12 +434,13 @@ async function startServer() {
     }
   });
 
-  app.patch('/api/panel/library', async (req, res) => {
+  app.patch('/api/panel/library', requireAuth, async (req, res) => {
     try {
       const { bookId, pages_read, progress_percent, reading_status, personal_note } =
         req.body || {};
       const updated = await mysqlDb.updateMemberLibraryItem({
         bookId: Number(bookId),
+        member_phone: req.authUser!.phone,
         pages_read: pages_read !== undefined ? Number(pages_read) : undefined,
         progress_percent:
           progress_percent !== undefined ? Number(progress_percent) : undefined,
@@ -296,7 +455,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/panel/library', async (req, res) => {
+  app.post('/api/panel/library', requireAuth, async (req, res) => {
     try {
       const {
         book_title,
@@ -311,6 +470,7 @@ async function startServer() {
         return;
       }
       const created = await mysqlDb.addMemberLibraryBook({
+        member_phone: req.authUser!.phone,
         book_title: String(book_title).trim(),
         author: String(author).trim(),
         translator: String(translator || '—').trim(),
@@ -326,7 +486,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/panel/tickets', async (req, res) => {
+  app.post('/api/panel/tickets', requireAuth, async (req, res) => {
     try {
       const {
         member_phone,
@@ -340,10 +500,15 @@ async function startServer() {
         res.status(400).json({ error: 'عنوان تیکت و متن پیام الزامی است.' });
         return;
       }
+      const targetPhone =
+        req.authUser!.role === 'admin' && member_phone
+          ? String(member_phone).trim()
+          : req.authUser!.phone;
+
       const created = await mysqlDb.createMemberTicket({
-        member_phone: String(member_phone || 'all').trim(),
+        member_phone: targetPhone,
         subject: String(subject).trim(),
-        department: String(department || 'پیشنهاد کتاب').trim(),
+        department: String(department || 'پشتیبانی اعضا').trim(),
         priority: priority || 'عادی',
         message: String(message).trim(),
         attachment_name: String(attachment_name || '').trim(),
@@ -356,10 +521,13 @@ async function startServer() {
     }
   });
 
-  app.post('/api/panel/calendar/reserve', async (req, res) => {
+  app.post('/api/panel/calendar/reserve', requireAuth, async (req, res) => {
     try {
       const { eventId } = req.body || {};
-      const updated = await mysqlDb.toggleCalendarReservation(Number(eventId));
+      const updated = await mysqlDb.toggleCalendarReservation(
+        Number(eventId),
+        req.authUser!.phone
+      );
       res.json({ success: true, event: updated });
     } catch (error) {
       const message =
@@ -368,7 +536,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/panel/announcements/read', async (req, res) => {
+  app.post('/api/panel/announcements/read', requireAuth, async (req, res) => {
     try {
       const { announcementId } = req.body || {};
       const updated = await mysqlDb.markAnnouncementRead(Number(announcementId));
@@ -380,18 +548,38 @@ async function startServer() {
     }
   });
 
-  // ==================== ADMIN PANEL API ROUTES ====================
-  app.get('/api/admin', async (_req, res) => {
+  app.post('/api/member/enroll', requireAuth, async (req, res) => {
     try {
-      const adminData = await mysqlDb.getAdminPanelData();
-      res.json(adminData);
+      const body = req.body || {};
+      const result = await mysqlDb.enrollMemberInItem({
+        ...body,
+        member_id: req.authUser!.id,
+        member_phone: req.authUser!.phone,
+        member_name: `${req.authUser!.first_name} ${req.authUser!.last_name}`.trim(),
+      });
+      res.json({ success: true, ...result });
     } catch (error) {
-      console.error('Failed to load admin panel data:', error);
-      res.status(500).json({ error: 'خطا در دریافت اطلاعات پنل مدیریت از دیتابیس' });
+      const message =
+        error instanceof Error ? error.message : 'خطا در ثبت‌نام دوره یا نشست';
+      res.status(400).json({ error: message });
     }
   });
 
-  app.post('/api/admin/sessions', async (req, res) => {
+  // ==================== ADMIN PANEL API ROUTES (ADMIN ONLY) ====================
+
+  app.get('/api/admin', requireAdmin, async (req, res) => {
+    try {
+      const adminData = await mysqlDb.getAdminPanelData(req.authUser!);
+      res.json(adminData);
+    } catch (error) {
+      console.error('Failed to load admin panel data:', error);
+      res
+        .status(500)
+        .json({ error: 'خطا در دریافت اطلاعات پنل مدیریت از دیتابیس MySQL' });
+    }
+  });
+
+  app.post('/api/admin/sessions', requireAdmin, async (req, res) => {
     try {
       const saved = await mysqlDb.saveAdminSession(req.body || {});
       res.json({ success: true, session: saved });
@@ -402,7 +590,7 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/admin/sessions/:id', async (req, res) => {
+  app.delete('/api/admin/sessions/:id', requireAdmin, async (req, res) => {
     try {
       await mysqlDb.deleteAdminSession(Number(req.params.id));
       res.json({ success: true });
@@ -412,7 +600,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/classes', async (req, res) => {
+  app.post('/api/admin/classes', requireAdmin, async (req, res) => {
     try {
       const saved = await mysqlDb.saveAdminClass(req.body || {});
       res.json({ success: true, classItem: saved });
@@ -423,7 +611,7 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/admin/classes/:id', async (req, res) => {
+  app.delete('/api/admin/classes/:id', requireAdmin, async (req, res) => {
     try {
       await mysqlDb.deleteAdminClass(Number(req.params.id));
       res.json({ success: true });
@@ -433,7 +621,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/users', async (req, res) => {
+  app.post('/api/admin/users', requireAdmin, async (req, res) => {
     try {
       const saved = await mysqlDb.saveAdminUser(req.body || {});
       res.json({ success: true, user: saved });
@@ -444,7 +632,7 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/admin/users/:id', async (req, res) => {
+  app.delete('/api/admin/users/:id', requireAdmin, async (req, res) => {
     try {
       await mysqlDb.deleteAdminUser(Number(req.params.id));
       res.json({ success: true });
@@ -454,7 +642,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/tickets/reply', async (req, res) => {
+  app.post('/api/admin/tickets/reply', requireAdmin, async (req, res) => {
     try {
       const { id, admin_reply, status } = req.body || {};
       const updated = await mysqlDb.replyAdminTicket({
@@ -470,7 +658,7 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/admin/tickets/:id', async (req, res) => {
+  app.delete('/api/admin/tickets/:id', requireAdmin, async (req, res) => {
     try {
       await mysqlDb.deleteAdminTicket(Number(req.params.id));
       res.json({ success: true });
@@ -480,7 +668,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/announcements', async (req, res) => {
+  app.post('/api/admin/announcements', requireAdmin, async (req, res) => {
     try {
       const saved = await mysqlDb.saveAdminAnnouncement(req.body || {});
       res.json({ success: true, announcement: saved });
@@ -491,7 +679,7 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/admin/announcements/:id', async (req, res) => {
+  app.delete('/api/admin/announcements/:id', requireAdmin, async (req, res) => {
     try {
       await mysqlDb.deleteAdminAnnouncement(Number(req.params.id));
       res.json({ success: true });
@@ -501,7 +689,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/admin/profile', async (req, res) => {
+  app.put('/api/admin/profile', requireAdmin, async (req, res) => {
     try {
       const {
         first_name,
@@ -514,11 +702,14 @@ async function startServer() {
         new_password,
       } = req.body || {};
       const admin = await mysqlDb.updateAdminProfile({
-        first_name: String(first_name || 'سهراب').trim(),
-        last_name: String(last_name || 'رستگار').trim(),
-        email: String(email || 'admin@bookmeet.ir').trim(),
-        education: String(education || 'دکتری').trim(),
-        favorite_genre: String(favorite_genre || 'ادبیات تطبیقی و نقد ادبی').trim(),
+        adminId: req.authUser!.id,
+        first_name: String(first_name || req.authUser!.first_name).trim(),
+        last_name: String(last_name || req.authUser!.last_name).trim(),
+        email: String(email || req.authUser!.email || '').trim(),
+        education: String(education || req.authUser!.education || 'دکتری').trim(),
+        favorite_genre: String(
+          favorite_genre || req.authUser!.favorite_genre || 'ادبیات تطبیقی'
+        ).trim(),
         bio: String(bio || '').trim(),
         avatar_url: avatar_url !== undefined ? String(avatar_url) : undefined,
         new_password: new_password ? String(new_password) : undefined,
@@ -531,7 +722,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/blog', async (req, res) => {
+  app.post('/api/admin/blog', requireAdmin, async (req, res) => {
     try {
       const saved = await mysqlDb.saveAdminBlogPost(req.body || {});
       res.json({ success: true, post: saved });
@@ -542,7 +733,7 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/admin/blog/:id', async (req, res) => {
+  app.delete('/api/admin/blog/:id', requireAdmin, async (req, res) => {
     try {
       await mysqlDb.deleteAdminBlogPost(Number(req.params.id));
       res.json({ success: true });
@@ -552,7 +743,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/comments', async (req, res) => {
+  app.post('/api/admin/comments', requireAdmin, async (req, res) => {
     try {
       const saved = await mysqlDb.saveUserComment(req.body || {});
       res.json({ success: true, comment: saved });
@@ -563,7 +754,7 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/admin/comments/:id', async (req, res) => {
+  app.delete('/api/admin/comments/:id', requireAdmin, async (req, res) => {
     try {
       await mysqlDb.deleteUserComment(Number(req.params.id));
       res.json({ success: true });
@@ -573,7 +764,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/admin/home-settings', async (req, res) => {
+  app.put('/api/admin/home-settings', requireAdmin, async (req, res) => {
     try {
       const updated = await mysqlDb.updateHomeSettings(req.body || {});
       res.json({ success: true, ...updated });
@@ -584,7 +775,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/gallery', async (req, res) => {
+  app.post('/api/admin/gallery', requireAdmin, async (req, res) => {
     try {
       const saved = await mysqlDb.saveAdminGalleryImage(req.body || {});
       res.json({ success: true, image: saved });
@@ -595,7 +786,7 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/admin/gallery/:id', async (req, res) => {
+  app.delete('/api/admin/gallery/:id', requireAdmin, async (req, res) => {
     try {
       await mysqlDb.deleteAdminGalleryImage(Number(req.params.id));
       res.json({ success: true });
@@ -606,18 +797,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/member/enroll', async (req, res) => {
-    try {
-      const result = await mysqlDb.enrollMemberInItem(req.body || {});
-      res.json({ success: true, ...result });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'خطا در ثبت‌نام دوره یا نشست';
-      res.status(400).json({ error: message });
-    }
-  });
-
-  app.put('/api/admin/enrollments', async (req, res) => {
+  app.put('/api/admin/enrollments', requireAdmin, async (req, res) => {
     try {
       const result = await mysqlDb.updateAdminEnrollmentStatus(req.body || {});
       res.json({ success: true, ...result });
@@ -628,7 +808,7 @@ async function startServer() {
     }
   });
 
-
+  // ==================== STATIC / VITE SERVING ====================
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

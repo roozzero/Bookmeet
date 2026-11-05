@@ -45,6 +45,15 @@ export function createBlogSectionComponent(
 
   const $grid = $section.find('.js-blog-grid');
 
+  if (!blogPosts || blogPosts.length === 0) {
+    $grid.append(`
+      <div class="col-span-full bg-[#f8f4ea] border border-[#ded3be] rounded-[24px] p-10 text-center text-sm text-[#6b5643]">
+        هنوز مقاله‌ای در وبلاگ باشگاه ثبت نشده است.
+      </div>
+    `);
+    return $section;
+  }
+
   blogPosts.forEach((post) => {
     const $card = $(`
       <article

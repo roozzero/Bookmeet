@@ -500,9 +500,16 @@ export function createLibrarySectionComponent(
       );
   }
 
-  function renderCurrentBook(book: LibraryBook, shouldAnimateNow = false) {
-    if (!book) return;
+  function renderCurrentBook(book: LibraryBook | undefined, shouldAnimateNow = false) {
     $currentContainer.empty();
+    if (!book) {
+      $currentContainer.append(`
+        <div class="py-10 px-6 text-center text-sm text-[#6b5643]">
+          هنوز کتابی برای دوره هم‌خوانی جاری در دیتابیس ثبت نشده است.
+        </div>
+      `);
+      return;
+    }
 
     const statusLabel =
       book.is_current === 1
@@ -622,6 +629,15 @@ export function createLibrarySectionComponent(
         selectedCategory === 'همه' || b.category === selectedCategory;
       return isRecent && matchesCat;
     });
+
+    if (recentBooks.length === 0) {
+      $recentGrid.append(`
+        <div class="col-span-full bg-[#e6decb]/45 border border-[#d5cab6] rounded-xl p-8 text-center text-sm text-[#6b5643]">
+          هنوز کتابی در آرشیو کتابخانه باشگاه ثبت نشده است.
+        </div>
+      `);
+      return;
+    }
 
     recentBooks.forEach((book) => {
       const isInspecting = activeBook?.id === book.id;

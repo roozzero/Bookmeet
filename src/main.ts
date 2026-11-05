@@ -62,53 +62,7 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
     hero_image_url: '/assets/hero-bookshelf.png',
     audio_progress_percent: 100,
   },
-  featuredBooks: [
-    {
-      id: 1,
-      title: 'The Little Prince',
-      persian_title: 'شازده کوچولو',
-      author: 'آنتوان دو سنت‌اگزوپری',
-      publication_year: 1943,
-      synopsis:
-        'نسخه مصور آبرنگ و مرکب از سفر شاعرانه شازده کوچولو در میان سیارک‌ها و گفت‌وگو با روباه.',
-    },
-    {
-      id: 2,
-      title: 'The Alchemist',
-      persian_title: 'کیمیاگر',
-      author: 'پائولو کوئیلو',
-      publication_year: 1988,
-      synopsis:
-        'روایت مصور سفر سانتیاگو از دشت‌های آندلس تا اهرام مصر در جست‌وجوی افسانه شخصی.',
-    },
-    {
-      id: 3,
-      title: 'Watership Down',
-      persian_title: 'تپه خرگوش‌ها',
-      author: 'ریچارد آدامز',
-      publication_year: 1972,
-      synopsis:
-        'حکاکی‌های طبیعت‌گرایانه از حماسه مهاجرت و بقای گروهی کوچک در تپه‌های سرسبز برکشایر.',
-    },
-    {
-      id: 4,
-      title: 'The Night Circus',
-      persian_title: 'سیرک شبانه',
-      author: 'ارین مورگنسترن',
-      publication_year: 2011,
-      synopsis:
-        'تصویرسازی‌های سیاه‌وسفید با رگه‌های سرخ از چادرهای جادویی سیرکی که تنها شب‌ها گشوده می‌شود.',
-    },
-    {
-      id: 5,
-      title: 'The Neverending Story',
-      persian_title: 'داستان بی‌پایان',
-      author: 'میشائیل انده',
-      publication_year: 1979,
-      synopsis:
-        'چاپ دو رنگ مسی و زمردی با سرلوحه‌های دست‌ساز که خواننده را به سرزمین فانتازیا فرا می‌خواند.',
-    },
-  ],
+  featuredBooks: [],
   aboutClub: {
     id: 1,
     section_kicker: '۰۱ · درباره باشگاه کتابخوانی بوک‌میت',
@@ -119,11 +73,11 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
       'در نشست‌های دوره‌ای و حلقه‌های مطالعاتی بوک‌میت، اعضا گرد هم می‌آیند تا ضمن واکاوی ساختار، شخصیت‌پردازی و درون‌مایه‌های فلسفی آثار برگزیده، تجربه‌های زیسته و برداشت‌های شخصی خود را به اشتراک بگذارند. چه خواننده‌ای حرفه‌ای باشید و چه به‌تازگی قدم در مسیر مطالعه جدی گذاشته باشید، بوک‌میت خانه‌ای الهام‌بخش برای تداوم عادت مطالعه و ساختن خاطراتی مشترک از جهان کتاب‌هاست.',
     image_url: '/assets/about-club.png',
     image_caption: 'نشست‌های هم‌خوانی و بررسی نسخه‌های ماندگار ادبی در باشگاه بوک‌میت',
-    stat_1_value: '+۱۲۰',
+    stat_1_value: '۰',
     stat_1_label: 'نشست نقد و هم‌خوانی',
-    stat_2_value: '+۸۵۰',
+    stat_2_value: '۰',
     stat_2_label: 'عضو فعال باشگاه',
-    stat_3_value: '۴۸',
+    stat_3_value: '۰',
     stat_3_label: 'شاهکار ادبی بررسی‌شده',
   },
   aboutManager: {
@@ -142,137 +96,8 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
     credentials_line:
       'دکتری ادبیات تطبیقی · ۱۲ سال تجربه تسهیل‌گری نشست‌های کتاب · نویسنده و پژوهشگر روایت',
   },
-  libraryBooks: [
-    {
-      id: 1,
-      is_current: 1,
-      title: 'صد سال تنهایی',
-      original_title: 'One Hundred Years of Solitude',
-      author: 'گابریل گارسیا مارکز',
-      translator: 'بهمن فرزانه',
-      category: 'کلاسیک',
-      publication_year: 1967,
-      pages_count: 468,
-      reading_progress_percent: 68,
-      session_schedule: 'نشست بعدی هم‌خوانی: چهارشنبه ساعت ۱۸:۰۰ (فصل‌های ۱۲ تا ۱۵)',
-      cover_url: '/assets/book-current.png',
-      short_description:
-        'حماسه پررمزوراز خاندان بوئندیا در دهکده خیالی ماکوندو؛ اثری بنیادین در سبک رئالیسم جادویی که مرز میان واقعیت، اسطوره، عشق و تنهایی ابدی انسان را با زبانی شاعرانه و تکرارناپذیر روایت می‌کند. در حلقه‌های مطالعاتی این ماه، ساختار دایره‌ای زمان و استعاره‌های تاریخی این شاهکار را فصل‌به‌فصل بررسی می‌کنیم.',
-      sort_order: 1,
-    },
-    {
-      id: 2,
-      is_current: 0,
-      title: 'مرشد و مارگاریتا',
-      original_title: 'The Master and Margarita',
-      author: 'میخائیل بولگاکف',
-      translator: 'عباس میلانی',
-      category: 'کلاسیک',
-      publication_year: 1967,
-      pages_count: 512,
-      reading_progress_percent: 100,
-      session_schedule: 'بررسی‌شده در دوره مهرماه باشگاه',
-      cover_url: '/assets/book-recent-1.png',
-      short_description:
-        'روایتی طنزآمیز، فلسفی و چندلایه از حضور ناگهانی پروفسور ولاند در مسکو دهه ۱۹۳۰ که در هم‌تنیدگی با عشق مرشد و مارگاریتا، تقابل جاودانه خیر، شر و آزادی هنر را به تصویر می‌کشد.',
-      sort_order: 2,
-    },
-    {
-      id: 3,
-      is_current: 0,
-      title: 'کوری',
-      original_title: 'Blindness',
-      author: 'ژوزه ساراماگو',
-      translator: 'مینو مشیری',
-      category: 'معاصر',
-      publication_year: 1995,
-      pages_count: 348,
-      reading_progress_percent: 100,
-      session_schedule: 'بررسی‌شده در دوره شهریورماه باشگاه',
-      cover_url: '/assets/book-recent-2.png',
-      short_description:
-        'تمثیلی تکان‌دهنده از شیوع یک نابینایی سفید در شهری بی‌نام که فروپاشی اخلاقی جامعه و درعین‌حال امید، همدلی و بیداری وجدان انسانی را در تاریک‌ترین لحظات می‌آزماید.',
-      sort_order: 3,
-    },
-    {
-      id: 4,
-      is_current: 0,
-      title: 'بلندی‌های بادگیر',
-      original_title: 'Wuthering Heights',
-      author: 'امیلی برونته',
-      translator: 'رضا رضایی',
-      category: 'کلاسیک',
-      publication_year: 1847,
-      pages_count: 420,
-      reading_progress_percent: 100,
-      session_schedule: 'بررسی‌شده در دوره مردادماه باشگاه',
-      cover_url: '/assets/book-recent-3.png',
-      short_description:
-        'داستانی پرشور و تسخیرکننده در دشت‌های مه‌آلود یورکشایر که پیوند پرتلاطم کاترین و هیت‌کلیف را در قالب ساختار روایی تو در تو و فضاسازی گوتیک واکاوی می‌کند.',
-      sort_order: 4,
-    },
-    {
-      id: 5,
-      is_current: 0,
-      title: 'کافکا در کرانه',
-      original_title: 'Kafka on the Shore',
-      author: 'هاروکی موراکامی',
-      translator: 'مهدی غبرائی',
-      category: 'معاصر',
-      publication_year: 2002,
-      pages_count: 614,
-      reading_progress_percent: 100,
-      session_schedule: 'بررسی‌شده در دوره تیرماه باشگاه',
-      cover_url: '/assets/book-recent-4.png',
-      short_description:
-        'سفری هزارتو و رؤیاگونه در پیوند دو روایت موازی از نوجوانی گریزان از خانه و پیرمردی ساده دل که مرزهای حافظه، موسیقی، تقدیر و ضمیر ناخودآگاه را درمی‌نوردد.',
-      sort_order: 5,
-    },
-  ],
-  blogPosts: [
-    {
-      id: 1,
-      title: 'چگونه خواندنِ آهسته و گروهی درک ما از رمان‌های کلاسیک را دگرگون می‌کند؟',
-      category: 'یادداشت ادبی',
-      author: 'سهراب رستگار',
-      published_date: '۱۲ آبان ۱۴۰۵',
-      reading_time: '۶ دقیقه مطالعه',
-      cover_url: '/assets/blog-1.png',
-      excerpt:
-        'در روزگاری که سرعت مصرف اطلاعات مجال درنگ را از ما گرفته است، خوانش آهسته و گفت‌وگوی گروهی درباره متون کلاسیک به ما می‌آموزد که چگونه میان سطرهای یک رمان زندگی کنیم و جزئیات پنهان معماری روایت را دریابیم.',
-      full_content:
-        'در نشست‌های باشگاه کتابخوانی بوک‌میت بارها تجربه کرده‌ایم که یک متن واحد، در برخورد با ذهن‌های گوناگون، لایه‌هایی تازه و غیرمنتظره از معنا را آشکار می‌سازد. خواندن آهسته به ما اجازه می‌دهد از سطح پیرنگ عبور کنیم و به ضرباهنگ جمله‌ها، استعاره‌های تکرارشونده و سکوت‌های میان دیالوگ‌ها گوش بسپاریم. هنگامی که اعضای باشگاه برداشت‌های خود را از یک فصل مشترک بازگو می‌کنند، کتاب از یک شیء خاموش به میدانی زنده برای تجربه همدلی و تفکر انتقادی تبدیل می‌شود.',
-      sort_order: 1,
-    },
-    {
-      id: 2,
-      title: 'نگاهی به رئالیسم جادویی؛ از تنهایی ماکوندو تا هزارتوهای روایت معاصر',
-      category: 'نقد و بررسی',
-      author: 'نیلوفر فرهادی',
-      published_date: '۵ آبان ۱۴۰۵',
-      reading_time: '۸ دقیقه مطالعه',
-      cover_url: '/assets/blog-2.png',
-      excerpt:
-        'رئالیسم جادویی صرفاً ترفندی فانتزی برای گریز از واقعیت نیست؛ بلکه شیوه‌ای اصیل برای نگریستن به تاریخ، حافظه جمعی و شگفتی‌های نهفته در زندگی روزمره مردمانی است که اسطوره و واقعیت را هم‌زمان زیسته اند.',
-      full_content:
-        'هنگامی که گابریل گارسیا مارکز در «صد سال تنهایی» از رویدادهای خارق‌العاده با لحنی کاملاً عادی و روزمره سخن می‌گوید، مرز سنتی میان باورپذیری و خیال را جابه‌جا می‌کند. در حلقه مطالعاتی این ماه بررسی کردیم که چگونه این شگرد روایی به نویسندگان آمریکای لاتین و سپس ادبیات معاصر جهان امکان داد تا زخم‌های تاریخی، فراموشی جمعی و تنهایی انسان مدرن را در قاب تصاویری فراموش‌نشدنی ثبت کنند.',
-      sort_order: 2,
-    },
-    {
-      id: 3,
-      title: 'راهنمای نوشتن حاشیه‌نویسی و یادداشت‌برداری خلاق هنگام مطالعه رمان',
-      category: 'کارگاه خوانش',
-      author: 'آرمان کاظمی',
-      published_date: '۲۷ مهر ۱۴۰۵',
-      reading_time: '۵ دقیقه مطالعه',
-      cover_url: '/assets/blog-3.png',
-      excerpt:
-        'گفت‌وگو با کتاب از لحظه‌ای آغاز می‌شود که مداد را در دست می‌گیرید و پرسش‌ها، تردیدها و تداعی‌های شخصی خود را در حاشیه صفحه‌ها یا دفترچه یادداشت‌های روزانه ثبت می‌کنید.',
-      full_content:
-        'بسیاری از خوانندگان پس از پایان یک رمان حجیم احساس می‌کنند بخش بزرگی از ظرایف اثر از یادشان رفته است. روش پیشنهادی ما در باشگاه بوک‌میت، ثبت سه محور کلیدی در پایان هر فصل است: نخست، یک جمله یا تصویر تکان‌دهنده؛ دوم، دگرگونی انگیزه شخصیت‌ها؛ و سوم، پرسشی که متن در ذهن ما بی‌پاسخ رها کرده است. این یادداشت‌های کوتاه، بهترین توشه برای مشارکت فعال در نشست‌های هفتگی نقد و بررسی هستند.',
-      sort_order: 3,
-    },
-  ],
+  libraryBooks: [],
+  blogPosts: [],
   contactInfo: {
     id: 1,
     section_kicker: '۰۵ · ارتباط با ما و عضویت در حلقه‌های مطالعاتی',
@@ -307,12 +132,13 @@ type PendingEnrollment =
   | { type: 'event'; eventItem: ClubEventDetailItem }
   | null;
 
-function mountApplication(payload: BootstrapPayload): void {
+function mountApplication(
+  payload: BootstrapPayload,
+  initialSessionMember: ClubMember | null = null
+): void {
   const $app = $('#app');
-  let allPosts = payload.blogPosts || FALLBACK_BOOTSTRAP.blogPosts;
-  let currentMember: ClubMember | null = null;
-  let cachedAdminData: AdminPanelPayload | null = null;
-  let cachedMemberData: MemberPanelPayload | null = null;
+  let allPosts = payload.blogPosts || [];
+  let currentMember: ClubMember | null = initialSessionMember;
   let pendingEnrollment: PendingEnrollment = null;
 
   function scrollToSection(href: string): void {
@@ -440,44 +266,14 @@ function mountApplication(payload: BootstrapPayload): void {
 
     ApiService.fetchAdminPanelData()
       .then((adminData: AdminPanelPayload) => {
-        cachedAdminData = adminData;
         currentMember = adminData.admin;
         renderAdminPanelView(adminData, initialTab, initialSubPath);
       })
       .catch(() => {
-        const fallbackAdmin: ClubMember = currentMember || {
-          id: 2,
-          first_name: 'سهراب',
-          last_name: 'رستگار',
-          phone: 'admin',
-          role: 'admin',
-          education: 'دکتری',
-          favorite_genre: 'ادبیات تطبیقی و نقد ادبی',
-          email: 'admin@bookmeet.ir',
-          city: 'تهران',
-          avatar_url: '/assets/manager-portrait.png',
-          bio: 'پژوهشگر ادبیات تطبیقی، منتقد ادبی و مدیر باشگاه کتابخوانی بوک‌میت.',
-          membership_code: 'BM-ADMIN-۰۰۱',
-          joined_date: '۱ فروردین ۱۴۰۲',
-          created_at: new Date().toISOString(),
-        };
-        const fallbackPayload: AdminPanelPayload = cachedAdminData || {
-          admin: fallbackAdmin,
-          sessions: [],
-          classes: [],
-          users: [],
-          tickets: [],
-          announcements: [],
-          blogPosts: allPosts,
-          comments: [],
-          gallery: [],
-          heroSettings: payload.heroSettings || FALLBACK_BOOTSTRAP.heroSettings,
-          aboutClub: payload.aboutClub || FALLBACK_BOOTSTRAP.aboutClub,
-          aboutManager: payload.aboutManager || FALLBACK_BOOTSTRAP.aboutManager,
-          contactInfo: payload.contactInfo || FALLBACK_BOOTSTRAP.contactInfo,
-          libraryBooks: payload.libraryBooks || FALLBACK_BOOTSTRAP.libraryBooks,
-        };
-        renderAdminPanelView(fallbackPayload, initialTab, initialSubPath);
+        currentMember = null;
+        pushRoute('/');
+        renderMainHomeView();
+        $('.js-login-modal').removeClass('hidden');
       });
   }
 
@@ -516,9 +312,11 @@ function mountApplication(payload: BootstrapPayload): void {
         renderMainHomeView();
       },
       onLogout: () => {
-        currentMember = null;
-        pushRoute('/');
-        renderMainHomeView();
+        ApiService.logoutClubMember().finally(() => {
+          currentMember = null;
+          pushRoute('/');
+          renderMainHomeView();
+        });
       },
       onAdminUpdated: (updatedAdmin) => {
         currentMember = updatedAdmin;
@@ -558,7 +356,6 @@ function mountApplication(payload: BootstrapPayload): void {
 
     ApiService.fetchMemberPanelData(phone || currentMember?.phone)
       .then((panelData: MemberPanelPayload) => {
-        cachedMemberData = panelData;
         currentMember = panelData.member;
         renderMemberPanelView(
           panelData,
@@ -568,35 +365,10 @@ function mountApplication(payload: BootstrapPayload): void {
         );
       })
       .catch(() => {
-        const fallbackMember: ClubMember = currentMember || {
-          id: 1,
-          first_name: 'پرنیا',
-          last_name: 'فرهمند',
-          phone: '۰۹۱۲۳۴۵۶۷۸۹',
-          education: 'کارشناسی ارشد',
-          favorite_genre: 'ادبیات داستانی و رمان کلاسیک',
-          email: 'parnia.farahmand@bookmeet.ir',
-          city: 'تهران',
-          bio: 'علاقه‌مند به ادبیات کلاسیک جهان و شرکت در حلقه‌های مطالعاتی هفتگی باشگاه بوک‌میت.',
-          membership_code: 'BM-۱۴۰۵-۱۰۸',
-          joined_date: '۱۲ مهر ۱۴۰۴',
-          created_at: new Date().toISOString(),
-        };
-        const fallbackPanel: MemberPanelPayload = cachedMemberData || {
-          member: fallbackMember,
-          sessions: [],
-          classes: [],
-          library: [],
-          tickets: [],
-          calendarEvents: [],
-          announcements: [],
-        };
-        renderMemberPanelView(
-          fallbackPanel,
-          initialTab,
-          initialSubPath,
-          initialEnrollmentNotice
-        );
+        currentMember = null;
+        pushRoute('/');
+        renderMainHomeView();
+        $('.js-login-modal').removeClass('hidden');
       });
   }
 
@@ -637,9 +409,11 @@ function mountApplication(payload: BootstrapPayload): void {
         renderMainHomeView();
       },
       onLogout: () => {
-        currentMember = null;
-        pushRoute('/');
-        renderMainHomeView();
+        ApiService.logoutClubMember().finally(() => {
+          currentMember = null;
+          pushRoute('/');
+          renderMainHomeView();
+        });
       },
       onMemberUpdated: (updatedMember) => {
         currentMember = updatedMember;
@@ -700,12 +474,17 @@ function mountApplication(payload: BootstrapPayload): void {
     });
 
     const $library = createLibrarySectionComponent({
-      libraryBooks: payload.libraryBooks || FALLBACK_BOOTSTRAP.libraryBooks,
+      libraryBooks: payload.libraryBooks || [],
       onOpenEventDetail: (eventItem) => {
         pushRoute(`/event/${eventItem.id}`);
         renderEventDetailPageView(eventItem, true);
       },
       onRegisterEvent: (eventItem) => {
+        if (currentMember && currentMember.role !== 'admin') {
+          pendingEnrollment = { type: 'event', eventItem };
+          handleMemberAuthSuccess(currentMember);
+          return;
+        }
         pendingEnrollment = { type: 'event', eventItem };
         $loginModal.removeClass('hidden');
       },
@@ -717,6 +496,11 @@ function mountApplication(payload: BootstrapPayload): void {
         renderCourseDetailPageView(course, true);
       },
       onRegisterCourse: (course) => {
+        if (currentMember && currentMember.role !== 'admin') {
+          pendingEnrollment = { type: 'course', course };
+          handleMemberAuthSuccess(currentMember);
+          return;
+        }
         pendingEnrollment = { type: 'course', course };
         $loginModal.removeClass('hidden');
       },
@@ -803,6 +587,11 @@ function mountApplication(payload: BootstrapPayload): void {
         renderMainHomeView('#courses', true);
       },
       onRegisterCourse: (targetCourse) => {
+        if (currentMember && currentMember.role !== 'admin') {
+          pendingEnrollment = { type: 'course', course: targetCourse };
+          handleMemberAuthSuccess(currentMember);
+          return;
+        }
         pendingEnrollment = { type: 'course', course: targetCourse };
         $loginModal.removeClass('hidden');
       },
@@ -868,6 +657,11 @@ function mountApplication(payload: BootstrapPayload): void {
         renderMainHomeView('#events', true);
       },
       onRegisterEvent: (targetEvent) => {
+        if (currentMember && currentMember.role !== 'admin') {
+          pendingEnrollment = { type: 'event', eventItem: targetEvent };
+          handleMemberAuthSuccess(currentMember);
+          return;
+        }
         pendingEnrollment = { type: 'event', eventItem: targetEvent };
         $loginModal.removeClass('hidden');
       },
@@ -989,7 +783,7 @@ function mountApplication(payload: BootstrapPayload): void {
     // Event detail routes: /event/:id
     if (first === 'event' && segments[1]) {
       const eventId = Number(segments[1]);
-      const books = payload.libraryBooks || FALLBACK_BOOTSTRAP.libraryBooks;
+      const books = payload.libraryBooks || [];
       const currentBook = books.find((b) => Number(b.is_current) === 1) || books[0];
       if (currentBook && (eventId === 100 || eventId === currentBook.id)) {
         renderEventDetailPageView(buildBookEventDetail(currentBook), true);
@@ -1047,19 +841,15 @@ function mountApplication(payload: BootstrapPayload): void {
 }
 
 $(function () {
-  mountApplication(FALLBACK_BOOTSTRAP);
+  const sessionPromise = ApiService.fetchCurrentSessionMember()
+    .then((res) => res.member)
+    .catch(() => null);
 
-  ApiService.fetchBootstrapData()
-    .then((data) => {
-      if (
-        $('#home').length &&
-        $('.js-auth-modal-backdrop:not(.hidden)').length === 0 &&
-        ($(window).scrollTop() || 0) < 40
-      ) {
-        mountApplication(data);
-      }
-    })
-    .catch(() => {
-      // Already mounted with FALLBACK_BOOTSTRAP
-    });
+  const bootstrapPromise = ApiService.fetchBootstrapData().catch(
+    () => FALLBACK_BOOTSTRAP
+  );
+
+  Promise.all([bootstrapPromise, sessionPromise]).then(([data, sessionMember]) => {
+    mountApplication(data, sessionMember);
+  });
 });
