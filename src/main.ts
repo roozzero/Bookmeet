@@ -6,6 +6,7 @@ import { createHeroSectionComponent } from './components/HeroSection.ts';
 import { createAboutClubSectionComponent } from './components/AboutClubSection.ts';
 import { createAboutManagerSectionComponent } from './components/AboutManagerSection.ts';
 import { createLibrarySectionComponent } from './components/LibrarySection.ts';
+import { createCoursesSectionComponent } from './components/CoursesSection.ts';
 import { createBlogSectionComponent } from './components/BlogSection.ts';
 import { createBlogPostPageComponent } from './components/BlogPostPage.ts';
 import { createContactSectionComponent } from './components/ContactSection.ts';
@@ -32,9 +33,11 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
     { id: 1, label: 'صفحه اصلی', href: '#home', sort_order: 1, is_active: 1 },
     { id: 2, label: 'درباره باشگاه', href: '#about-club', sort_order: 2, is_active: 1 },
     { id: 3, label: 'درباره من', href: '#about-me', sort_order: 3, is_active: 1 },
-    { id: 4, label: 'کتابخانه', href: '#library', sort_order: 4, is_active: 1 },
-    { id: 5, label: 'وبلاگ', href: '#blog', sort_order: 5, is_active: 1 },
-    { id: 6, label: 'ارتباط با ما', href: '#contact', sort_order: 6, is_active: 1 },
+    { id: 4, label: 'رویدادها', href: '#events', sort_order: 4, is_active: 1 },
+    { id: 5, label: 'کتابخانه', href: '#library', sort_order: 5, is_active: 1 },
+    { id: 6, label: 'دوره ها', href: '#courses', sort_order: 6, is_active: 1 },
+    { id: 7, label: 'وبلاگ', href: '#blog', sort_order: 7, is_active: 1 },
+    { id: 8, label: 'ارتباط با ما', href: '#contact', sort_order: 8, is_active: 1 },
   ],
   heroSettings: {
     id: 1,
@@ -300,7 +303,9 @@ function mountApplication(payload: BootstrapPayload): void {
       '#home': '/',
       '#about-club': '/about-club',
       '#about-me': '/about-me',
+      '#events': '/events',
       '#library': '/library',
+      '#courses': '/courses',
       '#blog': '/blog',
       '#contact': '/contact',
     };
@@ -454,9 +459,7 @@ function mountApplication(payload: BootstrapPayload): void {
       },
     });
 
-    const $scrollToTopBtn = createScrollToTopButtonComponent();
-
-    $shell.append($navbar, $adminPage, $scrollToTopBtn);
+    $shell.append($navbar, $adminPage);
     $app.append($shell);
 
     window.scrollTo(0, 0);
@@ -554,9 +557,7 @@ function mountApplication(payload: BootstrapPayload): void {
       },
     });
 
-    const $scrollToTopBtn = createScrollToTopButtonComponent();
-
-    $shell.append($navbar, $panelPage, $scrollToTopBtn);
+    $shell.append($navbar, $panelPage);
     $app.append($shell);
 
     window.scrollTo(0, 0);
@@ -612,6 +613,8 @@ function mountApplication(payload: BootstrapPayload): void {
       libraryBooks: payload.libraryBooks || FALLBACK_BOOTSTRAP.libraryBooks,
     });
 
+    const $courses = createCoursesSectionComponent();
+
     const $blog = createBlogSectionComponent({
       blogPosts: allPosts,
       onOpenPost: (post: BlogPost) => {
@@ -632,6 +635,7 @@ function mountApplication(payload: BootstrapPayload): void {
       $aboutClub,
       $aboutManager,
       $library,
+      $courses,
       $blog,
       $contact,
       $scrollToTopBtn,
@@ -723,7 +727,9 @@ function mountApplication(payload: BootstrapPayload): void {
     const sectionRoutes: Record<string, string> = {
       'about-club': '#about-club',
       'about-me': '#about-me',
+      events: '#events',
       library: '#library',
+      courses: '#courses',
       contact: '#contact',
     };
     if (sectionRoutes[first]) {

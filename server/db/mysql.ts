@@ -295,9 +295,11 @@ const SEED_DATA: MySQLStoreSchema = {
     { id: 1, label: 'صفحه اصلی', href: '#home', sort_order: 1, is_active: 1 },
     { id: 2, label: 'درباره باشگاه', href: '#about-club', sort_order: 2, is_active: 1 },
     { id: 3, label: 'درباره من', href: '#about-me', sort_order: 3, is_active: 1 },
-    { id: 4, label: 'کتابخانه', href: '#library', sort_order: 4, is_active: 1 },
-    { id: 5, label: 'وبلاگ', href: '#blog', sort_order: 5, is_active: 1 },
-    { id: 6, label: 'ارتباط با ما', href: '#contact', sort_order: 6, is_active: 1 },
+    { id: 4, label: 'رویدادها', href: '#events', sort_order: 4, is_active: 1 },
+    { id: 5, label: 'کتابخانه', href: '#library', sort_order: 5, is_active: 1 },
+    { id: 6, label: 'دوره ها', href: '#courses', sort_order: 6, is_active: 1 },
+    { id: 7, label: 'وبلاگ', href: '#blog', sort_order: 7, is_active: 1 },
+    { id: 8, label: 'ارتباط با ما', href: '#contact', sort_order: 8, is_active: 1 },
   ],
   hero_settings: [
     {
@@ -1408,15 +1410,15 @@ class MySQLDatabaseManager {
   }
 
   public async getNavigationLinks(): Promise<NavigationLinkRow[]> {
-    if (this.pool && this.isExternalMySQLConnected) {
-      try {
-        const [rows] = await this.pool.query(
-          'SELECT * FROM navigation_links WHERE is_active = 1 ORDER BY sort_order ASC'
-        );
-        return rows as NavigationLinkRow[];
-      } catch {
-        this.isExternalMySQLConnected = false;
-      }
+    const hasEventsAndCourses =
+      Array.isArray(this.store.navigation_links) &&
+      this.store.navigation_links.some((n) => n.href === '#events') &&
+      this.store.navigation_links.some((n) => n.href === '#courses');
+    if (!hasEventsAndCourses) {
+      this.store.navigation_links = JSON.parse(
+        JSON.stringify(SEED_DATA.navigation_links)
+      );
+      this.saveDiskStore();
     }
     return [...this.store.navigation_links]
       .filter((item) => item.is_active === 1)

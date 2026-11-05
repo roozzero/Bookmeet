@@ -2101,8 +2101,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     if (blogPageMode === 'editor' && editingBlogPost) {
       return `
         <div class="space-y-6">
-          <div class="flex flex-wrap items-center justify-between gap-4">
-            <div>
+          <div class="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="text-right">
               <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">
                 ${editingBlogPost.id ? 'صفحه ویرایش مقاله وبلاگ' : 'صفحه ساخت مقاله جدید در وبلاگ'}
               </h2>
@@ -2110,7 +2110,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 تمامی مشخصات مقاله، تصویر کاور، برچسب‌ها، خلاصه و متن کامل مقاله را در این صفحه تکمیل نمایید.
               </p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="mr-auto flex items-center gap-2 shrink-0 self-end sm:self-auto">
               <button
                 type="button"
                 class="js-admin-open-blog-cat-modal px-4 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer"
@@ -2252,13 +2252,108 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
 
               <div class="sm:col-span-3">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">متن کامل مقاله *</label>
-                <textarea
-                  name="full_content"
-                  rows="10"
-                  required
-                  placeholder="متن کامل مقاله، پاراگراف‌ها و تحلیل‌های ادبی را در این بخش بنویسید..."
-                  class="w-full px-4 py-3 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px] leading-[2]"
-                >${editingBlogPost.full_content || ''}</textarea>
+                <div class="rounded-xl border border-[#DFCEB9] bg-[#F4E9DA]/60 overflow-hidden">
+                  <!-- Rich Text Formatting Toolbar -->
+                  <div class="px-3 py-2 bg-[#EFE3D2] border-b border-[#DFCEB9] flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      data-editor-cmd="bold"
+                      title="ضخیم (Bold)"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-bold text-[#231912] cursor-pointer"
+                    >
+                      B بولد
+                    </button>
+                    <button
+                      type="button"
+                      data-editor-cmd="italic"
+                      title="مورب (Italic)"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] italic font-semibold text-[#231912] cursor-pointer"
+                    >
+                      I ایتالیک
+                    </button>
+                    <button
+                      type="button"
+                      data-editor-cmd="underline"
+                      title="زیرخط‌دار"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] underline font-semibold text-[#231912] cursor-pointer"
+                    >
+                      U زیرخط
+                    </button>
+                    <span class="w-px h-5 bg-[#D5C3AE] mx-0.5"></span>
+                    <button
+                      type="button"
+                      data-editor-cmd="h2"
+                      title="افزودن تیتر اصلی"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-bold text-[#231912] cursor-pointer"
+                    >
+                      تیتر H2
+                    </button>
+                    <button
+                      type="button"
+                      data-editor-cmd="h3"
+                      title="افزودن زیرعنوان"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                    >
+                      زیرعنوان H3
+                    </button>
+                    <button
+                      type="button"
+                      data-editor-cmd="quote"
+                      title="درج نقل‌قول ادبی"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                    >
+                      « نقل‌قول »
+                    </button>
+                    <span class="w-px h-5 bg-[#D5C3AE] mx-0.5"></span>
+                    <button
+                      type="button"
+                      data-editor-cmd="ul"
+                      title="لیست نقطه‌ای"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                    >
+                      • لیست نقطه‌ای
+                    </button>
+                    <button
+                      type="button"
+                      data-editor-cmd="ol"
+                      title="لیست شماره‌دار"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                    >
+                      ۱. لیست شماره‌دار
+                    </button>
+                    <button
+                      type="button"
+                      data-editor-cmd="link"
+                      title="درج لینک"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                    >
+                      🔗 لینک
+                    </button>
+                    <button
+                      type="button"
+                      data-editor-cmd="hr"
+                      title="درج خط جداکننده"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                    >
+                      ― جداکننده
+                    </button>
+                    <button
+                      type="button"
+                      data-editor-cmd="clear"
+                      title="پاک‌سازی فرمت متن انتخاب‌شده"
+                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#FBEAE8] border border-[#E6B8B3] text-[11.5px] font-semibold text-[#9E3329] cursor-pointer mr-auto"
+                    >
+                      پاک‌سازی فرمت
+                    </button>
+                  </div>
+                  <textarea
+                    name="full_content"
+                    rows="11"
+                    required
+                    placeholder="متن کامل مقاله، پاراگراف‌ها و تحلیل‌های ادبی را در این بخش بنویسید..."
+                    class="js-admin-blog-content-textarea w-full px-4 py-3 bg-transparent text-[13.5px] text-[#231912] leading-[2] focus:outline-none"
+                  >${editingBlogPost.full_content || ''}</textarea>
+                </div>
               </div>
             </div>
 
@@ -3767,6 +3862,80 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     isBlogCategoryModalOpen = false;
     render();
     showToast(`دسته‌بندی جدید «${newCat}» به مقالات اضافه شد.`);
+  });
+
+  // Rich Text Editor Toolbar Handler for Blog Content
+  $wrapper.on('click', '.js-blog-editor-tool', function () {
+    const cmd = String($(this).data('editor-cmd') || '');
+    const textarea = $wrapper.find('.js-admin-blog-content-textarea')[0] as
+      | HTMLTextAreaElement
+      | undefined;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart || 0;
+    const end = textarea.selectionEnd || 0;
+    const currentVal = textarea.value;
+    const selected = currentVal.slice(start, end);
+
+    let replacement = selected;
+    switch (cmd) {
+      case 'bold':
+        replacement = `**${selected || 'متن برجسته'}**`;
+        break;
+      case 'italic':
+        replacement = `*${selected || 'متن مورب'}*`;
+        break;
+      case 'underline':
+        replacement = `<u>${selected || 'متن زیرخط‌دار'}</u>`;
+        break;
+      case 'h2':
+        replacement = `\n## ${selected || 'تیتر بخش اصلی'}\n`;
+        break;
+      case 'h3':
+        replacement = `\n### ${selected || 'زیرعنوان بخش'}\n`;
+        break;
+      case 'quote':
+        replacement = `\n«${selected || 'جمله یا نقل‌قول ادبی برگزیده را اینجا بنویسید...'}»\n`;
+        break;
+      case 'ul':
+        replacement = selected
+          ? selected
+              .split('\n')
+              .map((line) => `• ${line}`)
+              .join('\n')
+          : `\n• مورد اول\n• مورد دوم\n• مورد سوم\n`;
+        break;
+      case 'ol':
+        replacement = selected
+          ? selected
+              .split('\n')
+              .map((line, idx) => `${toPersianDigits(idx + 1)}. ${line}`)
+              .join('\n')
+          : `\n۱. نکته اول\n۲. نکته دوم\n۳. نکته سوم\n`;
+        break;
+      case 'link':
+        replacement = `[${selected || 'عنوان لینک'}](https://bookmeet.ir)`;
+        break;
+      case 'hr':
+        replacement = `\n────────────────────\n`;
+        break;
+      case 'clear':
+        replacement = selected
+          .replace(/(\*\*|\*|<u>|<\/u>|^##\s+|^###\s+|«|»)/gm, '')
+          .trim();
+        break;
+      default:
+        break;
+    }
+
+    const nextVal = currentVal.slice(0, start) + replacement + currentVal.slice(end);
+    textarea.value = nextVal;
+    if (editingBlogPost) {
+      editingBlogPost.full_content = nextVal;
+    }
+    textarea.focus();
+    const cursorPos = start + replacement.length;
+    textarea.setSelectionRange(cursorPos, cursorPos);
   });
 
   $wrapper.on('submit', '.js-admin-blog-form', function (e) {
