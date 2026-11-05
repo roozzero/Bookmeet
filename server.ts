@@ -111,29 +111,40 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
 
-  try {
-    await mysqlDb.initializeDatabase();
-    if (mysqlDb.isConnectedToMySQL()) {
-      console.log('✅ Connected to MySQL database and verified schema.');
-    } else {
-      console.log(
-        'ℹ️ Local MySQL daemon (127.0.0.1:3306) not detected in this container; running SQL schema in-memory until MySQL is available.'
-      );
-    }
-  } catch (err) {
-    console.warn(
-      'Database initialization notice:',
-      err instanceof Error ? err.message : err
-    );
-  }
-
   // ==================== PUBLIC WEBSITE API ROUTES ====================
 
-  app.get('/api/health', (_req, res) => {
-    res.json({
-      status: 'ok',
-      mysqlConnected: mysqlDb.isConnectedToMySQL(),
-    });
+  app.get('/api/health', async (_req, res) => {
+    try {
+      await mysqlDb.verifyConnection();
+      res.status(200).json({
+        status: 'ok',
+        database: 'mysql',
+        connected: true,
+      });
+    } catch (error) {
+      res.status(503).json({
+        status: 'error',
+        database: 'mysql',
+        connected: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'MySQL database connection failed',
+      });
+    }
+  });
+
+  app.use('/api', async (_req, res, next) => {
+    try {
+      await mysqlDb.ensureInitialized();
+      next();
+    } catch (error) {
+      res.status(503).json({
+        error:
+          'خطا در اتصال به دیتابیس MySQL. لطفاً از روشن بودن سرویس MySQL در XAMPP و صحت تنظیمات فایل .env اطمینان حاصل کنید.',
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
   });
 
   app.get('/api/bootstrap', async (_req, res) => {
@@ -824,9 +835,21 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, '0.0.0.0', async () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
+    try {
+      await mysqlDb.initializeDatabase();
+      console.log('✅ Connected to MySQL database and verified schema.');
+    } catch (error) {
+      console.warn(
+        '⚠️ MySQL connection unavailable at startup (make sure MySQL is running on XAMPP/cPanel):',
+        error instanceof Error ? error.message : error
+      );
+    }
   });
 }
 
-startServer();
+startServer().catch((error) => {
+  console.error('❌ Fatal Server Startup Error:', error);
+  process.exit(1);
+});

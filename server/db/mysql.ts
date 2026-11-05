@@ -1,6 +1,5 @@
 import 'dotenv/config';
 import mysql, { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
-import { DatabaseSync } from 'node:sqlite';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
@@ -379,42 +378,12 @@ function stripPassword(row: ClubMemberRow): PublicClubMember {
   };
 }
 
-function translateMySqlToSqlite(sql: string): string {
-  const trimmed = sql.trim();
-  if (/^CREATE\s+TABLE/i.test(trimmed)) {
-    return trimmed
-      .replace(/INT\s+AUTO_INCREMENT\s+PRIMARY\s+KEY/gi, 'INTEGER PRIMARY KEY AUTOINCREMENT')
-      .replace(/TINYINT\(\d+\)/gi, 'INTEGER')
-      .replace(/LONGTEXT/gi, 'TEXT')
-      .replace(/DATETIME/gi, 'TEXT')
-      .replace(/ENUM\([^)]+\)/gi, 'TEXT')
-      .replace(/\s+ON\s+UPDATE\s+CURRENT_TIMESTAMP/gi, '')
-      .replace(/,\s*INDEX\s+\w+\s*\([^)]+\)/gi, '')
-      .replace(/UNIQUE\s+KEY\s+\w+\s*\(([^)]+)\)/gi, 'UNIQUE ($1)')
-      .replace(/\)\s*ENGINE=InnoDB[^;]*$/i, ')');
-  }
-
-  return trimmed
-    .replace(
-      /ON\s+DUPLICATE\s+KEY\s+UPDATE\s+status\s*=\s*'غیرفعال',\s*member_name\s*=\s*VALUES\(member_name\),\s*registered_at\s*=\s*'ثبت‌نام مجدد'/gi,
-      "ON CONFLICT(target_type, target_id, member_phone) DO UPDATE SET status = 'غیرفعال', member_name = excluded.member_name, registered_at = 'ثبت‌نام مجدد'"
-    )
-    .replace(/NOW\(\)/gi, "datetime('now')");
-}
-
 class MySQLDatabaseManager {
-  private mysqlPool: Pool;
-  private memorySqlDb: DatabaseSync | null = null;
-  private mysqlAvailable = true;
-  private pool: {
-    execute: <T extends RowDataPacket[] | ResultSetHeader>(
-      sql: string,
-      values?: unknown[]
-    ) => Promise<[T, unknown]>;
-  };
+  private pool: Pool;
+  private initialized = false;
 
   constructor() {
-    this.mysqlPool = mysql.createPool({
+    this.pool = mysql.createPool({
       host: process.env.MYSQL_HOST || 'localhost',
       port: Number(process.env.MYSQL_PORT || 3306),
       user: process.env.MYSQL_USER || 'root',
@@ -424,104 +393,20 @@ class MySQLDatabaseManager {
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
-      connectTimeout: 2500,
+      connectTimeout: 5000,
     });
-
-    this.pool = {
-      execute: async <T extends RowDataPacket[] | ResultSetHeader>(
-        sql: string,
-        values: unknown[] = []
-      ): Promise<[T, unknown]> => {
-        if (this.mysqlAvailable) {
-          try {
-            const [res, meta] = await this.mysqlPool.execute(
-              sql,
-              values as (string | number | null | Date)[]
-            );
-            return [res as T, meta];
-          } catch (err: unknown) {
-            const code = (err as { code?: string })?.code || '';
-            if (
-              code === 'ECONNREFUSED' ||
-              code === 'ENOTFOUND' ||
-              code === 'ETIMEDOUT' ||
-              code === 'PROTOCOL_CONNECTION_LOST' ||
-              code === 'ER_BAD_DB_ERROR'
-            ) {
-              this.mysqlAvailable = false;
-            } else {
-              throw err;
-            }
-          }
-        }
-        return this.executeInMemorySql<T>(sql, values);
-      },
-    };
-  }
-
-  private getMemorySqlDb(): DatabaseSync {
-    if (!this.memorySqlDb) {
-      this.memorySqlDb = new DatabaseSync(':memory:');
-    }
-    return this.memorySqlDb;
-  }
-
-  private executeInMemorySql<T extends RowDataPacket[] | ResultSetHeader>(
-    sql: string,
-    values: unknown[] = []
-  ): [T, unknown] {
-    const db = this.getMemorySqlDb();
-    const translatedSql = translateMySqlToSqlite(sql);
-    const normalizedParams = values.map((v) => {
-      if (v === undefined) return null;
-      if (v instanceof Date) return v.toISOString().slice(0, 19).replace('T', ' ');
-      return v as string | number | null;
-    });
-
-    const stmt = db.prepare(translatedSql);
-    if (/^\s*SELECT\b/i.test(translatedSql)) {
-      const rows = stmt.all(...normalizedParams) as unknown as T;
-      return [rows, []];
-    }
-
-    const res = stmt.run(...normalizedParams);
-    const header = {
-      insertId: Number(res.lastInsertRowid || 0),
-      affectedRows: Number(res.changes || 0),
-    } as unknown as T;
-    return [header, []];
   }
 
   public getPool(): Pool {
-    return this.mysqlPool;
-  }
-
-  public isConnectedToMySQL(): boolean {
-    return this.mysqlAvailable;
+    return this.pool;
   }
 
   public async verifyConnection(): Promise<void> {
+    const conn = await this.pool.getConnection();
     try {
-      const conn = await this.mysqlPool.getConnection();
-      try {
-        await conn.ping();
-        this.mysqlAvailable = true;
-      } finally {
-        conn.release();
-      }
-    } catch (err: unknown) {
-      const code = (err as { code?: string })?.code || '';
-      if (
-        code === 'ECONNREFUSED' ||
-        code === 'ENOTFOUND' ||
-        code === 'ETIMEDOUT' ||
-        code === 'ER_BAD_DB_ERROR'
-      ) {
-        this.mysqlAvailable = false;
-        this.getMemorySqlDb();
-        return;
-      }
-      throw err;
+      await conn.ping();
+    } finally {
+      conn.release();
     }
   }
 
@@ -829,6 +714,15 @@ class MySQLDatabaseManager {
     }
 
     await this.ensureInitialAdminFromEnv();
+    this.initialized = true;
+  }
+
+  public async ensureInitialized(): Promise<void> {
+    if (!this.initialized) {
+      await this.initializeDatabase();
+    } else {
+      await this.verifyConnection();
+    }
   }
 
   /**
