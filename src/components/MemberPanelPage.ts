@@ -1939,16 +1939,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                   .join('')}
               </select>
             </div>
-            <div>
-              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">حوزه مورد علاقه کتاب</label>
-              <input
-                type="text"
-                name="favorite_genre"
-                value="${state.member.favorite_genre || ''}"
-                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
-              />
-            </div>
-            <div>
+            <div class="sm:col-span-2">
               <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">پست الکترونیک (ایمیل)</label>
               <input
                 type="text"
@@ -2764,9 +2755,6 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     const first_name = String($form.find('[name="first_name"]').val() || '').trim();
     const last_name = String($form.find('[name="last_name"]').val() || '').trim();
     const education = String($form.find('[name="education"]').val() || 'کارشناسی ارشد').trim();
-    const favorite_genre = String(
-      $form.find('[name="favorite_genre"]').val() || 'ادبیات داستانی و رمان کلاسیک'
-    ).trim();
     const email = String($form.find('[name="email"]').val() || '').trim();
     const bio = String($form.find('[name="bio"]').val() || '').trim();
 
@@ -2780,11 +2768,10 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     $wrapper.find('.js-save-profile-btn').text('در حال ذخیره تغییرات...');
 
     const payload = {
-      phone: state.member.phone || '۰۹۱۲۳۴۵۶۷۸۹',
+      phone: state.member.phone || '',
       first_name,
       last_name,
       education,
-      favorite_genre,
       email,
       avatar_url: pendingAvatarUrl,
       bio,
@@ -2808,24 +2795,10 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
         render();
         showToast('اطلاعات و تصویر پروفایل شما با موفقیت ذخیره شد.');
       })
-      .catch(() => {
-        // Fallback local update if server is unreachable
+      .catch((err) => {
         isSavingProfile = false;
-        state.member = {
-          ...state.member,
-          first_name,
-          last_name,
-          education,
-          favorite_genre,
-          email,
-          avatar_url: pendingAvatarUrl,
-          bio,
-        };
-        profileSavedBannerMessage =
-          'اطلاعات و تغییرات پروفایل شما با موفقیت ذخیره شد.';
-        props.onMemberUpdated(state.member);
         render();
-        showToast('تغییرات پروفایل شما با موفقیت ذخیره شد.');
+        showToast(err.message || 'خطا در ذخیره پروفایل در دیتابیس', true);
       });
   }
 

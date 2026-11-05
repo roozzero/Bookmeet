@@ -66,7 +66,7 @@ export interface LibraryBookRow {
   original_title: string;
   author: string;
   translator: string;
-  category: 'کلاسیک' | 'معاصر';
+  category: string;
   publication_year: number;
   pages_count: number;
   reading_progress_percent: number;
@@ -121,9 +121,7 @@ export interface ClubMemberRow {
   role: 'member' | 'admin';
   status: 'فعال' | 'غیرفعال';
   education: string;
-  favorite_genre: string;
   email: string;
-  city: string;
   avatar_url?: string;
   bio: string;
   membership_code: string;
@@ -178,12 +176,17 @@ export interface MemberSessionRow {
   title: string;
   book_title: string;
   book_author?: string;
+  translator?: string;
+  category?: string;
+  publication_year?: number;
   pages_count?: number;
   publisher?: string;
   mentor_name: string;
   session_date: string;
   session_time: string;
   cover_url: string;
+  short_description?: string;
+  full_description?: string;
   location_type: string;
   meeting_link_or_room: string;
   status: 'ثبت‌نام‌شده' | 'برگزارشده' | 'ظرفیت باز' | 'فعال' | 'غیرفعال';
@@ -552,9 +555,7 @@ class MySQLDatabaseManager {
         role ENUM('member', 'admin') NOT NULL DEFAULT 'member',
         status VARCHAR(40) NOT NULL DEFAULT 'فعال',
         education VARCHAR(120) NOT NULL DEFAULT '',
-        favorite_genre VARCHAR(120) NOT NULL DEFAULT 'ادبیات داستانی و رمان کلاسیک',
         email VARCHAR(150) NOT NULL DEFAULT '',
-        city VARCHAR(100) NOT NULL DEFAULT 'تهران',
         avatar_url LONGTEXT,
         bio TEXT NOT NULL,
         membership_code VARCHAR(60) NOT NULL DEFAULT '',
@@ -597,12 +598,17 @@ class MySQLDatabaseManager {
         title VARCHAR(220) NOT NULL,
         book_title VARCHAR(180) NOT NULL,
         book_author VARCHAR(150) NOT NULL DEFAULT '',
-        pages_count INT NOT NULL DEFAULT 300,
+        translator VARCHAR(150) NOT NULL DEFAULT '',
+        category VARCHAR(100) NOT NULL DEFAULT '',
+        publication_year INT NOT NULL DEFAULT 1405,
+        pages_count INT NOT NULL DEFAULT 0,
         publisher VARCHAR(150) NOT NULL DEFAULT '',
-        mentor_name VARCHAR(150) NOT NULL,
-        session_date VARCHAR(100) NOT NULL,
-        session_time VARCHAR(100) NOT NULL,
+        mentor_name VARCHAR(150) NOT NULL DEFAULT '',
+        session_date VARCHAR(100) NOT NULL DEFAULT '',
+        session_time VARCHAR(100) NOT NULL DEFAULT '',
         cover_url LONGTEXT NOT NULL,
+        short_description TEXT NOT NULL,
+        full_description LONGTEXT NOT NULL,
         location_type VARCHAR(80) NOT NULL DEFAULT 'حضوری و آنلاین',
         meeting_link_or_room VARCHAR(255) NOT NULL DEFAULT '',
         status VARCHAR(60) NOT NULL DEFAULT 'فعال',
@@ -713,8 +719,49 @@ class MySQLDatabaseManager {
       await this.pool.execute(stmt);
     }
 
+    await this.ensureSchemaMigrations();
     await this.ensureInitialAdminFromEnv();
     this.initialized = true;
+  }
+
+  private async ensureSchemaMigrations(): Promise<void> {
+    const dbName = process.env.MYSQL_DATABASE || 'bookmeet_db';
+
+    // 1. Safely drop legacy city and favorite_genre columns from club_members if present
+    for (const legacyCol of ['city', 'favorite_genre']) {
+      const [colRows] = await this.pool.execute<RowDataPacket[]>(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'club_members' AND COLUMN_NAME = ?`,
+        [dbName, legacyCol]
+      );
+      if (colRows.length > 0) {
+        await this.pool.execute(
+          `ALTER TABLE club_members DROP COLUMN \`${legacyCol}\``
+        );
+      }
+    }
+
+    // 2. Safely add new session columns to member_sessions if missing
+    const sessionColumnsToEnsure: Array<{ name: string; definition: string }> = [
+      { name: 'translator', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
+      { name: 'category', definition: "VARCHAR(100) NOT NULL DEFAULT ''" },
+      { name: 'publication_year', definition: 'INT NOT NULL DEFAULT 1405' },
+      { name: 'short_description', definition: 'TEXT NULL' },
+      { name: 'full_description', definition: 'LONGTEXT NULL' },
+    ];
+
+    for (const col of sessionColumnsToEnsure) {
+      const [colRows] = await this.pool.execute<RowDataPacket[]>(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'member_sessions' AND COLUMN_NAME = ?`,
+        [dbName, col.name]
+      );
+      if (colRows.length === 0) {
+        await this.pool.execute(
+          `ALTER TABLE member_sessions ADD COLUMN \`${col.name}\` ${col.definition}`
+        );
+      }
+    }
   }
 
   public async ensureInitialized(): Promise<void> {
@@ -767,8 +814,8 @@ class MySQLDatabaseManager {
 
     await this.pool.execute(
       `INSERT INTO club_members
-        (first_name, last_name, phone, role, status, education, favorite_genre, email, city, avatar_url, bio, membership_code, joined_date, password_hash)
-       VALUES (?, ?, ?, 'admin', 'فعال', 'دکتری', 'ادبیات تطبیقی و نقد ادبی', ?, 'تهران', '/assets/manager-portrait.png', 'مدیر باشگاه کتابخوانی بوک‌میت', 'BM-ADMIN-۰۰۱', '۱۴۰۵', ?)`,
+        (first_name, last_name, phone, role, status, education, email, avatar_url, bio, membership_code, joined_date, password_hash)
+       VALUES (?, ?, ?, 'admin', 'فعال', 'دکتری', ?, '/assets/manager-portrait.png', 'مدیر باشگاه کتابخوانی بوک‌میت', 'BM-ADMIN-۰۰۱', '۱۴۰۵', ?)`,
       [firstName, lastName, username, email, passwordHash]
     );
   }
@@ -811,8 +858,8 @@ class MySQLDatabaseManager {
 
     const [result] = await this.pool.execute<ResultSetHeader>(
       `INSERT INTO club_members
-        (first_name, last_name, phone, role, status, education, favorite_genre, email, city, avatar_url, bio, membership_code, joined_date, password_hash)
-       VALUES (?, ?, ?, 'admin', 'فعال', 'دکتری', 'ادبیات تطبیقی و نقد ادبی', ?, 'تهران', '/assets/manager-portrait.png', 'مدیر باشگاه کتابخوانی بوک‌میت', 'BM-ADMIN-۰۰۱', '۱۴۰۵', ?)`,
+        (first_name, last_name, phone, role, status, education, email, avatar_url, bio, membership_code, joined_date, password_hash)
+       VALUES (?, ?, ?, 'admin', 'فعال', 'دکتری', ?, '/assets/manager-portrait.png', 'مدیر باشگاه کتابخوانی بوک‌میت', 'BM-ADMIN-۰۰۱', '۱۴۰۵', ?)`,
       [
         input.firstName.trim(),
         input.lastName.trim(),
@@ -912,10 +959,43 @@ class MySQLDatabaseManager {
   }
 
   public async getLibraryBooks(): Promise<LibraryBookRow[]> {
-    const [rows] = await this.pool.execute<RowDataPacket[]>(
-      'SELECT * FROM library_books ORDER BY sort_order ASC, id DESC'
+    const [rows, inactiveSessions] = await Promise.all([
+      this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM library_books ORDER BY sort_order ASC, id DESC'
+      ),
+      this.pool.execute<RowDataPacket[]>(
+        "SELECT book_title, title FROM member_sessions WHERE status = 'غیرفعال'"
+      ),
+    ]);
+    const inactiveTitles = new Set<string>();
+    for (const s of inactiveSessions[0]) {
+      if (s.book_title) inactiveTitles.add(String(s.book_title).trim());
+      if (s.title) inactiveTitles.add(String(s.title).trim());
+    }
+    return (rows[0] as LibraryBookRow[]).filter(
+      (b) => !inactiveTitles.has(String(b.title || '').trim())
     );
-    return rows as LibraryBookRow[];
+  }
+
+  public async getPublicActiveSessions(): Promise<MemberSessionRow[]> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      "SELECT * FROM member_sessions WHERE status != 'غیرفعال' ORDER BY sort_order ASC, id DESC"
+    );
+    return this.mapSessionRowsWithEnrollments(rows);
+  }
+
+  public async getPublicActiveClasses(): Promise<MemberClassRow[]> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      "SELECT * FROM member_classes WHERE status != 'غیرفعال' ORDER BY sort_order ASC, id DESC"
+    );
+    return this.mapClassRowsWithEnrollments(rows);
+  }
+
+  public async getApprovedComments(): Promise<UserCommentRow[]> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      "SELECT * FROM user_comments WHERE status = 'تایید شده' ORDER BY sort_order ASC, id DESC"
+    );
+    return rows as UserCommentRow[];
   }
 
   public async getBlogPosts(): Promise<BlogPostRow[]> {
@@ -962,7 +1042,6 @@ class MySQLDatabaseManager {
     last_name: string;
     phone: string;
     education: string;
-    favorite_genre: string;
     password_plain: string;
   }): Promise<{ member: PublicClubMember; token: string }> {
     const normalizedPhone = normalizeIdentifierDigits(input.phone);
@@ -996,14 +1075,13 @@ class MySQLDatabaseManager {
 
     const [result] = await this.pool.execute<ResultSetHeader>(
       `INSERT INTO club_members
-        (first_name, last_name, phone, role, status, education, favorite_genre, email, city, avatar_url, bio, membership_code, joined_date, password_hash)
-       VALUES (?, ?, ?, 'member', 'فعال', ?, ?, '', 'تهران', '', 'عضو باشگاه کتابخوانی بوک‌میت', ?, ?, ?)`,
+        (first_name, last_name, phone, role, status, education, email, avatar_url, bio, membership_code, joined_date, password_hash)
+       VALUES (?, ?, ?, 'member', 'فعال', ?, '', '', 'عضو باشگاه کتابخوانی بوک‌میت', ?, ?, ?)`,
       [
         input.first_name.trim(),
         input.last_name.trim(),
         persianPhone,
         input.education.trim(),
-        (input.favorite_genre || 'ادبیات داستانی و رمان کلاسیک').trim(),
         tempCode,
         joinedDate,
         passwordHash,
@@ -1111,26 +1189,34 @@ class MySQLDatabaseManager {
       bySessionId.set(tid, list);
     }
 
-    return rawSessions.map((r) => ({
-      id: Number(r.id),
-      member_phone: String(r.member_phone || 'all'),
-      title: String(r.title || ''),
-      book_title: String(r.book_title || ''),
-      book_author: String(r.book_author || ''),
-      pages_count: Number(r.pages_count || 300),
-      publisher: String(r.publisher || ''),
-      mentor_name: String(r.mentor_name || ''),
-      session_date: String(r.session_date || ''),
-      session_time: String(r.session_time || ''),
-      cover_url: String(r.cover_url || '/assets/book-current.png'),
-      location_type: String(r.location_type || 'حضوری و آنلاین'),
-      meeting_link_or_room: String(r.meeting_link_or_room || ''),
-      status: (r.status as MemberSessionRow['status']) || 'فعال',
-      member_note: String(r.member_note || ''),
-      sub_sessions: safeJsonParse<SessionSubItemRow[]>(r.sub_sessions_json, []),
-      enrolled_members: bySessionId.get(Number(r.id)) || [],
-      sort_order: Number(r.sort_order || 0),
-    }));
+    return rawSessions.map((r) => {
+      const translatorVal = String(r.translator || r.mentor_name || '');
+      return {
+        id: Number(r.id),
+        member_phone: String(r.member_phone || 'all'),
+        title: String(r.title || ''),
+        book_title: String(r.book_title || ''),
+        book_author: String(r.book_author || ''),
+        translator: translatorVal,
+        category: String(r.category || ''),
+        publication_year: Number(r.publication_year || 0),
+        pages_count: Number(r.pages_count || 0),
+        publisher: String(r.publisher || ''),
+        mentor_name: String(r.mentor_name || translatorVal),
+        session_date: String(r.session_date || ''),
+        session_time: String(r.session_time || ''),
+        cover_url: String(r.cover_url || '/assets/book-current.png'),
+        short_description: String(r.short_description || ''),
+        full_description: String(r.full_description || ''),
+        location_type: String(r.location_type || 'حضوری و آنلاین'),
+        meeting_link_or_room: String(r.meeting_link_or_room || ''),
+        status: (r.status as MemberSessionRow['status']) || 'فعال',
+        member_note: String(r.member_note || ''),
+        sub_sessions: safeJsonParse<SessionSubItemRow[]>(r.sub_sessions_json, []),
+        enrolled_members: bySessionId.get(Number(r.id)) || [],
+        sort_order: Number(r.sort_order || 0),
+      };
+    });
   }
 
   private async mapClassRowsWithEnrollments(
@@ -1358,9 +1444,7 @@ class MySQLDatabaseManager {
     first_name: string;
     last_name: string;
     education: string;
-    favorite_genre: string;
     email: string;
-    city?: string;
     avatar_url?: string;
     bio: string;
   }): Promise<PublicClubMember> {
@@ -1374,20 +1458,17 @@ class MySQLDatabaseManager {
     }
 
     const current = existingRows[0] as ClubMemberRow;
-    const nextCity = input.city !== undefined ? input.city : current.city;
     const nextAvatar = input.avatar_url !== undefined ? input.avatar_url : current.avatar_url;
 
     await this.pool.execute(
       `UPDATE club_members
-       SET first_name = ?, last_name = ?, education = ?, favorite_genre = ?, email = ?, city = ?, avatar_url = ?, bio = ?
+       SET first_name = ?, last_name = ?, education = ?, email = ?, avatar_url = ?, bio = ?
        WHERE id = ?`,
       [
         input.first_name.trim(),
         input.last_name.trim(),
         input.education.trim(),
-        input.favorite_genre.trim(),
         input.email.trim(),
-        nextCity || 'تهران',
         nextAvatar || '',
         input.bio.trim(),
         input.memberId,
@@ -1689,6 +1770,7 @@ class MySQLDatabaseManager {
     member_phone: string;
     member_name?: string;
     target_type: 'session' | 'class';
+    target_id?: number;
     title: string;
     book_title?: string;
     book_author?: string;
@@ -1709,53 +1791,27 @@ class MySQLDatabaseManager {
     const resolvedName = String(input.member_name || 'عضو باشگاه').trim();
 
     if (input.target_type === 'class') {
-      const [existingClasses] = await this.pool.execute<RowDataPacket[]>(
-        'SELECT * FROM member_classes WHERE title = ? LIMIT 1',
-        [input.title.trim()]
-      );
+      const [existingClasses] = input.target_id
+        ? await this.pool.execute<RowDataPacket[]>(
+            'SELECT * FROM member_classes WHERE id = ? LIMIT 1',
+            [Number(input.target_id)]
+          )
+        : await this.pool.execute<RowDataPacket[]>(
+            'SELECT * FROM member_classes WHERE title = ? LIMIT 1',
+            [input.title.trim()]
+          );
 
-      let classId: number;
-      if (existingClasses.length > 0) {
-        classId = Number(existingClasses[0].id);
-      } else {
-        const defaultSubs: SessionSubItemRow[] =
-          Array.isArray(input.sub_sessions) && input.sub_sessions.length > 0
-            ? input.sub_sessions
-            : [
-                {
-                  id: Date.now() + 1,
-                  session_number: 'جلسه اول',
-                  title: `جلسه معارفه و آغازین «${input.title}»`,
-                  status: 'تعریف شده',
-                  session_date: 'آبان ۱۴۰۵',
-                  session_time: '۱۷:۳۰ تا ۱۹:۰۰',
-                  cover_url: input.cover_url || '/assets/blog-1.png',
-                  pages_read: 0,
-                  pages_to_read: 'طبق سرفصل جلسه اول دوره',
-                  reviewed_topics: '',
-                  session_notes: '',
-                  meeting_link: 'https://meet.bookmeet.ir/course-live',
-                },
-              ];
-
-        const [insertRes] = await this.pool.execute<ResultSetHeader>(
-          `INSERT INTO member_classes
-            (member_phone, title, book_title, instructor_name, schedule_summary, level_label, cover_url, status, description, sub_sessions_json, sort_order)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 'غیرفعال', ?, ?, 0)`,
-          [
-            input.member_phone,
-            input.title.trim(),
-            input.book_title || 'سرفصل تخصصی دوره آموزشی',
-            input.mentor_or_instructor || 'دکتر سهراب رستگار',
-            input.schedule_text || 'هفتگی',
-            input.level_label || 'مبتدی',
-            input.cover_url || '/assets/blog-1.png',
-            input.description || '',
-            JSON.stringify(defaultSubs),
-          ]
-        );
-        classId = insertRes.insertId;
+      if (existingClasses.length === 0) {
+        throw new Error('کلاس یا دوره مورد نظر در سیستم یافت نشد.');
       }
+
+      if (String(existingClasses[0].status) === 'غیرفعال') {
+        throw new Error(
+          'این دوره در حال حاضر غیرفعال است و امکان ثبت‌نام جدید در آن وجود ندارد.'
+        );
+      }
+
+      const classId = Number(existingClasses[0].id);
 
       await this.pool.execute(
         `INSERT INTO session_enrollments
@@ -1777,55 +1833,27 @@ class MySQLDatabaseManager {
     }
 
     // target_type === 'session'
-    const [existingSessions] = await this.pool.execute<RowDataPacket[]>(
-      'SELECT * FROM member_sessions WHERE title = ? OR (book_title = ? AND book_title != "") LIMIT 1',
-      [input.title.trim(), String(input.book_title || '').trim()]
-    );
+    const [existingSessions] = input.target_id
+      ? await this.pool.execute<RowDataPacket[]>(
+          'SELECT * FROM member_sessions WHERE id = ? LIMIT 1',
+          [Number(input.target_id)]
+        )
+      : await this.pool.execute<RowDataPacket[]>(
+          'SELECT * FROM member_sessions WHERE title = ? OR (book_title = ? AND book_title != "") LIMIT 1',
+          [input.title.trim(), String(input.book_title || '').trim()]
+        );
 
-    let sessionId: number;
-    if (existingSessions.length > 0) {
-      sessionId = Number(existingSessions[0].id);
-    } else {
-      const defaultSubs: SessionSubItemRow[] =
-        Array.isArray(input.sub_sessions) && input.sub_sessions.length > 0
-          ? input.sub_sessions
-          : [
-              {
-                id: Date.now() + 2,
-                session_number: 'جلسه اول',
-                title: `نشست هم‌خوانی و تحلیل «${input.book_title || input.title}»`,
-                status: 'تعریف شده',
-                session_date: input.schedule_text || 'آبان ۱۴۰۵',
-                session_time: input.time_text || '۱۸:۰۰ تا ۲۰:۰۰',
-                cover_url: input.cover_url || '/assets/book-current.png',
-                pages_read: 0,
-                pages_to_read: 'فصل‌های تعیین‌شده در برنامه نشست',
-                reviewed_topics: '',
-                session_notes: '',
-                meeting_link: 'https://meet.bookmeet.ir/session-live',
-              },
-            ];
-
-      const [insertRes] = await this.pool.execute<ResultSetHeader>(
-        `INSERT INTO member_sessions
-          (member_phone, title, book_title, book_author, pages_count, publisher, mentor_name, session_date, session_time, cover_url, location_type, meeting_link_or_room, status, member_note, sub_sessions_json, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'حضوری و آنلاین', 'تالار فردوسی خانه بوک‌میت', 'غیرفعال', '', ?, 0)`,
-        [
-          input.member_phone,
-          input.title.trim(),
-          input.book_title || input.title.trim(),
-          input.book_author || '',
-          Number(input.pages_count || 300),
-          input.publisher || '',
-          input.mentor_or_instructor || 'دکتر سهراب رستگار',
-          input.schedule_text || 'چهارشنبه‌ها',
-          input.time_text || 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-          input.cover_url || '/assets/book-current.png',
-          JSON.stringify(defaultSubs),
-        ]
-      );
-      sessionId = insertRes.insertId;
+    if (existingSessions.length === 0) {
+      throw new Error('نشست یا دوره هم‌خوانی مورد نظر در سیستم یافت نشد.');
     }
+
+    if (String(existingSessions[0].status) === 'غیرفعال') {
+      throw new Error(
+        'این دوره هم‌خوانی در حال حاضر غیرفعال است و امکان ثبت‌نام جدید در آن وجود ندارد.'
+      );
+    }
+
+    const sessionId = Number(existingSessions[0].id);
 
     await this.pool.execute(
       `INSERT INTO session_enrollments
@@ -2041,15 +2069,31 @@ class MySQLDatabaseManager {
       const nextTitle = input.title ?? current.title;
       const nextBookTitle = input.book_title ?? current.book_title;
       const nextBookAuthor = input.book_author ?? current.book_author;
+      const nextTranslator =
+        input.translator !== undefined
+          ? input.translator
+          : input.mentor_name !== undefined
+          ? input.mentor_name
+          : current.translator || current.mentor_name || '';
+      const nextCategory = input.category ?? current.category ?? '';
+      const nextPublicationYear =
+        input.publication_year !== undefined
+          ? Number(input.publication_year)
+          : Number(current.publication_year || 0);
       const nextPagesCount =
         input.pages_count !== undefined
           ? Number(input.pages_count)
-          : Number(current.pages_count || 300);
+          : Number(current.pages_count || 0);
       const nextPublisher = input.publisher ?? current.publisher;
-      const nextMentor = input.mentor_name ?? current.mentor_name;
+      const nextMentor =
+        input.mentor_name !== undefined
+          ? input.mentor_name
+          : nextTranslator || current.mentor_name || '';
       const nextDate = input.session_date ?? current.session_date;
       const nextTime = input.session_time ?? current.session_time;
       const nextCover = input.cover_url || current.cover_url || '/assets/book-current.png';
+      const nextShortDesc = input.short_description ?? current.short_description ?? '';
+      const nextFullDesc = input.full_description ?? current.full_description ?? '';
       const nextStatus = input.status || current.status || 'فعال';
       const nextRoom = input.meeting_link_or_room ?? current.meeting_link_or_room;
       const nextSubs = Array.isArray(input.sub_sessions)
@@ -2058,20 +2102,27 @@ class MySQLDatabaseManager {
 
       await this.pool.execute(
         `UPDATE member_sessions
-         SET title = ?, book_title = ?, book_author = ?, pages_count = ?, publisher = ?,
+         SET title = ?, book_title = ?, book_author = ?, translator = ?, category = ?,
+             publication_year = ?, pages_count = ?, publisher = ?,
              mentor_name = ?, session_date = ?, session_time = ?, cover_url = ?,
+             short_description = ?, full_description = ?,
              status = ?, meeting_link_or_room = ?, sub_sessions_json = ?
          WHERE id = ?`,
         [
           nextTitle,
           nextBookTitle,
           nextBookAuthor,
+          nextTranslator,
+          nextCategory,
+          nextPublicationYear,
           nextPagesCount,
           nextPublisher,
           nextMentor,
           nextDate,
           nextTime,
           nextCover,
+          nextShortDesc,
+          nextFullDesc,
           nextStatus,
           nextRoom,
           nextSubs,
@@ -2082,10 +2133,13 @@ class MySQLDatabaseManager {
       await this.syncSessionBookToLibrary({
         book_title: String(nextBookTitle),
         author: String(nextBookAuthor || ''),
+        translator: String(nextTranslator || ''),
+        category: String(nextCategory || ''),
+        publication_year: nextPublicationYear,
         pages_count: nextPagesCount,
         cover_url: String(nextCover),
-        session_schedule: `${nextDate} · ${nextTime}`,
-        short_description: `دوره هم‌خوانی «${nextTitle}» با تسهیل‌گری ${nextMentor}`,
+        session_schedule: [nextDate, nextTime].filter(Boolean).join(' · '),
+        short_description: String(nextShortDesc || ''),
       });
 
       const [updatedRows] = await this.pool.execute<RowDataPacket[]>(
@@ -2096,16 +2150,21 @@ class MySQLDatabaseManager {
       return mapped[0];
     }
 
-    const title = String(input.title || 'دوره هم‌خوانی جدید').trim();
-    const bookTitle = String(input.book_title || 'کتاب منتخب باشگاه').trim();
+    const title = String(input.title || '').trim();
+    const bookTitle = String(input.book_title || title).trim();
     const bookAuthor = String(input.book_author || '').trim();
-    const pagesCount = Number(input.pages_count || 320);
+    const translator = String(input.translator ?? input.mentor_name ?? '').trim();
+    const category = String(input.category || '').trim();
+    const publicationYear = Number(input.publication_year || 0);
+    const pagesCount = Number(input.pages_count || 0);
     const publisher = String(input.publisher || '').trim();
-    const mentorName = String(input.mentor_name || 'دکتر سهراب رستگار').trim();
+    const mentorName = String(input.mentor_name ?? translator).trim();
     const sessionDate = String(input.session_date || '').trim();
     const sessionTime = String(input.session_time || '').trim();
     const coverUrl = String(input.cover_url || '/assets/book-current.png').trim();
-    const room = String(input.meeting_link_or_room || 'تالار فردوسی خانه بوک‌میت').trim();
+    const shortDescription = String(input.short_description || '').trim();
+    const fullDescription = String(input.full_description || '').trim();
+    const room = String(input.meeting_link_or_room || '').trim();
     const status = String(input.status || 'فعال').trim();
     const memberNote = String(input.member_note || '').trim();
     const subSessionsJson = JSON.stringify(
@@ -2114,18 +2173,23 @@ class MySQLDatabaseManager {
 
     const [result] = await this.pool.execute<ResultSetHeader>(
       `INSERT INTO member_sessions
-        (member_phone, title, book_title, book_author, pages_count, publisher, mentor_name, session_date, session_time, cover_url, location_type, meeting_link_or_room, status, member_note, sub_sessions_json, sort_order)
-       VALUES ('all', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'حضوری و آنلاین', ?, ?, ?, ?, 0)`,
+        (member_phone, title, book_title, book_author, translator, category, publication_year, pages_count, publisher, mentor_name, session_date, session_time, cover_url, short_description, full_description, location_type, meeting_link_or_room, status, member_note, sub_sessions_json, sort_order)
+       VALUES ('all', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'حضوری و آنلاین', ?, ?, ?, ?, 0)`,
       [
         title,
         bookTitle,
         bookAuthor,
+        translator,
+        category,
+        publicationYear,
         pagesCount,
         publisher,
         mentorName,
         sessionDate,
         sessionTime,
         coverUrl,
+        shortDescription,
+        fullDescription,
         room,
         status,
         memberNote,
@@ -2135,11 +2199,14 @@ class MySQLDatabaseManager {
 
     await this.syncSessionBookToLibrary({
       book_title: bookTitle,
-      author: bookAuthor || mentorName,
+      author: bookAuthor,
+      translator,
+      category,
+      publication_year: publicationYear,
       pages_count: pagesCount,
       cover_url: coverUrl,
-      session_schedule: `${sessionDate} · ${sessionTime}`,
-      short_description: `دوره هم‌خوانی «${title}» با تسهیل‌گری ${mentorName}`,
+      session_schedule: [sessionDate, sessionTime].filter(Boolean).join(' · '),
+      short_description: shortDescription,
     });
 
     const [createdRows] = await this.pool.execute<RowDataPacket[]>(
@@ -2153,6 +2220,9 @@ class MySQLDatabaseManager {
   private async syncSessionBookToLibrary(input: {
     book_title: string;
     author: string;
+    translator: string;
+    category: string;
+    publication_year: number;
     pages_count: number;
     cover_url: string;
     session_schedule: string;
@@ -2166,13 +2236,17 @@ class MySQLDatabaseManager {
     if (existing.length > 0) {
       await this.pool.execute(
         `UPDATE library_books
-         SET author = ?, pages_count = ?, cover_url = ?, session_schedule = ?
+         SET author = ?, translator = ?, category = ?, publication_year = ?, pages_count = ?, cover_url = ?, session_schedule = ?, short_description = ?
          WHERE id = ?`,
         [
-          input.author || 'نویسنده',
-          input.pages_count || 300,
+          input.author || '',
+          input.translator || '',
+          input.category || '',
+          input.publication_year || 0,
+          input.pages_count || 0,
           input.cover_url || '/assets/book-current.png',
           input.session_schedule,
+          input.short_description || '',
           existing[0].id,
         ]
       );
@@ -2187,15 +2261,18 @@ class MySQLDatabaseManager {
     await this.pool.execute(
       `INSERT INTO library_books
         (is_current, title, original_title, author, translator, category, publication_year, pages_count, reading_progress_percent, session_schedule, cover_url, short_description, sort_order)
-       VALUES (?, ?, '', ?, '—', 'کلاسیک', 1405, ?, 0, ?, ?, ?, 1)`,
+       VALUES (?, ?, '', ?, ?, ?, ?, ?, 0, ?, ?, ?, 1)`,
       [
         isCurrent,
         input.book_title,
-        input.author || 'نویسنده',
-        input.pages_count || 300,
+        input.author || '',
+        input.translator || '',
+        input.category || '',
+        input.publication_year || 0,
+        input.pages_count || 0,
         input.session_schedule,
         input.cover_url || '/assets/book-current.png',
-        input.short_description,
+        input.short_description || '',
       ]
     );
   }
@@ -2321,7 +2398,6 @@ class MySQLDatabaseManager {
       const nextLastName = input.last_name ?? existing.last_name;
       const nextPhone = input.phone ?? existing.phone;
       const nextEdu = input.education ?? existing.education;
-      const nextGenre = input.favorite_genre ?? existing.favorite_genre;
       const nextEmail = input.email ?? existing.email;
       const nextBio = input.bio ?? existing.bio;
       const nextCode = input.membership_code ?? existing.membership_code;
@@ -2334,7 +2410,7 @@ class MySQLDatabaseManager {
 
       await this.pool.execute(
         `UPDATE club_members
-         SET first_name = ?, last_name = ?, phone = ?, education = ?, favorite_genre = ?,
+         SET first_name = ?, last_name = ?, phone = ?, education = ?,
              email = ?, bio = ?, membership_code = ?, status = ?, password_hash = ?
          WHERE id = ?`,
         [
@@ -2342,7 +2418,6 @@ class MySQLDatabaseManager {
           nextLastName,
           nextPhone,
           nextEdu,
-          nextGenre,
           nextEmail,
           nextBio,
           nextCode,
@@ -2374,15 +2449,14 @@ class MySQLDatabaseManager {
 
     const [result] = await this.pool.execute<ResultSetHeader>(
       `INSERT INTO club_members
-        (first_name, last_name, phone, role, status, education, favorite_genre, email, city, avatar_url, bio, membership_code, joined_date, password_hash)
-       VALUES (?, ?, ?, 'member', ?, ?, ?, ?, 'تهران', '', ?, ?, '۱۴۰۵', ?)`,
+        (first_name, last_name, phone, role, status, education, email, avatar_url, bio, membership_code, joined_date, password_hash)
+       VALUES (?, ?, ?, 'member', ?, ?, ?, '', ?, ?, '۱۴۰۵', ?)`,
       [
         String(input.first_name || 'کاربر').trim(),
         String(input.last_name || 'جدید').trim(),
         persianPhone,
         input.status || 'فعال',
         String(input.education || 'کارشناسی').trim(),
-        String(input.favorite_genre || 'ادبیات داستانی').trim(),
         String(input.email || '').trim(),
         String(input.bio || 'عضو باشگاه کتابخوانی بوک‌میت').trim(),
         String(input.membership_code || 'BM-۱۴۰۵-۱۰۰').trim(),
@@ -2550,7 +2624,6 @@ class MySQLDatabaseManager {
     last_name: string;
     email: string;
     education: string;
-    favorite_genre: string;
     bio: string;
     avatar_url?: string;
     new_password?: string;
@@ -2574,7 +2647,7 @@ class MySQLDatabaseManager {
 
     await this.pool.execute(
       `UPDATE club_members
-       SET first_name = ?, last_name = ?, email = ?, education = ?, favorite_genre = ?,
+       SET first_name = ?, last_name = ?, email = ?, education = ?,
            bio = ?, avatar_url = ?, password_hash = ?
        WHERE id = ?`,
       [
@@ -2582,7 +2655,6 @@ class MySQLDatabaseManager {
         input.last_name.trim(),
         input.email.trim(),
         input.education.trim(),
-        input.favorite_genre.trim(),
         input.bio.trim(),
         nextAvatar || '/assets/manager-portrait.png',
         nextPasswordHash,

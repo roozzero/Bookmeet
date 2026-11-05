@@ -235,9 +235,7 @@ export const ApiService = {
     first_name: string;
     last_name: string;
     education: string;
-    favorite_genre: string;
     email: string;
-    city?: string;
     avatar_url?: string;
     bio: string;
   }): Promise<{ success: boolean; member: ClubMember }> {
@@ -580,7 +578,6 @@ export const ApiService = {
     last_name: string;
     email: string;
     education: string;
-    favorite_genre: string;
     bio: string;
     avatar_url?: string;
     new_password?: string;
@@ -737,6 +734,7 @@ export const ApiService = {
     member_phone: string;
     member_name?: string;
     target_type: 'session' | 'class';
+    target_id?: number;
     title: string;
     book_title?: string;
     book_author?: string;
@@ -762,6 +760,30 @@ export const ApiService = {
         data: JSON.stringify(payload),
         dataType: 'json',
         success: (data) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  submitPublicComment(payload: {
+    author_name: string;
+    author_phone?: string;
+    target_title: string;
+    target_type: string;
+    rating?: number;
+    comment_text: string;
+  }): Promise<{ success: boolean; comment: UserComment }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/comments',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data: { success: boolean; comment: UserComment }) => resolve(data),
         error: (jqXHR, textStatus, errorThrown) =>
           reject(
             new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')

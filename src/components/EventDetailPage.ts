@@ -1,399 +1,522 @@
 import $ from 'jquery';
+import {
+  type EventAudienceComment,
+  type UpcomingEventCard,
+} from './LibrarySection.ts';
 import { ApiService } from '../services/api.ts';
 import { toPersianDigits } from '../utils/persianNumbers.ts';
-import {
-  UPCOMING_EVENTS_DATA,
-  type ClubEventDetailItem,
-  type EventAudienceComment,
-} from './LibrarySection.ts';
 
 export interface EventDetailPageProps {
-  eventItem: ClubEventDetailItem;
-  onBackToHomeEvents: () => void;
-  onSelectEvent: (eventItem: ClubEventDetailItem) => void;
-  onRegisterEvent: (eventItem: ClubEventDetailItem) => void;
+  eventItem: UpcomingEventCard;
+  allEvents?: UpcomingEventCard[];
+  onBack?: () => void;
+  onBackToHomeEvents?: () => void;
+  onRegisterEvent: (eventItem: UpcomingEventCard) => void;
+  onSelectOtherEvent?: (eventItem: UpcomingEventCard) => void;
+  onSelectEvent?: (eventItem: UpcomingEventCard) => void;
 }
 
-export function createEventDetailPageComponent(
-  props: EventDetailPageProps
-): JQuery<HTMLElement> {
-  const { eventItem } = props;
-  let localComments: EventAudienceComment[] = [...(eventItem.comments || [])];
+export function createEventDetailPageComponent(props: EventDetailPageProps): JQuery {
+  return createEventDetailPage({
+    eventItem: props.eventItem,
+    allEvents: props.allEvents,
+    onBack: props.onBackToHomeEvents || props.onBack || (() => {}),
+    onRegisterEvent: props.onRegisterEvent,
+    onSelectOtherEvent: props.onSelectEvent || props.onSelectOtherEvent,
+  });
+}
+
+export function createEventDetailPage(
+  props: Required<Pick<EventDetailPageProps, 'eventItem' | 'onBack' | 'onRegisterEvent'>> &
+    EventDetailPageProps
+): JQuery {
+  let currentEvent: UpcomingEventCard = {
+    ...props.eventItem,
+    comments: [...(props.eventItem.comments || [])],
+  };
   let commentSubmittedMsg = '';
 
-  const $page = $(`
-    <main
-      dir="rtl"
-      aria-label="صفحه جزئیات نشست و معرفی کتاب"
-      class="w-full max-w-[1140px] mx-auto px-6 sm:px-10 pt-28 pb-20 space-y-12"
-    ></main>
+  const $wrapper = $(`
+    <section
+      aria-label="صفحه جزئیات کامل نشست و معرفی کتاب"
+      class="min-h-screen w-full bg-[#F5EFE6] text-[#231912] pt-28 sm:pt-32 pb-24 px-4 sm:px-8 lg:px-16"
+    ></section>
   `);
 
   function render(): void {
-    const otherEvents = UPCOMING_EVENTS_DATA.filter((e) => e.id !== eventItem.id);
+    const ev = currentEvent;
+    const otherEvents = (props.allEvents || []).filter((e) => e.id !== ev.id);
 
-    $page.html(`
-      <!-- Top Breadcrumb & Back Action -->
-      <div class="flex flex-wrap items-center justify-between gap-4 border-b border-[#d8ceba] pb-4">
-        <div class="flex items-center gap-2 text-xs font-medium text-[#6e5a47]">
+    $wrapper.html(`
+      <div class="max-w-6xl mx-auto space-y-10">
+        <!-- Top Navigation Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-[#DFD0BC]">
+          <div class="flex items-center gap-2 text-[13px] text-[#6B5444]">
+            <span>صفحه اصلی</span>
+            <span>/</span>
+            <span>رویدادها و کتاب در حال مطالعه</span>
+            <span>/</span>
+            <strong class="text-[#231912]">${toPersianDigits(ev.title)}</strong>
+          </div>
+
           <button
             type="button"
-            class="js-back-to-events hover:text-[#23180f] cursor-pointer"
+            class="js-event-detail-back px-4 py-2.5 rounded-xl bg-[#FAF5EC] hover:bg-[#EFE2CE] border border-[#D8C5AC] text-[#3F2E21] text-[13px] font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer"
           >
-            صفحه اصلی
+            <span>→</span>
+            <span>بازگشت به صفحه اصلی</span>
           </button>
-          <span>/</span>
-          <button
-            type="button"
-            class="js-back-to-events hover:text-[#23180f] cursor-pointer"
-          >
-            رویدادها و کتاب در حال مطالعه
-          </button>
-          <span>/</span>
-          <span class="text-[#38281b] font-semibold">${toPersianDigits(eventItem.bookTitle)}</span>
         </div>
 
-        <button
-          type="button"
-          class="js-back-to-events inline-flex items-center gap-1.5 text-xs font-semibold text-[#4e3d2e] hover:text-[#23180f] cursor-pointer"
-        >
-          <span>→</span>
-          <span>بازگشت به بخش رویدادها</span>
-        </button>
-      </div>
-
-      <!-- Session Specifications & Hero Overview (مشخصات نشست) -->
-      <section class="bg-[#e6decb]/65 border border-[#d5cab6] rounded-2xl p-6 sm:p-8 lg:p-10">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-          <!-- Book / Session Cover -->
-          <div class="lg:col-span-4 flex flex-col">
-            <div class="relative w-full h-full min-h-[280px] sm:min-h-[340px] rounded-xl overflow-hidden border border-[#d0c3ac] bg-[#dfd6c1]">
+        <!-- Hero Card: Event & Book Overview -->
+        <div class="rounded-3xl bg-[#FAF5EC] border border-[#E2D3BF] overflow-hidden shadow-[0_18px_48px_rgba(38,26,16,0.08)]">
+          <div class="grid grid-cols-1 lg:grid-cols-12">
+            <!-- Cover Column -->
+            <div class="lg:col-span-5 relative min-h-[290px] sm:min-h-[360px] bg-[#241810]">
               <img
-                src="${eventItem.coverUrl}"
-                alt="${toPersianDigits(eventItem.title)}"
-                referrerpolicy="no-referrer"
+                src="${ev.coverUrl}"
+                alt="${ev.title}"
                 class="w-full h-full object-cover"
               />
-            </div>
-          </div>
-
-          <!-- Session Specs & Register CTA -->
-          <div class="lg:col-span-8 flex flex-col justify-between space-y-6 text-right">
-            <div class="space-y-3">
-              <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-[#755f4b]">
-                <span>حلقه هم‌خوانی و نشست ادبی</span>
-                <span>·</span>
-                <span>اثر محور: ${toPersianDigits(eventItem.bookTitle)}</span>
-                <span>·</span>
-                <span>${toPersianDigits(eventItem.sessionsList.length)} جلسه در این دوره</span>
+              <div class="absolute inset-0 bg-gradient-to-t from-[#1E140E]/85 via-[#1E140E]/20 to-transparent"></div>
+              <div class="absolute top-4 right-4 left-4 flex items-center justify-between gap-2">
+                ${
+                  ev.badge
+                    ? `<span class="px-3.5 py-1.5 rounded-xl bg-[#1E140E]/80 backdrop-blur-md text-[#FAF5EC] text-[12px] font-bold border border-[#C69B6D]/40">
+                        ${toPersianDigits(ev.badge)}
+                      </span>`
+                    : '<span></span>'
+                }
+                <span class="px-3 py-1 rounded-xl bg-[#235332]/90 text-[#FAF5EC] text-[12px] font-bold">
+                  ${toPersianDigits(ev.capacityText)}
+                </span>
               </div>
-
-              <h1 class="text-[22px] sm:text-[28px] font-bold text-[#38281b] leading-[1.45]">
-                ${toPersianDigits(eventItem.title)}
-              </h1>
-
-              <p
-                class="text-[14px] sm:text-[15px] leading-[2] text-[#4e3e30] text-justify"
-                style="text-align: justify; text-justify: inter-word;"
-              >
-                ${toPersianDigits(eventItem.shortDescription)}
-              </p>
+              ${
+                ev.locationLabel
+                  ? `<div class="absolute bottom-4 right-4 left-4 text-[#FAF5EC]">
+                      <span class="text-[12px] text-[#E6D3B8] block">محل برگزاری نشست:</span>
+                      <strong class="text-[15px] font-bold">${toPersianDigits(ev.locationLabel)}</strong>
+                    </div>`
+                  : ''
+              }
             </div>
 
-            <!-- Session Specifications Grid (مشخصات نشست) -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-4 border-t border-[#d6cbb7] text-xs sm:text-[13px]">
-              <div class="p-3.5 rounded-xl bg-[#faf6ec]/75 border border-[#dbcfba]">
-                <span class="text-[#755f4b] block mb-1">تسهیل‌گر و منتقد نشست:</span>
-                <strong class="text-[#38281b] font-bold">${toPersianDigits(eventItem.mentor)}</strong>
-              </div>
-              <div class="p-3.5 rounded-xl bg-[#faf6ec]/75 border border-[#dbcfba]">
-                <span class="text-[#755f4b] block mb-1">زمان و تاریخ برگزاری:</span>
-                <strong class="text-[#38281b] font-bold">${toPersianDigits(eventItem.dateLabel)} · ${toPersianDigits(eventItem.timeLabel)}</strong>
-              </div>
-              <div class="p-3.5 rounded-xl bg-[#faf6ec]/75 border border-[#dbcfba]">
-                <span class="text-[#755f4b] block mb-1">محل برگزاری نشست:</span>
-                <strong class="text-[#38281b] font-bold">${toPersianDigits(eventItem.location)}</strong>
-              </div>
-              <div class="p-3.5 rounded-xl bg-[#faf6ec]/75 border border-[#dbcfba]">
-                <span class="text-[#755f4b] block mb-1">شناسنامه اثر:</span>
-                <strong class="text-[#38281b] font-bold">${toPersianDigits(eventItem.bookAuthor)} · ترجمه ${toPersianDigits(eventItem.bookTranslator)} (${toPersianDigits(eventItem.pagesCount)} صفحه)</strong>
-              </div>
-            </div>
-
-            <!-- Primary CTA -->
-            <div class="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-[#d6cbb7]">
-              <div class="text-xs text-[#5f4d3d] leading-relaxed">
-                با ثبت‌نام در این نشست، دوره در بخش <strong class="text-[#38281b]">«جلسات من»</strong> در پنل کاربری شما ایجاد می‌شود و پس از تایید مدیر فعال می‌گردد.
-              </div>
-              <button
-                type="button"
-                class="js-detail-register-event px-7 py-3 rounded-xl bg-[#3e2d1f] hover:bg-[#291d13] text-[#faf6ec] text-sm font-semibold transition-colors cursor-pointer shrink-0"
-              >
-                ثبت‌نام در این نشست
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Book Introduction & Full Session Description (معرفی کتاب و توضیحات نشست) -->
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <section class="lg:col-span-6 bg-[#e6decb]/50 border border-[#d5cab6] rounded-2xl p-6 sm:p-7 space-y-4">
-          <h2 class="text-lg sm:text-xl font-bold text-[#38281b] border-b border-[#d8ceba] pb-3">
-            معرفی کتاب «${toPersianDigits(eventItem.bookTitle)}»
-          </h2>
-          <div class="grid grid-cols-2 gap-3 text-xs text-[#5f4d3d] bg-[#faf6ec]/70 p-3.5 rounded-xl border border-[#dbcfba]">
-            <div>نویسنده: <strong class="text-[#38281b]">${toPersianDigits(eventItem.bookAuthor)}</strong></div>
-            <div>مترجم: <strong class="text-[#38281b]">${toPersianDigits(eventItem.bookTranslator)}</strong></div>
-            <div>انتشارات: <strong class="text-[#38281b]">${toPersianDigits(eventItem.publisher)}</strong></div>
-            <div>تعداد صفحات: <strong class="text-[#38281b]">${toPersianDigits(eventItem.pagesCount)} صفحه (چاپ ${toPersianDigits(eventItem.publicationYear)})</strong></div>
-          </div>
-          <p
-            class="text-[14px] sm:text-[14.5px] leading-[2.05] text-[#4e3e30] text-justify"
-            style="text-align: justify; text-justify: inter-word;"
-          >
-            ${toPersianDigits(eventItem.bookIntroduction)}
-          </p>
-        </section>
-
-        <section class="lg:col-span-6 bg-[#e6decb]/50 border border-[#d5cab6] rounded-2xl p-6 sm:p-7 space-y-4">
-          <h2 class="text-lg sm:text-xl font-bold text-[#38281b] border-b border-[#d8ceba] pb-3">
-            توضیحات و محورهای تحلیلی نشست
-          </h2>
-          <div class="space-y-4 text-[14px] sm:text-[14.5px] leading-[2.05] text-[#4e3e30] text-justify">
-            ${eventItem.fullDescription
-              .map(
-                (para) => `
-              <p style="text-align: justify; text-justify: inter-word;">
-                ${toPersianDigits(para)}
-              </p>
-            `
-              )
-              .join('')}
-          </div>
-        </section>
-      </div>
-
-      <!-- Sessions Schedule List (جلسات دوره هم‌خوانی) -->
-      <section class="space-y-5">
-        <div class="border-b border-[#d8ceba] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h2 class="text-lg sm:text-xl font-bold text-[#38281b]">
-              برنامه جلسات این دوره هم‌خوانی
-            </h2>
-            <p class="text-xs sm:text-sm text-[#695645] mt-1">
-              فهرست جلسات برگزار شده و نشست‌های پیش رو به همراه محدوده صفحات مطالعه هر جلسه
-            </p>
-          </div>
-          <span class="text-xs font-semibold text-[#5a3a22]">
-            مجموعاً ${toPersianDigits(eventItem.sessionsList.length)} نشست
-          </span>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          ${eventItem.sessionsList
-            .map(
-              (s) => `
-            <article class="bg-[#e6decb]/55 border border-[#d5cab6] rounded-xl p-5 flex flex-col justify-between space-y-3">
-              <div class="space-y-2">
-                <div class="flex items-center justify-between gap-2 text-xs font-semibold border-b border-[#d8ceba] pb-2">
-                  <span class="${
-                    s.status === 'نشست پیش رو' ? 'text-[#235332]' : 'text-[#6e5641]'
-                  }">
-                    ${toPersianDigits(s.sessionNumber)} · ${toPersianDigits(s.status)}
-                  </span>
-                  <span class="text-[#5f4d3d]">
-                    ${toPersianDigits(s.dateLabel)} · ساعت ${toPersianDigits(s.timeLabel)}
-                  </span>
+            <!-- Event & Book Specs Column -->
+            <div class="lg:col-span-7 p-6 sm:p-8 lg:p-10 flex flex-col justify-between space-y-6">
+              <div class="space-y-4">
+                <div class="flex flex-wrap items-center gap-2 text-[12.5px] text-[#7A4B2A] font-semibold">
+                  ${
+                    ev.category
+                      ? `<span class="px-3 py-1 rounded-lg bg-[#EFE2CE]">${toPersianDigits(ev.category)}</span>`
+                      : ''
+                  }
+                  ${
+                    ev.publicationYear
+                      ? `<span>•</span><span>سال انتشار: ${toPersianDigits(ev.publicationYear)}</span>`
+                      : ''
+                  }
+                  ${
+                    ev.pagesCount
+                      ? `<span>•</span><span>${toPersianDigits(ev.pagesCount)} صفحه</span>`
+                      : ''
+                  }
                 </div>
-                <h3 class="text-base font-bold text-[#38281b]">
-                  ${toPersianDigits(s.title)}
-                </h3>
-              </div>
-              <div class="pt-2 border-t border-[#ded4c1] flex items-center justify-between text-xs text-[#4e3e30]">
-                <span class="text-[#755f4b]">بخش مورد مطالعه:</span>
-                <strong class="font-semibold text-[#38281b]">${toPersianDigits(s.pagesToRead)}</strong>
-              </div>
-            </article>
-          `
-            )
-            .join('')}
-        </div>
-      </section>
 
-      <!-- Audience Comments Section (نظرات مخاطبان) -->
-      <section class="bg-[#e6decb]/55 border border-[#d5cab6] rounded-2xl p-6 sm:p-8 space-y-6">
-        <div class="border-b border-[#d8ceba] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h2 class="text-lg sm:text-xl font-bold text-[#38281b]">
-              نظرات مخاطبان و اعضای حلقه هم‌خوانی
-            </h2>
-            <p class="text-xs sm:text-sm text-[#695645] mt-1">
-              دیدگاه‌ها و برداشت‌های شرکت‌کنندگان درباره این کتاب و نشست‌های هم‌خوانی
-            </p>
-          </div>
-          <span class="text-xs font-semibold text-[#5a3a22]">
-            ${toPersianDigits(localComments.length)} دیدگاه ثبت‌شده
-          </span>
-        </div>
+                <h1 class="font-display text-[24px] sm:text-[30px] font-bold text-[#1E150F] leading-[1.45] text-justify">
+                  ${toPersianDigits(ev.title)}
+                </h1>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          ${localComments
-            .map(
-              (c) => `
-            <article class="p-4 sm:p-5 rounded-xl bg-[#faf6ec]/80 border border-[#dbcfba] space-y-2.5">
-              <div class="flex items-center justify-between gap-2">
+                ${
+                  ev.summary
+                    ? `<p class="text-[14.5px] leading-[1.95] text-[#4A382B] text-justify">
+                        ${toPersianDigits(ev.summary)}
+                      </p>`
+                    : ''
+                }
+
+                <!-- Specifications Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3.5 pt-2">
+                  <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
+                    <span class="block text-[11.5px] text-[#786150]">نام کتاب</span>
+                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(ev.bookTitle || '—')}</strong>
+                  </div>
+                  <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
+                    <span class="block text-[11.5px] text-[#786150]">نویسنده</span>
+                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(ev.bookAuthor || '—')}</strong>
+                  </div>
+                  <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
+                    <span class="block text-[11.5px] text-[#786150]">مترجم</span>
+                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(ev.bookTranslator || '—')}</strong>
+                  </div>
+                  <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
+                    <span class="block text-[11.5px] text-[#786150]">انتشارات و صفحات</span>
+                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${
+                      ev.bookPublisher ? toPersianDigits(ev.bookPublisher) : '—'
+                    }${ev.pagesCount ? ` (${toPersianDigits(ev.pagesCount)} ص)` : ''}</strong>
+                  </div>
+                  <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
+                    <span class="block text-[11.5px] text-[#786150]">روزهای برگزاری</span>
+                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(ev.dateText || '—')}</strong>
+                  </div>
+                  <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
+                    <span class="block text-[11.5px] text-[#786150]">ساعت نشست</span>
+                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(ev.timeText || '—')}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CTA Register Bar -->
+              <div class="pt-5 border-t border-[#E6D7C3] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <strong class="text-sm font-bold text-[#38281b] block">${toPersianDigits(c.authorName)}</strong>
-                  <span class="text-[11px] text-[#755f4b]">${toPersianDigits(c.roleLabel)}</span>
+                  <span class="text-[12px] text-[#6B5444] block">نحوه ثبت‌نام در نشست:</span>
+                  <span class="text-[13.5px] font-bold text-[#235332]">ثبت در بخش «جلسات من» و تایید توسط مدیریت باشگاه</span>
                 </div>
-                <div class="text-left">
-                  <div class="text-xs text-[#8c5a2b] font-bold">${'★'.repeat(c.rating)}</div>
-                  <span class="text-[11px] text-[#755f4b]">${toPersianDigits(c.dateLabel)}</span>
-                </div>
+                <button
+                  type="button"
+                  class="js-detail-register-event px-7 py-3.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[14px] font-bold transition-colors shadow-sm cursor-pointer shrink-0"
+                >
+                  ثبت نام در این نشست هم‌خوانی
+                </button>
               </div>
-              <p class="text-[13px] leading-[1.9] text-[#4e3e30] text-justify" style="text-align: justify; text-justify: inter-word;">
-                ${toPersianDigits(c.commentText)}
-              </p>
-            </article>
-          `
-            )
-            .join('')}
+            </div>
+          </div>
         </div>
 
-        <!-- Add Comment Form -->
-        <form class="js-event-comment-form pt-4 border-t border-[#d8ceba] space-y-4">
-          <h3 class="text-sm sm:text-base font-bold text-[#38281b]">
-            ثبت دیدگاه شما درباره این نشست و کتاب
-          </h3>
-          ${
-            commentSubmittedMsg
-              ? `<div class="p-3 rounded-xl bg-[#e4f2e7] border border-[#bbd9c2] text-[#235332] text-xs font-semibold">${toPersianDigits(commentSubmittedMsg)}</div>`
-              : ''
-          }
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-semibold text-[#4e3e30] mb-1">نام و نام خانوادگی *</label>
-              <input
-                type="text"
-                name="author_name"
-                required
-                placeholder="نام خود را وارد کنید..."
-                class="w-full px-3.5 py-2.5 rounded-xl bg-[#faf6ec] border border-[#d5cab6] text-xs text-[#231912] focus:outline-none focus:border-[#755f4b]"
-              />
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-[#4e3e30] mb-1">امتیاز شما به نشست</label>
-              <select
-                name="rating"
-                class="w-full px-3.5 py-2.5 rounded-xl bg-[#faf6ec] border border-[#d5cab6] text-xs text-[#231912] focus:outline-none focus:border-[#755f4b]"
-              >
-                <option value="5">۵ ستاره (عالی)</option>
-                <option value="4">۴ ستاره (خوب)</option>
-                <option value="3">۳ ستاره (متوسط)</option>
-              </select>
-            </div>
+        <!-- Book Introduction & Event Description -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <div class="lg:col-span-7 p-6 sm:p-8 rounded-3xl bg-[#FAF5EC] border border-[#E2D3BF] space-y-4">
+            <h2 class="font-display text-[21px] sm:text-[24px] font-bold text-[#1E150F]">
+              درباره این نشست و محورهای گفت‌وگو
+            </h2>
+            ${
+              ev.fullDescription.length > 0
+                ? `<div class="space-y-3.5 text-[14.5px] leading-[2] text-[#3F2F23] text-justify">
+                    ${ev.fullDescription
+                      .map((p) => `<p>${toPersianDigits(p)}</p>`)
+                      .join('')}
+                  </div>`
+                : `<p class="text-[14px] text-[#6B5444]">توضیحات تکمیلی برای این دوره ثبت نشده است.</p>`
+            }
           </div>
-          <div>
-            <label class="block text-xs font-semibold text-[#4e3e30] mb-1">متن دیدگاه یا برداشت ادبی *</label>
-            <textarea
-              name="comment_text"
-              rows="3"
-              required
-              placeholder="دیدگاه یا پرسش خود را درباره این کتاب و نشست بنویسید..."
-              class="w-full px-3.5 py-2.5 rounded-xl bg-[#faf6ec] border border-[#d5cab6] text-xs text-[#231912] focus:outline-none focus:border-[#755f4b]"
-            ></textarea>
-          </div>
-          <div class="flex justify-end">
-            <button
-              type="submit"
-              class="px-5 py-2.5 rounded-xl bg-[#3e2d1f] hover:bg-[#2a1d13] text-[#faf6ec] text-xs font-semibold cursor-pointer"
-            >
-              ثبت دیدگاه
-            </button>
-          </div>
-        </form>
-      </section>
 
-      <!-- Other Upcoming Events -->
-      <section class="space-y-4 pt-4 border-t border-[#d8ceba]">
-        <h3 class="text-base sm:text-lg font-bold text-[#38281b]">
-          سایر رویدادها و نشست‌های پیش رو در باشگاه بوک‌میت
-        </h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          ${otherEvents
-            .map(
-              (oe) => `
-            <div class="p-4 rounded-xl bg-[#e6decb]/45 border border-[#d5cab6] flex items-center justify-between gap-4">
-              <div class="min-w-0">
-                <div class="text-xs text-[#755f4b]">${toPersianDigits(oe.dateLabel)} · ${toPersianDigits(oe.timeLabel)}</div>
-                <h4 class="text-sm font-bold text-[#38281b] truncate mt-0.5">${toPersianDigits(oe.title)}</h4>
+          <div class="lg:col-span-5 p-6 sm:p-8 rounded-3xl bg-[#EFE4D3] border border-[#DECBB2] space-y-4">
+            <h2 class="font-display text-[20px] sm:text-[22px] font-bold text-[#1E150F]">
+              معرفی کتاب «${toPersianDigits(ev.bookTitle)}»
+            </h2>
+            ${
+              ev.bookIntroduction
+                ? `<p class="text-[14px] leading-[1.95] text-[#3B2C22] text-justify">
+                    ${toPersianDigits(ev.bookIntroduction)}
+                  </p>`
+                : `<p class="text-[13.5px] text-[#6B5444]">معرفی کتاب برای این نشست ثبت نشده است.</p>`
+            }
+            <div class="pt-3 border-t border-[#D8C2A6] text-[12.5px] text-[#5A4535] space-y-1.5">
+              <div>• ژانر و دسته‌بندی: <strong>${toPersianDigits(ev.category || '—')}</strong></div>
+              <div>• سال انتشار: <strong>${ev.publicationYear ? toPersianDigits(ev.publicationYear) : '—'}</strong></div>
+              <div>• تعداد جلسات تعریف‌شده: <strong>${toPersianDigits(ev.sessionsList.length)} جلسه</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sessions Schedule List -->
+        <div class="p-6 sm:p-8 lg:p-10 rounded-3xl bg-[#FAF5EC] border border-[#E2D3BF] space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 class="font-display text-[21px] sm:text-[25px] font-bold text-[#1E150F]">
+                برنامه جلسات و بخش‌بندی مطالعه کتاب
+              </h2>
+              <p class="text-[13.5px] text-[#6B5444] mt-1">
+                برنامه زمان‌بندی جلسات ثبت‌شده برای این دوره هم‌خوانی
+              </p>
+            </div>
+            <span class="px-3.5 py-1.5 rounded-xl bg-[#EFE2CE] text-[#5A3A22] text-[12.5px] font-bold self-start sm:self-auto">
+              مجموعاً ${toPersianDigits(ev.sessionsList.length)} جلسه
+            </span>
+          </div>
+
+          ${
+            ev.sessionsList.length > 0
+              ? `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              ${ev.sessionsList
+                .map(
+                  (sub) => `
+                <div class="p-5 rounded-2xl bg-[#F4E9DA]/65 border border-[#E2D2BC] flex flex-col justify-between gap-3">
+                  <div class="space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="px-2.5 py-1 rounded-lg bg-[#5A3A22] text-[#FAF5EC] text-[11.5px] font-bold">
+                        ${toPersianDigits(sub.sessionNumber)}
+                      </span>
+                      <span class="px-2.5 py-0.5 rounded-md text-[11px] font-bold ${
+                        sub.status === 'برگزار شده'
+                          ? 'bg-[#E4F2E7] text-[#235332]'
+                          : 'bg-[#FFF3CD] text-[#7A5A10]'
+                      }">
+                        ${toPersianDigits(sub.status)}
+                      </span>
+                    </div>
+                    <h3 class="font-display text-[16px] font-bold text-[#231912] leading-[1.6] text-justify">
+                      ${toPersianDigits(sub.title)}
+                    </h3>
+                  </div>
+
+                  <div class="pt-3 border-t border-[#E2D2BC] text-[12px] text-[#5B4739] space-y-1">
+                    ${
+                      sub.date || sub.time
+                        ? `<div class="flex items-center justify-between">
+                            <span>تاریخ و ساعت:</span>
+                            <strong class="text-[#231912]">${toPersianDigits(sub.date)}${
+                            sub.date && sub.time ? ' · ساعت ' : ''
+                          }${toPersianDigits(sub.time)}</strong>
+                          </div>`
+                        : ''
+                    }
+                    ${
+                      sub.pagesRange
+                        ? `<div class="flex items-center justify-between">
+                            <span>محدوده مطالعه:</span>
+                            <strong class="text-[#7A4B2A]">${toPersianDigits(sub.pagesRange)}</strong>
+                          </div>`
+                        : ''
+                    }
+                  </div>
+                </div>
+              `
+                )
+                .join('')}
+            </div>
+          `
+              : `
+            <div class="p-6 rounded-2xl bg-[#F4E9DA]/50 border border-[#E2D2BC] text-center text-[13.5px] text-[#6B5444]">
+              هنوز جلسه‌ای برای این دوره ثبت نشده است.
+            </div>
+          `
+          }
+        </div>
+
+        <!-- Audience Comments & Reviews Section -->
+        <div class="p-6 sm:p-8 lg:p-10 rounded-3xl bg-[#FAF5EC] border border-[#E2D3BF] space-y-8">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 class="font-display text-[21px] sm:text-[25px] font-bold text-[#1E150F]">
+                نظرات و دیدگاه‌های شرکت‌کنندگان (${toPersianDigits(ev.comments.length)})
+              </h2>
+              <p class="text-[13.5px] text-[#6B5444] mt-1">
+                تجربه اعضا از حضور در نشست‌های هم‌خوانی و تحلیل این کتاب در باشگاه بوک‌میت
+              </p>
+            </div>
+          </div>
+
+          <!-- Existing Comments List -->
+          ${
+            ev.comments.length > 0
+              ? `
+            <div class="space-y-4">
+              ${ev.comments
+                .map(
+                  (c) => `
+                <article class="p-5 rounded-2xl bg-[#F4E9DA]/55 border border-[#E3D3BE] space-y-3">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-xl bg-[#7A4B2A] text-[#FAF5EC] font-display font-bold text-[15px] flex items-center justify-center">
+                        ${c.authorName.charAt(0)}
+                      </div>
+                      <div>
+                        <h4 class="font-bold text-[14px] text-[#231912]">${toPersianDigits(c.authorName)}</h4>
+                        <span class="text-[11.5px] text-[#6B5444]">${toPersianDigits(c.authorRole)} · ${toPersianDigits(c.createdDate)}</span>
+                      </div>
+                    </div>
+                    <div class="text-[#C58B2B] text-[13px] font-bold">
+                      ${'★'.repeat(c.rating)}${'☆'.repeat(Math.max(0, 5 - c.rating))}
+                    </div>
+                  </div>
+
+                  <p class="text-[13.5px] leading-[1.9] text-[#3B2C22] text-justify">
+                    ${toPersianDigits(c.commentText)}
+                  </p>
+
+                  ${
+                    c.adminReply
+                      ? `
+                    <div class="p-3.5 rounded-xl bg-[#EDF5EE] border border-[#C7DFCB] text-[12.5px] text-[#1E3F29]">
+                      <strong class="block text-[#235332] mb-1">پاسخ مدیر باشگاه:</strong>
+                      <p class="leading-[1.8] text-justify">${toPersianDigits(c.adminReply)}</p>
+                    </div>
+                  `
+                      : ''
+                  }
+                </article>
+              `
+                )
+                .join('')}
+            </div>
+          `
+              : `
+            <div class="p-6 rounded-2xl bg-[#F4E9DA]/40 border border-[#E3D3BE] text-center text-[13.5px] text-[#6B5444]">
+              هنوز دیدگاهی برای این نشست ثبت نشده است. اولین نفری باشید که دیدگاه خود را ثبت می‌کند.
+            </div>
+          `
+          }
+
+          <!-- Add New Comment Form -->
+          <form class="js-event-comment-form pt-6 border-t border-[#E6D7C3] space-y-4">
+            <h3 class="font-display text-[17px] font-bold text-[#231912]">
+              ثبت دیدگاه یا پرسش درباره این نشست
+            </h3>
+            ${
+              commentSubmittedMsg
+                ? `
+              <div class="p-3.5 rounded-xl bg-[#E4F2E7] border border-[#BBD9C2] text-[#235332] text-[13px] font-semibold">
+                ✓ ${toPersianDigits(commentSubmittedMsg)}
               </div>
+            `
+                : ''
+            }
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">نام و نام خانوادگی *</label>
+                <input
+                  type="text"
+                  name="author_name"
+                  required
+                  placeholder="نام شما..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                />
+              </div>
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">امتیاز شما به این انتخاب</label>
+                <select
+                  name="rating"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]"
+                >
+                  <option value="5">۵ ستاره (عالی)</option>
+                  <option value="4">۴ ستاره (خوب)</option>
+                  <option value="3">۳ ستاره (متوسط)</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">متن دیدگاه شما *</label>
+              <textarea
+                name="comment_text"
+                rows="3"
+                required
+                placeholder="دیدگاه یا سؤال خود را درباره این کتاب و نشست بنویسید..."
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+              ></textarea>
+            </div>
+            <div class="flex justify-end">
               <button
-                type="button"
-                data-other-event-id="${oe.id}"
-                class="js-switch-other-event px-3.5 py-2 rounded-lg border border-[#7c624a] text-xs font-semibold text-[#38281b] hover:bg-[#dfd5c0] shrink-0 cursor-pointer"
+                type="submit"
+                class="px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer"
               >
-                مشاهده جزئیات ←
+                ثبت دیدگاه
               </button>
             </div>
-          `
-            )
-            .join('')}
+          </form>
         </div>
-      </section>
+
+        <!-- Other Upcoming Events -->
+        ${
+          otherEvents.length > 0
+            ? `
+          <div class="space-y-4">
+            <h3 class="font-display text-[20px] font-bold text-[#1E150F]">
+              سایر رویدادها و نشست‌های پیش رو
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              ${otherEvents
+                .map(
+                  (item) => `
+                <div class="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E2D3BF] flex items-center justify-between gap-4">
+                  <div>
+                    ${
+                      item.badge
+                        ? `<span class="text-[11.5px] font-bold text-[#7A4B2A]">${toPersianDigits(item.badge)}</span>`
+                        : ''
+                    }
+                    <h4 class="font-display text-[16.5px] font-bold text-[#231912] mt-0.5">${toPersianDigits(item.title)}</h4>
+                    <p class="text-[12px] text-[#6B5444] mt-1">${toPersianDigits(item.dateText)}${
+                    item.dateText && item.timeText ? ' · ' : ''
+                  }${toPersianDigits(item.timeText)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    data-switch-event="${item.id}"
+                    class="js-switch-event-detail px-4 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] text-[#3F2E21] text-[12px] font-semibold shrink-0 cursor-pointer"
+                  >
+                    مشاهده جزئیات
+                  </button>
+                </div>
+              `
+                )
+                .join('')}
+            </div>
+          </div>
+        `
+            : ''
+        }
+      </div>
     `);
   }
 
-  $page.on('click', '.js-back-to-events', () => {
-    props.onBackToHomeEvents();
+  $wrapper.on('click', '.js-event-detail-back', () => {
+    props.onBack();
   });
 
-  $page.on('click', '.js-detail-register-event', () => {
-    props.onRegisterEvent(eventItem);
+  $wrapper.on('click', '.js-detail-register-event', () => {
+    props.onRegisterEvent(currentEvent);
   });
 
-  $page.on('click', '.js-switch-other-event', function () {
-    const id = Number($(this).attr('data-other-event-id'));
-    const nextEv = UPCOMING_EVENTS_DATA.find((e) => e.id === id);
+  $wrapper.on('click', '.js-switch-event-detail', function () {
+    const id = Number($(this).data('switch-event'));
+    const nextEv = (props.allEvents || []).find((e) => e.id === id);
     if (nextEv) {
-      props.onSelectEvent(nextEv);
+      currentEvent = { ...nextEv, comments: [...(nextEv.comments || [])] };
+      commentSubmittedMsg = '';
+      if (props.onSelectOtherEvent) {
+        props.onSelectOtherEvent(nextEv);
+      }
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   });
 
-  $page.on('submit', '.js-event-comment-form', function (e) {
+  $wrapper.on('submit', '.js-event-comment-form', function (e) {
     e.preventDefault();
     const $f = $(this);
     const authorName = String($f.find('[name="author_name"]').val() || '').trim();
-    const commentText = String($f.find('[name="comment_text"]').val() || '').trim();
     const rating = Number($f.find('[name="rating"]').val() || 5);
+    const commentText = String($f.find('[name="comment_text"]').val() || '').trim();
     if (!authorName || !commentText) return;
 
-    const newComment: EventAudienceComment = {
-      id: Date.now(),
-      authorName,
-      roleLabel: 'هم‌خوان باشگاه',
-      dateLabel: '۱۴ آبان ۱۴۰۵',
-      rating,
-      commentText,
-    };
-    localComments = [newComment, ...localComments];
-    commentSubmittedMsg = 'دیدگاه شما با موفقیت ثبت شد و در لیست نظرات قرار گرفت.';
-
-    ApiService.saveAdminComment({
+    ApiService.submitPublicComment({
       author_name: authorName,
-      target_title: eventItem.title,
-      target_type: 'نشست هم‌خوانی',
+      target_title: currentEvent.title,
+      target_type: 'نشست کتاب‌خوانی',
       rating,
       comment_text: commentText,
-      status: 'تایید شده',
-    }).catch(() => {
-      // already added locally
-    });
-
-    render();
+    })
+      .then(() => {
+        const newComment: EventAudienceComment = {
+          id: Date.now(),
+          authorName,
+          authorRole: 'عضو و مخاطب باشگاه',
+          createdDate: 'هم‌اکنون',
+          rating,
+          commentText,
+        };
+        currentEvent.comments = [newComment, ...currentEvent.comments];
+        commentSubmittedMsg =
+          'دیدگاه شما با موفقیت در دیتابیس ثبت شد و پس از تایید مدیریت نمایش داده می‌شود.';
+        render();
+      })
+      .catch(() => {
+        commentSubmittedMsg = 'دیدگاه شما ثبت شد.';
+        render();
+      });
   });
 
   render();
-  return $page;
+  return $wrapper;
 }

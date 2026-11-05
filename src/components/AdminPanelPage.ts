@@ -17,7 +17,7 @@ import type {
   SessionSubItem,
   UserComment,
 } from '../types/models.ts';
-import { toPersianDigits } from '../utils/persianNumbers.ts';
+import { toEnglishDigits, toPersianDigits } from '../utils/persianNumbers.ts';
 
 export type AdminTabKey =
   | 'dashboard'
@@ -46,6 +46,8 @@ export interface AdminPanelPageProps {
     aboutManager?: AboutManagerData;
     contactInfo?: ContactInfoData;
     blogPosts?: BlogPost[];
+    sessions?: MemberSession[];
+    classes?: MemberClassItem[];
   }) => void;
 }
 
@@ -143,6 +145,13 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     member_phone: string;
     member_name: string;
     course_or_session_title: string;
+  } | null = null;
+
+  // Dedicated Registered Members Modal state
+  let enrolledMembersModalTarget: {
+    targetType: 'session' | 'class';
+    targetId: number;
+    targetTitle: string;
   } | null = null;
 
   // Personal announcement modal state (for a specific user)
@@ -332,23 +341,95 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     render();
   }
 
-  function getDefaultEnrolledMembers(status?: string): EnrollmentRecord[] {
-    return [
-      {
-        id: 1,
-        member_phone: '۰۹۱۲۳۴۵۶۷۸۹',
-        member_name: 'پرنیا فرهمند',
-        registered_at: '۸ آبان ۱۴۰۵',
-        status: status === 'غیرفعال' ? 'غیرفعال' : 'فعال',
-      },
-      {
-        id: 2,
-        member_phone: '۰۹۳۵۴۴۴۵۵۶۶',
-        member_name: 'مهسا تاجیک',
-        registered_at: '۱۴ آبان ۱۴۰۵',
-        status: 'غیرفعال',
-      },
-    ];
+  function syncOpenFormsFromDom(): void {
+    const $sessionForm = $wrapper.find('.js-admin-session-form');
+    if (editingSession && $sessionForm.length) {
+      const rawPages = toEnglishDigits(
+        String($sessionForm.find('[name="pages_count"]').val() || '').trim()
+      );
+      const rawPubYear = toEnglishDigits(
+        String($sessionForm.find('[name="publication_year"]').val() || '').trim()
+      );
+      const translatorVal = String(
+        $sessionForm.find('[name="translator"]').val() || ''
+      ).trim();
+
+      editingSession = {
+        ...editingSession,
+        title: String($sessionForm.find('[name="title"]').val() || ''),
+        status: String(
+          $sessionForm.find('[name="status"]').val() || 'فعال'
+        ) as MemberSession['status'],
+        book_title: String($sessionForm.find('[name="book_title"]').val() || ''),
+        book_author: String($sessionForm.find('[name="book_author"]').val() || ''),
+        translator: translatorVal,
+        mentor_name: translatorVal,
+        category: String($sessionForm.find('[name="category"]').val() || ''),
+        publication_year: rawPubYear ? Number(rawPubYear) : undefined,
+        pages_count: rawPages ? Number(rawPages) : undefined,
+        publisher: String($sessionForm.find('[name="publisher"]').val() || ''),
+        session_date: String($sessionForm.find('[name="session_date"]').val() || ''),
+        session_time: String($sessionForm.find('[name="session_time"]').val() || ''),
+        cover_url: String(
+          $sessionForm.find('[name="cover_url"]').val() ||
+            editingSession.cover_url ||
+            '/assets/book-current.png'
+        ),
+        short_description: String(
+          $sessionForm.find('[name="short_description"]').val() || ''
+        ),
+        full_description: String(
+          $sessionForm.find('[name="full_description"]').val() || ''
+        ),
+      };
+    }
+
+    const $classForm = $wrapper.find('.js-admin-class-form');
+    if (editingClass && $classForm.length) {
+      editingClass = {
+        ...editingClass,
+        title: String($classForm.find('[name="title"]').val() || ''),
+        status: String(
+          $classForm.find('[name="status"]').val() || 'فعال'
+        ) as MemberClassItem['status'],
+        book_title: String($classForm.find('[name="book_title"]').val() || ''),
+        instructor_name: String($classForm.find('[name="instructor_name"]').val() || ''),
+        schedule_summary: String(
+          $classForm.find('[name="schedule_summary"]').val() || ''
+        ),
+        level_label: String($classForm.find('[name="level_label"]').val() || 'مبتدی'),
+        cover_url: String(
+          $classForm.find('[name="cover_url"]').val() ||
+            editingClass.cover_url ||
+            '/assets/blog-1.png'
+        ),
+        description: String($classForm.find('[name="description"]').val() || ''),
+      };
+    }
+
+    const $blogForm = $wrapper.find('.js-admin-blog-form');
+    if (editingBlogPost && $blogForm.length) {
+      editingBlogPost = {
+        ...editingBlogPost,
+        title: String($blogForm.find('[name="title"]').val() || ''),
+        slug: String($blogForm.find('[name="slug"]').val() || ''),
+        category: String($blogForm.find('[name="category"]').val() || ''),
+        author: String($blogForm.find('[name="author"]').val() || ''),
+        published_date: String($blogForm.find('[name="published_date"]').val() || ''),
+        reading_time: String($blogForm.find('[name="reading_time"]').val() || ''),
+        tags: String($blogForm.find('[name="tags"]').val() || ''),
+        status: String($blogForm.find('[name="status"]').val() || 'منتشر شده') as
+          | 'منتشر شده'
+          | 'پیش‌نویس',
+        cover_url: String(
+          $blogForm.find('[name="cover_url"]').val() ||
+            editingBlogPost.cover_url ||
+            '/assets/blog-1.png'
+        ),
+        excerpt: String($blogForm.find('[name="excerpt"]').val() || ''),
+        full_content: String($blogForm.find('[name="full_content"]').val() || ''),
+      };
+    }
   }
 
   function renderEnrolledMembersBlock(params: {
@@ -356,98 +437,154 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     targetId: number;
     targetTitle: string;
     members?: EnrollmentRecord[];
-    fallbackStatus?: string;
   }): string {
-    const list =
-      Array.isArray(params.members) && params.members.length > 0
-        ? params.members
-        : getDefaultEnrolledMembers(params.fallbackStatus);
+    const list = Array.isArray(params.members) ? params.members : [];
+    const activeCount = list.filter((m) => m.status === 'فعال').length;
+    const pendingCount = list.filter((m) => m.status === 'غیرفعال').length;
 
     return `
-      <div class="mt-3 pt-3 border-t border-[#E2D2BE] space-y-2.5">
-        <div class="flex items-center justify-between">
-          <h4 class="text-[12.5px] font-bold text-[#231912] flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-[#5A3A22]"></span>
-            <span>لیست اعضای ثبت‌نام‌شده (${toPersianDigits(list.length)} نفر)</span>
-          </h4>
-          <span class="text-[11px] text-[#6B5444]">تایید، لغو یا ارسال تیکت</span>
+      <div class="mt-3 pt-3 border-t border-[#E2D2BE] flex flex-wrap items-center justify-between gap-2">
+        <div class="text-[12px] text-[#4E3B2D] flex items-center gap-1.5 flex-wrap">
+          <span class="w-2 h-2 rounded-full bg-[#5A3A22]"></span>
+          <span>اعضای ثبت‌نام‌شده: <strong class="text-[#231912]">${toPersianDigits(list.length)} نفر</strong></span>
+          ${
+            list.length > 0
+              ? `<span class="text-[11px] text-[#6B5444]">(${toPersianDigits(activeCount)} فعال · ${toPersianDigits(pendingCount)} در انتظار)</span>`
+              : ''
+          }
         </div>
-
-        <div class="space-y-2 max-h-56 overflow-y-auto pl-1">
-          ${list
-            .map((m) => {
-              const badgeClass =
-                m.status === 'فعال'
-                  ? 'bg-[#E4F2E7] text-[#235332] border-[#BBD9C2]'
-                  : m.status === 'لغو شده'
-                  ? 'bg-[#FBEAE8] text-[#9E3329] border-[#E6B8B3]'
-                  : 'bg-[#FFF3CD] text-[#7A5A10] border-[#E5C77B]';
-
-              const statusText =
-                m.status === 'غیرفعال' ? 'غیرفعال (در انتظار تایید)' : m.status;
-
-              return `
-                <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                  <div class="min-w-0 space-y-0.5">
-                    <div class="flex items-center gap-2 flex-wrap">
-                      <strong class="text-[12.5px] font-bold text-[#231912]">${toPersianDigits(m.member_name)}</strong>
-                      <span class="text-[11px] text-[#6B5444]" dir="ltr">${toPersianDigits(m.member_phone)}</span>
-                      <span class="px-2 py-0.5 rounded-md border text-[10.5px] font-semibold ${badgeClass}">
-                        ${toPersianDigits(statusText)}
-                      </span>
-                    </div>
-                    <div class="text-[10.5px] text-[#7A6352]">
-                      تاریخ ثبت‌نام: ${toPersianDigits(m.registered_at)}
-                    </div>
-                  </div>
-
-                  <div class="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      data-enroll-type="${params.targetType}"
-                      data-enroll-id="${params.targetId}"
-                      data-enroll-title="${params.targetTitle}"
-                      data-member-phone="${m.member_phone}"
-                      data-member-name="${m.member_name}"
-                      class="js-admin-approve-enrollment px-2.5 py-1 rounded-lg bg-[#235332] hover:bg-[#193E25] text-[#FAF5EC] text-[11px] font-semibold cursor-pointer transition-colors ${
-                        m.status === 'فعال' ? 'opacity-60' : ''
-                      }"
-                    >
-                      تایید
-                    </button>
-                    <button
-                      type="button"
-                      data-enroll-type="${params.targetType}"
-                      data-enroll-id="${params.targetId}"
-                      data-enroll-title="${params.targetTitle}"
-                      data-member-phone="${m.member_phone}"
-                      data-member-name="${m.member_name}"
-                      class="js-admin-cancel-enrollment px-2.5 py-1 rounded-lg border border-[#E0A9A3] bg-[#FBEAE8] hover:bg-[#F5D5D1] text-[#9E3329] text-[11px] font-semibold cursor-pointer transition-colors"
-                    >
-                      لغو
-                    </button>
-                    <button
-                      type="button"
-                      data-enroll-title="${params.targetTitle}"
-                      data-member-phone="${m.member_phone}"
-                      data-member-name="${m.member_name}"
-                      class="js-admin-ticket-enrollment px-2.5 py-1 rounded-lg bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[11px] font-semibold cursor-pointer transition-colors"
-                    >
-                      ارسال تیکت
-                    </button>
-                  </div>
-                </div>
-              `;
-            })
-            .join('')}
-        </div>
+        <button
+          type="button"
+          data-open-enrolled-type="${params.targetType}"
+          data-open-enrolled-id="${params.targetId}"
+          data-open-enrolled-title="${params.targetTitle}"
+          class="js-admin-open-enrolled-modal px-3 py-1.5 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] text-[11.5px] font-semibold cursor-pointer transition-colors"
+        >
+          لیست اعضای ثبت‌نام‌شده
+        </button>
       </div>
     `;
   }
 
-  // ==================== MODALS: CONFIRMATION, TICKET TO MEMBER & GALLERY PICKER ====================
+  // ==================== MODALS: CONFIRMATION, ENROLLED MEMBERS, TICKET TO MEMBER & GALLERY PICKER ====================
   function renderModals(): string {
     let html = '';
+
+    if (enrolledMembersModalTarget) {
+      const targetParent =
+        enrolledMembersModalTarget.targetType === 'session'
+          ? state.sessions.find((s) => s.id === enrolledMembersModalTarget?.targetId)
+          : state.classes.find((c) => c.id === enrolledMembersModalTarget?.targetId);
+      const list: EnrollmentRecord[] = Array.isArray(targetParent?.enrolled_members)
+        ? targetParent!.enrolled_members!
+        : [];
+      const modalTitle = targetParent?.title || enrolledMembersModalTarget.targetTitle;
+
+      html += `
+        <div class="js-admin-enrolled-modal-backdrop fixed inset-0 z-40 bg-[#1B120C]/65 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div class="w-full max-w-[680px] max-h-[85vh] rounded-2xl bg-[#FAF5EC] border-2 border-[#DEC8AC] shadow-[0_24px_60px_rgba(27,18,12,0.35)] flex flex-col overflow-hidden">
+            <div class="px-6 py-4 border-b border-[#E5D7C5] flex items-center justify-between gap-3">
+              <div>
+                <h3 class="font-display text-[17.5px] font-bold text-[#231912]">
+                  لیست اعضای ثبت‌نام‌شده · ${toPersianDigits(modalTitle)}
+                </h3>
+                <p class="text-[12px] text-[#6B5444] mt-0.5">
+                  تعداد کل ثبت‌نام‌کنندگان واقعی در این دوره: <strong>${toPersianDigits(list.length)} نفر</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                class="js-admin-close-enrolled-modal px-3 py-1.5 rounded-xl text-[#4E3B2D] hover:bg-[#EFE3D2] text-[13px] font-semibold cursor-pointer"
+              >
+                بستن ✕
+              </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto space-y-3">
+              ${
+                list.length === 0
+                  ? `
+                    <div class="p-8 rounded-2xl bg-[#F4E9DA]/55 border border-dashed border-[#D8C4AA] text-center space-y-2">
+                      <div class="text-[14.5px] font-bold text-[#231912]">هنوز هیچ کاربری در این دوره ثبت‌نام نکرده است.</div>
+                      <p class="text-[12.5px] text-[#6B5444]">
+                        پس از ثبت‌نام کاربران از طریق سایت، مشخصات، شماره تماس و وضعیت ثبت‌نام آن‌ها در این پنجره نمایش داده می‌شود.
+                      </p>
+                    </div>
+                  `
+                  : list
+                      .map((m) => {
+                        const badgeClass =
+                          m.status === 'فعال'
+                            ? 'bg-[#E4F2E7] text-[#235332] border-[#BBD9C2]'
+                            : m.status === 'لغو شده'
+                            ? 'bg-[#FBEAE8] text-[#9E3329] border-[#E6B8B3]'
+                            : 'bg-[#FFF3CD] text-[#7A5A10] border-[#E5C77B]';
+
+                        const statusText =
+                          m.status === 'غیرفعال'
+                            ? 'غیرفعال (در انتظار تایید)'
+                            : m.status;
+
+                        return `
+                          <div class="p-3.5 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="min-w-0 space-y-1">
+                              <div class="flex items-center gap-2 flex-wrap">
+                                <strong class="text-[13px] font-bold text-[#231912]">${toPersianDigits(m.member_name)}</strong>
+                                <span class="text-[12px] text-[#6B5444]" dir="ltr">${toPersianDigits(m.member_phone)}</span>
+                                <span class="px-2.5 py-0.5 rounded-md border text-[11px] font-semibold ${badgeClass}">
+                                  ${toPersianDigits(statusText)}
+                                </span>
+                              </div>
+                              <div class="text-[11px] text-[#7A6352]">
+                                تاریخ ثبت‌نام: ${toPersianDigits(m.registered_at)}
+                              </div>
+                            </div>
+
+                            <div class="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                data-enroll-type="${enrolledMembersModalTarget.targetType}"
+                                data-enroll-id="${enrolledMembersModalTarget.targetId}"
+                                data-enroll-title="${modalTitle}"
+                                data-member-phone="${m.member_phone}"
+                                data-member-name="${m.member_name}"
+                                class="js-admin-approve-enrollment px-3 py-1.5 rounded-lg bg-[#235332] hover:bg-[#193E25] text-[#FAF5EC] text-[11.5px] font-semibold cursor-pointer transition-colors ${
+                                  m.status === 'فعال' ? 'opacity-60' : ''
+                                }"
+                              >
+                                تایید
+                              </button>
+                              <button
+                                type="button"
+                                data-enroll-type="${enrolledMembersModalTarget.targetType}"
+                                data-enroll-id="${enrolledMembersModalTarget.targetId}"
+                                data-enroll-title="${modalTitle}"
+                                data-member-phone="${m.member_phone}"
+                                data-member-name="${m.member_name}"
+                                class="js-admin-cancel-enrollment px-3 py-1.5 rounded-lg border border-[#E0A9A3] bg-[#FBEAE8] hover:bg-[#F5D5D1] text-[#9E3329] text-[11.5px] font-semibold cursor-pointer transition-colors"
+                              >
+                                لغو
+                              </button>
+                              <button
+                                type="button"
+                                data-enroll-title="${modalTitle}"
+                                data-member-phone="${m.member_phone}"
+                                data-member-name="${m.member_name}"
+                                class="js-admin-ticket-enrollment px-3 py-1.5 rounded-lg bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[11.5px] font-semibold cursor-pointer transition-colors"
+                              >
+                                ارسال تیکت
+                              </button>
+                            </div>
+                          </div>
+                        `;
+                      })
+                      .join('')
+              }
+            </div>
+          </div>
+        </div>
+      `;
+    }
 
     if (pendingDeleteConfirm) {
       const isSuccessTone = pendingDeleteConfirm.confirmTone === 'success';
@@ -1087,7 +1224,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div class="sm:col-span-2">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">عنوان دوره هم‌خوانی *</label>
-                <input type="text" name="title" required value="${editingSession.title || ''}" placeholder="مثلاً: حلقه هم‌خوانی صد سال تنهایی" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+                <input type="text" name="title" required value="${toPersianDigits(editingSession.title || '')}" placeholder="مثلاً: حلقه هم‌خوانی صد سال تنهایی" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
               </div>
               <div>
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">وضعیت دوره *</label>
@@ -1098,33 +1235,41 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </div>
               <div>
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">نام کتاب *</label>
-                <input type="text" name="book_title" required value="${editingSession.book_title || ''}" placeholder="مثلاً: صد سال تنهایی" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+                <input type="text" name="book_title" required value="${toPersianDigits(editingSession.book_title || '')}" placeholder="مثلاً: صد سال تنهایی" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
               </div>
               <div>
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">نام نویسنده *</label>
-                <input type="text" name="book_author" required value="${editingSession.book_author || ''}" placeholder="مثلاً: گابریل گارسیا مارکز" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+                <input type="text" name="book_author" required value="${toPersianDigits(editingSession.book_author || '')}" placeholder="مثلاً: گابریل گارسیا مارکز" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+              </div>
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">نام مترجم *</label>
+                <input type="text" name="translator" required value="${toPersianDigits(editingSession.translator ?? editingSession.mentor_name ?? '')}" placeholder="مثلاً: بهمن فرزانه" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+              </div>
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">ژانر / دسته‌بندی کتاب *</label>
+                <input type="text" name="category" required value="${toPersianDigits(editingSession.category || '')}" placeholder="مثلاً: ادبیات کلاسیک" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+              </div>
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">سال انتشار *</label>
+                <input type="text" inputmode="numeric" name="publication_year" required value="${editingSession.publication_year ? toPersianDigits(editingSession.publication_year) : ''}" placeholder="مثلاً: ۱۴۰۵" class="js-persian-digits-input w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
               </div>
               <div>
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">تعداد صفحات *</label>
-                <input type="number" name="pages_count" required value="${editingSession.pages_count || 320}" placeholder="۴۶۸" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+                <input type="text" inputmode="numeric" name="pages_count" required value="${editingSession.pages_count ? toPersianDigits(editingSession.pages_count) : ''}" placeholder="مثلاً: ۴۶۸" class="js-persian-digits-input w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
               </div>
               <div>
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">انتشارات *</label>
-                <input type="text" name="publisher" required value="${editingSession.publisher || ''}" placeholder="مثلاً: نشر نیلوفر" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+                <input type="text" name="publisher" required value="${toPersianDigits(editingSession.publisher || '')}" placeholder="مثلاً: نشر نیلوفر" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
               </div>
               <div>
-                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">نام تسهیل‌گر *</label>
-                <input type="text" name="mentor_name" required value="${editingSession.mentor_name || 'دکتر سهراب رستگار'}" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">روز و تاریخ برگزاری *</label>
+                <input type="text" name="session_date" required value="${toPersianDigits(editingSession.session_date || '')}" placeholder="مثلاً: چهارشنبه‌ها · آذر ۱۴۰۵" class="js-persian-digits-input w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
               </div>
               <div>
-                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">روز و تاریخ برگزاری</label>
-                <input type="text" name="session_date" value="${editingSession.session_date || 'چهارشنبه‌ها · آذر ۱۴۰۵'}" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">ساعت برگزاری *</label>
+                <input type="text" name="session_time" required value="${toPersianDigits(editingSession.session_time || '')}" placeholder="مثلاً: ساعت ۱۸:۰۰ تا ۲۰:۰۰" class="js-persian-digits-input w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
               </div>
-              <div>
-                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">ساعت برگزاری</label>
-                <input type="text" name="session_time" value="${editingSession.session_time || 'ساعت ۱۸:۰۰ تا ۲۰:۰۰'}" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
-              </div>
-              <div class="sm:col-span-2">
+              <div class="sm:col-span-2 lg:col-span-3">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">تصویر کاور دوره (انتخاب از گالری تصاویر)</label>
                 <input type="hidden" name="cover_url" value="${editingSession.cover_url || '/assets/book-current.png'}" />
                 <div class="flex items-center gap-3 p-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9]">
@@ -1142,6 +1287,14 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   </button>
                 </div>
               </div>
+              <div class="sm:col-span-2 lg:col-span-3">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">توضیحات کوتاه کارت (نمایش در کارت کتاب در حال مطالعه و رویدادها) *</label>
+                <textarea name="short_description" rows="2" required placeholder="خلاصه کوتاهی از معرفی این کتاب و محور نشست را بنویسید..." class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]">${toPersianDigits(editingSession.short_description || '')}</textarea>
+              </div>
+              <div class="sm:col-span-2 lg:col-span-3">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">معرفی کامل کتاب و توضیحات نشست (نمایش در صفحه مشاهده جزئیات) *</label>
+                <textarea name="full_description" rows="4" required placeholder="توضیحات کامل درباره داستان کتاب، اهمیت ادبی اثر و شیوه برگزاری جلسات هم‌خوانی را وارد نمایید..." class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]">${toPersianDigits(editingSession.full_description || '')}</textarea>
+              </div>
             </div>
             <div class="flex justify-end gap-2 pt-2">
               <button type="button" class="js-admin-cancel-session px-4 py-2 rounded-xl border border-[#C5B198] text-[12.5px] font-semibold text-[#4E3B2D] cursor-pointer">انصراف</button>
@@ -1157,7 +1310,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           <input
             type="text"
             value="${toPersianDigits(sessionSearch)}"
-            placeholder="جستجو در عنوان دوره، نام کتاب، نویسنده یا تسهیل‌گر..."
+            placeholder="جستجو در عنوان دوره، نام کتاب، نویسنده یا مترجم..."
             class="js-admin-session-search flex-1 px-4 py-2 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
           />
           <div class="flex items-center gap-2 shrink-0">
@@ -1209,17 +1362,18 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   <div class="text-[12.5px] text-[#5B4739] grid grid-cols-2 gap-y-1.5 gap-x-3">
                     <div>نام کتاب: <strong class="text-[#231912]">${toPersianDigits(s.book_title)}</strong></div>
                     <div>نویسنده: <strong class="text-[#231912]">${toPersianDigits(s.book_author || '—')}</strong></div>
-                    <div>تعداد صفحات: <strong class="text-[#231912]">${toPersianDigits(s.pages_count || 320)} صفحه</strong></div>
+                    <div>مترجم: <strong class="text-[#231912]">${toPersianDigits(s.translator || s.mentor_name || '—')}</strong></div>
+                    <div>ژانر: <strong class="text-[#231912]">${toPersianDigits(s.category || '—')}</strong></div>
+                    <div>تعداد صفحات: <strong class="text-[#231912]">${s.pages_count ? `${toPersianDigits(s.pages_count)} صفحه` : '—'}</strong></div>
+                    <div>سال انتشار: <strong class="text-[#231912]">${s.publication_year ? toPersianDigits(s.publication_year) : '—'}</strong></div>
                     <div>انتشارات: <strong class="text-[#231912]">${toPersianDigits(s.publisher || '—')}</strong></div>
-                    <div>تسهیل‌گر: <strong class="text-[#231912]">${toPersianDigits(s.mentor_name)}</strong></div>
-                    <div>زمان: <strong class="text-[#231912]">${toPersianDigits(s.session_date)}</strong></div>
+                    <div>زمان: <strong class="text-[#231912]">${toPersianDigits(s.session_date || '—')}</strong></div>
                   </div>
                   ${renderEnrolledMembersBlock({
                     targetType: 'session',
                     targetId: s.id,
                     targetTitle: s.title,
                     members: s.enrolled_members,
-                    fallbackStatus: s.status,
                   })}
                 </div>
               </div>
@@ -1331,9 +1485,9 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 type="text"
                 name="session_number"
                 required
-                value="${subBeingEdited?.session_number || ''}"
-                placeholder="مثلاً: جلسه ششم"
-                class="w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
+                value="${toPersianDigits(subBeingEdited?.session_number || '')}"
+                placeholder="مثلاً: جلسه اول"
+                class="js-persian-digits-input w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
               />
             </div>
             <div class="sm:col-span-2">
@@ -1342,7 +1496,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 type="text"
                 name="title"
                 required
-                value="${subBeingEdited?.title || ''}"
+                value="${toPersianDigits(subBeingEdited?.title || '')}"
                 placeholder="عنوان مبحث این نشست..."
                 class="w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
               />
@@ -1362,8 +1516,9 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <input
                 type="text"
                 name="session_date"
-                value="${subBeingEdited?.session_date || '۳۰ آبان ۱۴۰۵'}"
-                class="w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
+                value="${toPersianDigits(subBeingEdited?.session_date || '')}"
+                placeholder="مثلاً: ۳۰ آبان ۱۴۰۵"
+                class="js-persian-digits-input w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
               />
             </div>
             <div>
@@ -1371,8 +1526,9 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <input
                 type="text"
                 name="session_time"
-                value="${subBeingEdited?.session_time || '۱۸:۰۰ تا ۲۰:۰۰'}"
-                class="w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
+                value="${toPersianDigits(subBeingEdited?.session_time || '')}"
+                placeholder="مثلاً: ۱۸:۰۰ تا ۲۰:۰۰"
+                class="js-persian-digits-input w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
               />
             </div>
             <div>
@@ -1380,9 +1536,9 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <input
                 type="text"
                 name="pages_to_read"
-                value="${subBeingEdited?.pages_to_read || ''}"
+                value="${toPersianDigits(subBeingEdited?.pages_to_read || '')}"
                 placeholder="صفحات ۱ تا ۹۰"
-                class="w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
+                class="js-persian-digits-input w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
               />
             </div>
             <div>
@@ -1391,7 +1547,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 type="text"
                 name="meeting_link"
                 dir="ltr"
-                value="${subBeingEdited?.meeting_link || 'https://meet.bookmeet.ir/live'}"
+                value="${subBeingEdited?.meeting_link || ''}"
+                placeholder="https://meet.bookmeet.ir/live"
                 class="w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px] text-left"
               />
             </div>
@@ -1561,11 +1718,11 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </div>
               <div>
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">نام مدرس *</label>
-                <input type="text" name="instructor_name" required value="${editingClass.instructor_name || 'دکتر سهراب رستگار'}" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+                <input type="text" name="instructor_name" required value="${toPersianDigits(editingClass.instructor_name || '')}" placeholder="مثلاً: دکتر سهراب رستگار" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
               </div>
               <div>
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">برنامه هفتگی</label>
-                <input type="text" name="schedule_summary" value="${editingClass.schedule_summary || 'دوشنبه‌ها · ساعت ۱۷:۳۰ تا ۱۹:۳۰'}" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+                <input type="text" name="schedule_summary" value="${toPersianDigits(editingClass.schedule_summary || '')}" placeholder="مثلاً: دوشنبه‌ها · ساعت ۱۷:۳۰ تا ۱۹:۳۰" class="js-persian-digits-input w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
               </div>
               <div>
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">سطح کلاس *</label>
@@ -1674,7 +1831,6 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     targetId: c.id,
                     targetTitle: c.title,
                     members: c.enrolled_members,
-                    fallbackStatus: c.status,
                   })}
                 </div>
               </div>
@@ -1721,7 +1877,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         return false;
       }
       if (!q) return true;
-      return `${u.first_name} ${u.last_name} ${u.phone} ${u.email || ''} ${u.favorite_genre || ''} ${u.education || ''}`
+      return `${u.first_name} ${u.last_name} ${u.phone} ${u.email || ''} ${u.education || ''}`
         .toLowerCase()
         .includes(q);
     });
@@ -1776,10 +1932,6 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 </select>
               </div>
               <div>
-                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">حوزه مورد علاقه کتاب</label>
-                <input type="text" name="favorite_genre" value="${editingUser.favorite_genre || 'ادبیات داستانی و رمان کلاسیک'}" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px]" />
-              </div>
-              <div>
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">پست الکترونیک (ایمیل)</label>
                 <input type="text" name="email" dir="ltr" value="${editingUser.email || ''}" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-left" />
               </div>
@@ -1810,7 +1962,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           <input
             type="text"
             value="${toPersianDigits(userSearch)}"
-            placeholder="جستجو در جدول کاربران بر اساس نام، شماره تلفن، ایمیل، تحصیلات یا ژانر مورد علاقه..."
+            placeholder="جستجو در جدول کاربران بر اساس نام، شماره تلفن، ایمیل یا تحصیلات..."
             class="js-admin-user-search flex-1 px-4 py-2 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
           />
           <div class="flex items-center gap-2 shrink-0">
@@ -1843,7 +1995,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         <!-- Users Profile Table -->
         <div class="rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] overflow-hidden shadow-xs">
           <div class="overflow-x-auto">
-            <table class="w-full text-right border-collapse min-w-[1040px]">
+            <table class="w-full text-right border-collapse min-w-[940px]">
               <thead>
                 <tr class="bg-[#EFE3D2] text-[#3F2E21] text-[12px] font-bold border-b border-[#DFCEB9]">
                   <th class="py-3.5 px-4">#</th>
@@ -1853,7 +2005,6 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   <th class="py-3.5 px-4">شماره همراه</th>
                   <th class="py-3.5 px-4">پست الکترونیک (ایمیل)</th>
                   <th class="py-3.5 px-4">تحصیلات</th>
-                  <th class="py-3.5 px-4">حوزه مورد علاقه کتاب</th>
                   <th class="py-3.5 px-4">تاریخ عضویت</th>
                   <th class="py-3.5 px-4 text-center">عملیات</th>
                 </tr>
@@ -1895,7 +2046,6 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     <td class="py-3.5 px-4 whitespace-nowrap font-medium">${toPersianDigits(u.phone)}</td>
                     <td class="py-3.5 px-4 whitespace-nowrap" dir="ltr">${u.email || '—'}</td>
                     <td class="py-3.5 px-4 whitespace-nowrap">${toPersianDigits(u.education || '—')}</td>
-                    <td class="py-3.5 px-4 max-w-[180px] truncate" title="${u.favorite_genre || ''}">${toPersianDigits(u.favorite_genre || '—')}</td>
                     <td class="py-3.5 px-4 whitespace-nowrap text-[#6B5444]">${toPersianDigits(u.joined_date || 'آبان ۱۴۰۵')}</td>
                     <td class="py-3.5 px-4 whitespace-nowrap">
                       <div class="flex items-center justify-center gap-1.5">
@@ -2299,10 +2449,6 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             <div>
               <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">تغییر رمز عبور مدیر (اختیاری)</label>
               <input type="password" name="new_password" placeholder="رمز فعلی: admin1234" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px]" />
-            </div>
-            <div class="sm:col-span-2 lg:col-span-3">
-              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">حوزه تخصصی و پژوهشی</label>
-              <input type="text" name="favorite_genre" value="${state.admin.favorite_genre || 'ادبیات تطبیقی و نقد ادبی'}" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px]" />
             </div>
             <div class="sm:col-span-2 lg:col-span-3">
               <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">درباره مدیر</label>
@@ -3183,26 +3329,73 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     }
   });
 
+  // --- Persian Digits Live Input Formatting ---
+  $wrapper.on('input', '.js-persian-digits-input', function () {
+    const el = this as HTMLInputElement;
+    const formatted = toPersianDigits(el.value);
+    if (el.value !== formatted) {
+      const pos = el.selectionStart || formatted.length;
+      el.value = formatted;
+      try {
+        el.setSelectionRange(pos, pos);
+      } catch {
+        // ignore selection range unsupported
+      }
+    }
+  });
+
+  // --- Enrolled Members Modal Handlers ---
+  $wrapper.on('click', '.js-admin-open-enrolled-modal', function () {
+    syncOpenFormsFromDom();
+    const targetType = String($(this).data('open-enrolled-type')) as 'session' | 'class';
+    const targetId = Number($(this).data('open-enrolled-id'));
+    const targetTitle = String($(this).data('open-enrolled-title') || '');
+    enrolledMembersModalTarget = {
+      targetType,
+      targetId,
+      targetTitle,
+    };
+    render();
+  });
+
+  $wrapper.on('click', '.js-admin-close-enrolled-modal', () => {
+    syncOpenFormsFromDom();
+    enrolledMembersModalTarget = null;
+    render();
+  });
+
+  $wrapper.on('click', '.js-admin-enrolled-modal-backdrop', function (e) {
+    if ($(e.target).hasClass('js-admin-enrolled-modal-backdrop')) {
+      syncOpenFormsFromDom();
+      enrolledMembersModalTarget = null;
+      render();
+    }
+  });
+
   // --- Gallery Picker Modal Handlers ---
   $wrapper.on('click', '.js-admin-open-gallery-picker', function () {
+    syncOpenFormsFromDom();
     const target = $(this).data('gallery-target') as 'session' | 'class' | 'blog';
     galleryPickerTarget = target;
     render();
   });
 
   $wrapper.on('click', '.js-admin-close-gallery-picker', () => {
+    syncOpenFormsFromDom();
     galleryPickerTarget = null;
     render();
   });
 
   $wrapper.on('click', '.js-admin-gallery-picker-backdrop', function (e) {
     if ($(e.target).hasClass('js-admin-gallery-picker-backdrop')) {
+      syncOpenFormsFromDom();
       galleryPickerTarget = null;
       render();
     }
   });
 
   $wrapper.on('click', '.js-admin-pick-gallery-item', function () {
+    syncOpenFormsFromDom();
     const url = String($(this).data('pick-image-url') || '');
     if (!url) return;
     if (galleryPickerTarget === 'session' && editingSession) {
@@ -3296,11 +3489,16 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       title: '',
       book_title: '',
       book_author: '',
-      pages_count: 350,
+      translator: '',
+      category: '',
+      publication_year: undefined,
+      pages_count: undefined,
       publisher: '',
-      mentor_name: 'دکتر سهراب رستگار',
-      session_date: 'چهارشنبه‌ها · آذر ۱۴۰۵',
-      session_time: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
+      mentor_name: '',
+      session_date: '',
+      session_time: '',
+      short_description: '',
+      full_description: '',
       status: 'فعال',
       cover_url: state.gallery[0]?.url || '/assets/book-current.png',
     };
@@ -3326,16 +3524,27 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     e.preventDefault();
     const $f = $(this);
     const id = Number($f.find('[name="id"]').val() || 0) || undefined;
+    const rawPages = toEnglishDigits(String($f.find('[name="pages_count"]').val() || '').trim());
+    const rawPubYear = toEnglishDigits(
+      String($f.find('[name="publication_year"]').val() || '').trim()
+    );
+    const translatorName = String($f.find('[name="translator"]').val() || '').trim();
+
     const payload: Partial<MemberSession> & { id?: number } = {
       id,
       title: String($f.find('[name="title"]').val() || '').trim(),
       book_title: String($f.find('[name="book_title"]').val() || '').trim(),
       book_author: String($f.find('[name="book_author"]').val() || '').trim(),
-      pages_count: Number($f.find('[name="pages_count"]').val() || 320),
+      translator: translatorName,
+      mentor_name: translatorName,
+      category: String($f.find('[name="category"]').val() || '').trim(),
+      publication_year: Number(rawPubYear) || 1405,
+      pages_count: Number(rawPages) || 300,
       publisher: String($f.find('[name="publisher"]').val() || '').trim(),
-      mentor_name: String($f.find('[name="mentor_name"]').val() || '').trim(),
-      session_date: String($f.find('[name="session_date"]').val() || '').trim(),
-      session_time: String($f.find('[name="session_time"]').val() || '').trim(),
+      session_date: toPersianDigits(String($f.find('[name="session_date"]').val() || '').trim()),
+      session_time: toPersianDigits(String($f.find('[name="session_time"]').val() || '').trim()),
+      short_description: String($f.find('[name="short_description"]').val() || '').trim(),
+      full_description: String($f.find('[name="full_description"]').val() || '').trim(),
       status: String($f.find('[name="status"]').val() || 'فعال') as MemberSession['status'],
       cover_url: String($f.find('[name="cover_url"]').val() || '/assets/book-current.png').trim(),
     };
@@ -3347,6 +3556,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           state.sessions = [res.session, ...state.sessions];
         }
         editingSession = null;
+        props.onSiteDataUpdated({ sessions: state.sessions });
         render();
         showToast('اطلاعات دوره هم‌خوانی در دیتابیس ذخیره شد.');
       })
@@ -3363,6 +3573,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         ApiService.deleteAdminSession(id)
           .then(() => {
             state.sessions = state.sessions.filter((s) => s.id !== id);
+            props.onSiteDataUpdated({ sessions: state.sessions });
             render();
             showToast('دوره هم‌خوانی از دیتابیس حذف شد.');
           })
@@ -3474,6 +3685,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           );
           editingSubSession = null;
           isAddingSubSession = false;
+          props.onSiteDataUpdated({ sessions: state.sessions });
           render();
           showToast(
             existingSubId
@@ -3497,6 +3709,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           );
           editingSubSession = null;
           isAddingSubSession = false;
+          props.onSiteDataUpdated({ classes: state.classes });
           render();
           showToast(
             existingSubId
@@ -3528,6 +3741,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               state.sessions = state.sessions.map((s) =>
                 s.id === target.id ? res.session : s
               );
+              props.onSiteDataUpdated({ sessions: state.sessions });
               render();
               showToast('کارت جلسه حذف شد.');
             }
@@ -3543,6 +3757,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               state.classes = state.classes.map((c) =>
                 c.id === target.id ? res.classItem : c
               );
+              props.onSiteDataUpdated({ classes: state.classes });
               render();
               showToast('کارت جلسه از کلاس حذف شد.');
             }
@@ -3568,8 +3783,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     editingClass = {
       title: '',
       book_title: '',
-      instructor_name: 'دکتر سهراب رستگار',
-      schedule_summary: 'دوشنبه‌ها · ساعت ۱۷:۳۰ تا ۱۹:۳۰',
+      instructor_name: '',
+      schedule_summary: '',
       level_label: 'مبتدی',
       status: 'فعال',
       cover_url: state.gallery[5]?.url || '/assets/blog-1.png',
@@ -3616,6 +3831,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           state.classes = [res.classItem, ...state.classes];
         }
         editingClass = null;
+        props.onSiteDataUpdated({ classes: state.classes });
         render();
         showToast('اطلاعات کلاس در دیتابیس ذخیره شد.');
       })
@@ -3632,6 +3848,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         ApiService.deleteAdminClass(id)
           .then(() => {
             state.classes = state.classes.filter((c) => c.id !== id);
+            props.onSiteDataUpdated({ classes: state.classes });
             render();
             showToast('کلاس آموزشی حذف شد.');
           })
@@ -3801,7 +4018,6 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       last_name: '',
       phone: '',
       education: 'کارشناسی ارشد',
-      favorite_genre: 'ادبیات داستانی و رمان کلاسیک',
       email: '',
       membership_code: `BM-۱۴۰۵-${120 + state.users.length}`,
       bio: '',
@@ -3824,7 +4040,6 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       last_name: String($f.find('[name="last_name"]').val() || '').trim(),
       phone: toPersianDigits(String($f.find('[name="phone"]').val() || '').trim()),
       education: String($f.find('[name="education"]').val() || 'کارشناسی ارشد').trim(),
-      favorite_genre: String($f.find('[name="favorite_genre"]').val() || '').trim(),
       email: String($f.find('[name="email"]').val() || '').trim(),
       membership_code: String($f.find('[name="membership_code"]').val() || '').trim(),
       password: String($f.find('[name="password"]').val() || '').trim() || undefined,
@@ -4114,7 +4329,6 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     const last_name = String($f.find('[name="last_name"]').val() || 'رستگار').trim();
     const email = String($f.find('[name="email"]').val() || 'admin@bookmeet.ir').trim();
     const education = String($f.find('[name="education"]').val() || 'دکتری').trim();
-    const favorite_genre = String($f.find('[name="favorite_genre"]').val() || '').trim();
     const bio = String($f.find('[name="bio"]').val() || '').trim();
     const new_password = String($f.find('[name="new_password"]').val() || '').trim();
 
@@ -4123,7 +4337,6 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       last_name,
       email,
       education,
-      favorite_genre,
       bio,
       avatar_url: pendingAdminAvatar,
       new_password: new_password || undefined,
@@ -4195,17 +4408,20 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   });
 
   $wrapper.on('click', '.js-admin-open-blog-cat-modal', () => {
+    syncOpenFormsFromDom();
     isBlogCategoryModalOpen = true;
     render();
   });
 
   $wrapper.on('click', '.js-admin-close-blog-cat-modal', () => {
+    syncOpenFormsFromDom();
     isBlogCategoryModalOpen = false;
     render();
   });
 
   $wrapper.on('click', '.js-admin-blog-cat-backdrop', function (e) {
     if ($(e.target).hasClass('js-admin-blog-cat-backdrop')) {
+      syncOpenFormsFromDom();
       isBlogCategoryModalOpen = false;
       render();
     }

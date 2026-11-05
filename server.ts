@@ -158,6 +158,9 @@ async function startServer() {
         libraryBooks,
         blogPosts,
         contactInfo,
+        publicSessions,
+        publicClasses,
+        approvedComments,
       ] = await Promise.all([
         mysqlDb.getNavigationLinks(),
         mysqlDb.getHeroSettings(),
@@ -167,6 +170,9 @@ async function startServer() {
         mysqlDb.getLibraryBooks(),
         mysqlDb.getBlogPosts(),
         mysqlDb.getContactInfo(),
+        mysqlDb.getPublicActiveSessions(),
+        mysqlDb.getPublicActiveClasses(),
+        mysqlDb.getApprovedComments(),
       ]);
 
       res.json({
@@ -178,12 +184,40 @@ async function startServer() {
         libraryBooks,
         blogPosts,
         contactInfo,
+        publicSessions,
+        publicClasses,
+        approvedComments,
       });
     } catch (error) {
       console.error('Database fetch error (/api/bootstrap):', error);
       res.status(503).json({
         error: 'خطا در اتصال به دیتابیس MySQL. لطفاً از روشن بودن سرویس MySQL اطمینان حاصل کنید.',
       });
+    }
+  });
+
+  app.post('/api/comments', async (req, res) => {
+    try {
+      const { author_name, author_phone, target_title, target_type, rating, comment_text } =
+        req.body || {};
+      if (!author_name || !comment_text || !target_title) {
+        res.status(400).json({ error: 'لطفاً نام و متن دیدگاه خود را وارد نمایید.' });
+        return;
+      }
+      const saved = await mysqlDb.saveUserComment({
+        author_name: String(author_name).trim(),
+        author_phone: String(author_phone || '').trim(),
+        target_title: String(target_title).trim(),
+        target_type: String(target_type || 'نشست کتاب‌خوانی').trim(),
+        rating: Number(rating || 5),
+        comment_text: String(comment_text).trim(),
+        status: 'در انتظار تایید',
+      });
+      res.status(201).json({ success: true, comment: saved });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ثبت دیدگاه در دیتابیس MySQL';
+      res.status(400).json({ error: message });
     }
   });
 
@@ -276,7 +310,6 @@ async function startServer() {
         last_name,
         phone,
         education,
-        favorite_genre,
         password,
         confirm_password,
       } = req.body || {};
@@ -305,7 +338,6 @@ async function startServer() {
         last_name: String(last_name).trim(),
         phone: String(phone).trim(),
         education: String(education).trim(),
-        favorite_genre: String(favorite_genre || 'ادبیات داستانی و رمان کلاسیک').trim(),
         password_plain: String(password),
       });
 
@@ -398,9 +430,7 @@ async function startServer() {
         first_name,
         last_name,
         education,
-        favorite_genre,
         email,
-        city,
         avatar_url,
         bio,
       } = req.body || {};
@@ -413,11 +443,7 @@ async function startServer() {
         first_name: String(first_name).trim(),
         last_name: String(last_name).trim(),
         education: String(education || req.authUser!.education || 'کارشناسی').trim(),
-        favorite_genre: String(
-          favorite_genre || req.authUser!.favorite_genre || 'ادبیات داستانی'
-        ).trim(),
         email: String(email || '').trim(),
-        city: city !== undefined ? String(city).trim() : undefined,
         avatar_url: avatar_url !== undefined ? String(avatar_url) : undefined,
         bio: String(bio || '').trim(),
       });
@@ -707,7 +733,6 @@ async function startServer() {
         last_name,
         email,
         education,
-        favorite_genre,
         bio,
         avatar_url,
         new_password,
@@ -718,9 +743,6 @@ async function startServer() {
         last_name: String(last_name || req.authUser!.last_name).trim(),
         email: String(email || req.authUser!.email || '').trim(),
         education: String(education || req.authUser!.education || 'دکتری').trim(),
-        favorite_genre: String(
-          favorite_genre || req.authUser!.favorite_genre || 'ادبیات تطبیقی'
-        ).trim(),
         bio: String(bio || '').trim(),
         avatar_url: avatar_url !== undefined ? String(avatar_url) : undefined,
         new_password: new_password ? String(new_password) : undefined,

@@ -1,772 +1,629 @@
 import $ from 'jquery';
-import type { LibraryBook } from '../types/models.ts';
+import type { LibraryBook, MemberSession, UserComment } from '../types/models.ts';
 import { toPersianDigits } from '../utils/persianNumbers.ts';
 
-export interface EventSessionPlanItem {
+export interface EventSubSession {
   sessionNumber: string;
   title: string;
-  dateLabel: string;
-  timeLabel: string;
-  pagesToRead: string;
-  status: 'برگزار شده' | 'نشست پیش رو';
+  date: string;
+  time: string;
+  pagesRange: string;
+  status: 'برگزار شده' | 'نشست آتی';
 }
 
 export interface EventAudienceComment {
   id: number;
   authorName: string;
-  roleLabel: string;
-  dateLabel: string;
+  authorRole: string;
+  createdDate: string;
   rating: number;
   commentText: string;
+  adminReply?: string;
 }
 
-export interface ClubEventDetailItem {
+export interface UpcomingEventCard {
   id: number;
+  badge: string;
+  category: string;
+  publicationYear: number;
   title: string;
   bookTitle: string;
+  bookOriginalTitle: string;
   bookAuthor: string;
   bookTranslator: string;
-  publisher: string;
+  bookPublisher: string;
   pagesCount: number;
-  publicationYear: number;
+  dateText: string;
+  timeText: string;
+  hostName: string;
+  capacityText: string;
+  locationLabel: string;
   coverUrl: string;
-  dateLabel: string;
-  timeLabel: string;
-  mentor: string;
-  location: string;
-  shortDescription: string;
-  bookIntroduction: string;
+  summary: string;
   fullDescription: string[];
-  sessionsList: EventSessionPlanItem[];
+  bookIntroduction: string;
+  sessionsList: EventSubSession[];
   comments: EventAudienceComment[];
 }
 
-export const UPCOMING_EVENTS_DATA: ClubEventDetailItem[] = [
-  {
-    id: 1,
-    title: 'نشست هم‌خوانی و تحلیل «صد سال تنهایی» (فصل‌های ۱۲ تا ۱۵)',
-    bookTitle: 'صد سال تنهایی',
-    bookAuthor: 'گابریل گارسیا مارکز',
-    bookTranslator: 'بهمن فرزانه',
-    publisher: 'نشر نیلوفر',
-    pagesCount: 468,
-    publicationYear: 1967,
-    coverUrl: '/assets/book-current.png',
-    dateLabel: 'چهارشنبه ۲۴ آبان ۱۴۰۵',
-    timeLabel: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-    mentor: 'دکتر سهراب رستگار',
-    location: 'نشست حضوری · سالن اصلی خانه کتاب بوک‌میت',
-    shortDescription:
-      'واکاوی ساختار دایره‌ای زمان، استعاره‌های تنهایی خاندان بوئندیا و گفت‌وگوی گروهی اعضا درباره فصل‌های میانی رمان.',
-    bookIntroduction:
-      '«صد سال تنهایی» شاهکار بی‌بدیل گابریل گارسیا مارکز و یکی از ستون‌های اصلی ادبیات قرن بیستم است که سرگذشت هفت نسل از خاندان بوئندیا را در دهکده خیالی ماکوندو روایت می‌کند؛ جایی که اسطوره، تاریخ و واقعیت روزمره در بافتی شاعرانه به هم گره می‌خورند.',
-    fullDescription: [
-      'در این حلقه هم‌خوانی، فصل‌به‌فصل همراه با ساکنان ماکوندو پیش می‌رویم تا ببینیم چگونه مارکز با بهره‌گیری از شگردهای رئالیسم جادویی، مفهوم زمان خطی را می‌شکند و تاریخ آمریکای لاتین را در آیینه یک خانواده بازتاب می‌دهد.',
-      'نشست پیش رو به بررسی فصل‌های ۱۲ تا ۱۵ اختصاص دارد؛ بخش‌هایی که در آن ورود شرکت موز، دگرگونی ناگهانی دهکده و آغاز باران‌های چهارساله، نقطه اوج دراماتیک رمان را رقم می‌زند.',
-    ],
-    sessionsList: [
-      {
-        sessionNumber: 'جلسه اول',
-        title: 'پیدایش ماکوندو، کولی‌ها و کیمیاگری ملکیادس',
-        dateLabel: '۲۵ مهر ۱۴۰۵',
-        timeLabel: '۱۸:۰۰ تا ۲۰:۰۰',
-        pagesToRead: 'صفحات ۱ تا ۱۱۵ (فصل‌های ۱ تا ۳)',
-        status: 'برگزار شده',
-      },
-      {
-        sessionNumber: 'جلسه دوم',
-        title: 'طاعون بی‌خوابی و فراموشی جمعی در ماکوندو',
-        dateLabel: '۲ آبان ۱۴۰۵',
-        timeLabel: '۱۸:۰۰ تا ۲۰:۰۰',
-        pagesToRead: 'صفحات ۱۱۶ تا ۲۲۵ (فصل‌های ۴ تا ۷)',
-        status: 'برگزار شده',
-      },
-      {
-        sessionNumber: 'جلسه سوم',
-        title: 'جنگ‌های داخلی سرهنگ اورلیانو بوئندیا و ماهی‌های طلایی',
-        dateLabel: '۹ آبان ۱۴۰۵',
-        timeLabel: '۱۸:۰۰ تا ۲۰:۰۰',
-        pagesToRead: 'صفحات ۲۲۶ تا ۳۱۸ (فصل‌های ۸ تا ۱۱)',
-        status: 'برگزار شده',
-      },
-      {
-        sessionNumber: 'جلسه چهارم',
-        title: 'ورود شرکت موز و باران‌های چهارساله ماکوندو',
-        dateLabel: '۲۴ آبان ۱۴۰۵',
-        timeLabel: '۱۸:۰۰ تا ۲۰:۰۰',
-        pagesToRead: 'صفحات ۳۱۹ تا ۳۹۵ (فصل‌های ۱۲ تا ۱۵)',
-        status: 'نشست پیش رو',
-      },
-      {
-        sessionNumber: 'جلسه پنجم',
-        title: 'رمزگشایی از دست‌نوشته‌های ملکیادس و جمع‌بندی نهایی رمان',
-        dateLabel: '۱ آذر ۱۴۰۵',
-        timeLabel: '۱۸:۰۰ تا ۲۰:۳۰',
-        pagesToRead: 'صفحات ۳۹۶ تا ۴۶۸ (فصل‌های ۱۶ تا پایان کتاب)',
-        status: 'نشست پیش رو',
-      },
-    ],
-    comments: [
-      {
-        id: 501,
-        authorName: 'پرنیا فرهمند',
-        roleLabel: 'عضو حلقه هم‌خوانی',
-        dateLabel: '۱۲ آبان ۱۴۰۵',
-        rating: 5,
-        commentText:
-          'تحلیل شجره‌نامه خاندان بوئندیا و بررسی تکرار نام‌ها در جلسات دکتر رستگار، خوانش این رمان را برایم به تجربه‌ای فراموش‌نشدنی تبدیل کرده است.',
-      },
-      {
-        id: 502,
-        authorName: 'کیانوش معتمدی',
-        roleLabel: 'عضو فعال باشگاه',
-        dateLabel: '۱۳ آبان ۱۴۰۵',
-        rating: 5,
-        commentText:
-          'گفت‌وگوهای گروهی درباره مفهوم فراموشی تاریخی در ماکوندو بسیار عمیق و روشنگر بود.',
-      },
-    ],
-  },
-  {
-    id: 2,
-    title: 'شب ادبیات کلاسیک؛ کالبدشکافی رمان «مرشد و مارگاریتا»',
-    bookTitle: 'مرشد و مارگاریتا',
-    bookAuthor: 'میخائیل بولگاکف',
-    bookTranslator: 'عباس میلانی',
-    publisher: 'نشر فرهنگ نشر نو',
-    pagesCount: 512,
-    publicationYear: 1967,
-    coverUrl: '/assets/book-recent-1.png',
-    dateLabel: 'جمعه ۲۶ آبان ۱۴۰۵',
-    timeLabel: 'ساعت ۱۹:۰۰ تا ۲۱:۰۰',
-    mentor: 'دکتر سهراب رستگار و نیلوفر فرهادی',
-    location: 'نشست برخط (آنلاین) · تالار گفت‌وگوی بوک‌میت',
-    shortDescription:
-      'بررسی طنز فلسفی میخائیل بولگاکف، تقابل خیر و شر در مسکوی دهه ۱۹۳۰ و تحلیل شخصیت‌پردازی پروفسور ولاند.',
-    bookIntroduction:
-      '«مرشد و مارگاریتا» اثر درخشان میخائیل بولگاکف، ترکیبی شگفت‌انگیز از طنز گروتسک، فلسفه اخلاق، تاریخ و عاشقانه‌ای جاودان است که در دو بستر موازی مسکوی دهه ۱۹۳۰ و اورشلیم عصر پونتیوس پیلاتوس جریان می‌یابد.',
-    fullDescription: [
-      'در این نشست تخصصی، ساختار «رمان در رمان» اثر بولگاکف را کالبدشکافی می‌کنیم و به این پرسش بنیادین می‌پردازیم که چرا ورود پروفسور ولاند و دستیارانش به مسکو، نقاب از چهره جامعه بوروکراتیک و ریاکار آن دوران برمی‌دارد.',
-      'همچنین مفهوم جمله مشهور «دست‌نوشته‌ها نمی‌سوزند» و جایگاه آزادی هنر و شجاعت اخلاقی در شخصیت‌های مرشد، مارگاریتا و پونتیوس پیلاتوس با مشارکت اعضا بررسی خواهد شد.',
-    ],
-    sessionsList: [
-      {
-        sessionNumber: 'جلسه اول',
-        title: 'مباحثه در پارک پاتریارخ و آغاز روایت پونتیوس پیلاتوس',
-        dateLabel: '۱۹ آبان ۱۴۰۵',
-        timeLabel: '۱۹:۰۰ تا ۲۱:۰۰',
-        pagesToRead: 'صفحات ۱ تا ۱۷۰ (بخش اول رمان)',
-        status: 'برگزار شده',
-      },
-      {
-        sessionNumber: 'جلسه دوم',
-        title: 'تئاتر واریته، ورود مارگاریتا و دست‌نوشته‌هایی که نمی‌سوزند',
-        dateLabel: '۲۶ آبان ۱۴۰۵',
-        timeLabel: '۱۹:۰۰ تا ۲۱:۰۰',
-        pagesToRead: 'صفحات ۱۷۱ تا ۳۴۰',
-        status: 'نشست پیش رو',
-      },
-      {
-        sessionNumber: 'جلسه سوم',
-        title: 'جشن بزرگ بهار، پرواز مارگاریتا و رستگاری ابدی مرشد',
-        dateLabel: '۳ آذر ۱۴۰۵',
-        timeLabel: '۱۹:۰۰ تا ۲۱:۰۰',
-        pagesToRead: 'صفحات ۳۴۱ تا ۵۱۲ (تا پایان کتاب)',
-        status: 'نشست پیش رو',
-      },
-    ],
-    comments: [
-      {
-        id: 503,
-        authorName: 'مهسا تاجیک',
-        roleLabel: 'عضو باشگاه بوک‌میت',
-        dateLabel: '۱۱ آبان ۱۴۰۵',
-        rating: 5,
-        commentText:
-          'بررسی موازی فصل‌های مسکو و اورشلیم در این نشست باعث شد لایه‌های فلسفی و تاریخی کتاب را بسیار دقیق‌تر درک کنم.',
-      },
-    ],
-  },
-  {
-    id: 3,
-    title: 'کارگاه عملی حاشیه‌نویسی و خوانش خلاق متون داستانی',
-    bookTitle: 'هنر داستان‌نویسی و روایت‌شناسی کاربردی',
-    bookAuthor: 'ای. ام. فورستر',
-    bookTranslator: 'ابراهیم یونسی',
-    publisher: 'نشر چشمه',
-    pagesCount: 250,
-    publicationYear: 1927,
-    coverUrl: '/assets/blog-3.png',
-    dateLabel: 'دوشنبه ۲۹ آبان ۱۴۰۵',
-    timeLabel: 'ساعت ۱۷:۳۰ تا ۱۹:۳۰',
-    mentor: 'آرمان کاظمی',
-    location: 'نشست حضوری · اتاق مطالعه باشگاه بوک‌میت',
-    shortDescription:
-      'آموزش شیوه‌های یادداشت‌برداری تحلیلی، ثبت تداعی‌های فردی هنگام مطالعه رمان و آماده‌سازی جستارهای نقد ادبی.',
-    bookIntroduction:
-      'این کارگاه بر پایه کتاب کلاسیک «جنبه‌های رمان» اثر ای. ام. فورستر و گزیده‌ای از متون روایت‌شناسی مدرن طراحی شده است تا خوانندگان را از مطالعه منفعل به خوانشگرانی خلاق و منتقد تبدیل کند.',
-    fullDescription: [
-      'بسیاری از دوستداران کتاب پس از پایان مطالعه یک رمان، دغدغه ثبت برداشت‌ها و تبدیل تجربیات خوانش خود به یک یادداشت تحلیلی منسجم را دارند. در این کارگاه عملی، روش‌های حرفه‌ای حاشیه‌نویسی، کدگذاری موتیف‌ها و ترسیم نقشه روابط شخصیت‌ها را تمرین می‌کنیم.',
-      'در پایان هر نشست، شرکت‌کنندگان یک جستار کوتاه ۵۰۰ کلمه‌ای درباره فصل مورد بررسی می‌نویسند و بازخورد تخصصی دریافت می‌کنند.',
-    ],
-    sessionsList: [
-      {
-        sessionNumber: 'جلسه اول',
-        title: 'تفاوت داستان و پیرنگ؛ چگونه گره‌های روایت را علامت‌گذاری کنیم؟',
-        dateLabel: '۱۵ آبان ۱۴۰۵',
-        timeLabel: '۱۷:۳۰ تا ۱۹:۳۰',
-        pagesToRead: 'فصل اول و دوم کتاب جنبه‌های رمان (صفحات ۱ تا ۸۵)',
-        status: 'برگزار شده',
-      },
-      {
-        sessionNumber: 'جلسه دوم',
-        title: 'شخصیت‌های مسطح و جامع و تکنیک ثبت دیالوگ‌های کلیدی',
-        dateLabel: '۲۲ آبان ۱۴۰۵',
-        timeLabel: '۱۷:۳۰ تا ۱۹:۳۰',
-        pagesToRead: 'فصل سوم و چهارم (صفحات ۸۶ تا ۱۷۵)',
-        status: 'برگزار شده',
-      },
-      {
-        sessionNumber: 'جلسه سوم',
-        title: 'کارگاه عملی نگارش جستار نقد ادبی بر پایه یادداشت‌های حاشیه‌ای',
-        dateLabel: '۲۹ آبان ۱۴۰۵',
-        timeLabel: '۱۷:۳۰ تا ۱۹:۳۰',
-        pagesToRead: 'فصل پنجم تا پایان کتاب (صفحات ۱۷۶ تا ۲۵۰)',
-        status: 'نشست پیش رو',
-      },
-    ],
-    comments: [
-      {
-        id: 504,
-        authorName: 'سروش کاوه',
-        roleLabel: 'شرکت‌کننده کارگاه',
-        dateLabel: '۱۳ آبان ۱۴۰۵',
-        rating: 5,
-        commentText:
-          'روش سه محور کلیدی که آقای کاظمی در جلسه اول آموزش دادند، شیوه کتاب خواندن من را به کل متحول کرد.',
-      },
-    ],
-  },
-];
+export type ClubEventDetailItem = UpcomingEventCard;
 
-export function buildBookEventDetail(book: LibraryBook): ClubEventDetailItem {
-  const matchedPreset = UPCOMING_EVENTS_DATA.find(
-    (ev) => ev.bookTitle.trim() === book.title.trim()
+export function mapSessionToEventCard(
+  session: MemberSession,
+  approvedComments: UserComment[] = []
+): UpcomingEventCard {
+  const translatorName = (session.translator || session.mentor_name || '').trim();
+  const shortDesc = (session.short_description || '').trim();
+  const fullDescRaw = (session.full_description || '').trim();
+  const fullDescParagraphs = fullDescRaw
+    ? fullDescRaw
+        .split(/\n+/)
+        .map((p) => p.trim())
+        .filter(Boolean)
+    : shortDesc
+    ? [shortDesc]
+    : [];
+
+  const matchingComments: EventAudienceComment[] = approvedComments
+    .filter(
+      (c) =>
+        c.status === 'تایید شده' &&
+        (c.target_title === session.title || c.target_title === session.book_title)
+    )
+    .map((c) => ({
+      id: c.id,
+      authorName: c.author_name,
+      authorRole: 'عضو باشگاه کتابخوانی',
+      createdDate: c.created_date,
+      rating: c.rating || 5,
+      commentText: c.comment_text,
+      adminReply: c.admin_reply || undefined,
+    }));
+
+  const mappedSubSessions: EventSubSession[] = (session.sub_sessions || []).map(
+    (sub, idx) => ({
+      sessionNumber: String(sub.session_number || `جلسه ${toPersianDigits(idx + 1)}`),
+      title: String(sub.title || ''),
+      date: String(sub.session_date || session.session_date || ''),
+      time: String(sub.session_time || session.session_time || ''),
+      pagesRange: String(sub.pages_to_read || ''),
+      status: sub.status === 'برگزار شده' ? 'برگزار شده' : 'نشست آتی',
+    })
   );
-  if (matchedPreset) {
-    return {
-      ...matchedPreset,
-      coverUrl: book.cover_url || matchedPreset.coverUrl,
-      shortDescription: book.short_description || matchedPreset.shortDescription,
-    };
-  }
 
   return {
-    id: 100 + book.id,
-    title: `حلقه هم‌خوانی و نقد و بررسی رمان «${book.title}»`,
-    bookTitle: book.title,
-    bookAuthor: book.author,
-    bookTranslator: book.translator,
-    publisher: 'انتشارات منتخب باشگاه بوک‌میت',
-    pagesCount: book.pages_count,
-    publicationYear: book.publication_year,
-    coverUrl: book.cover_url,
-    dateLabel: book.session_schedule || 'چهارشنبه‌ها · آبان و آذر ۱۴۰۵',
-    timeLabel: 'ساعت ۱۸:۰۰ تا ۲۰:۰۰',
-    mentor: 'دکتر سهراب رستگار',
-    location: 'نشست حضوری و برخط · تالار فردوسی خانه بوک‌میت',
-    shortDescription: book.short_description,
-    bookIntroduction: `${book.short_description} این اثر ارزشمند نوشته ${book.author} و با ترجمه ${book.translator} در قالب ${toPersianDigits(book.pages_count)} صفحه، یکی از آثار برجسته ادبیات ${book.category} در برنامه مطالعاتی باشگاه کتابخوانی بوک‌میت است.`,
-    fullDescription: [
-      `در سلسله نشست‌های هم‌خوانی کتاب «${book.title}»، اعضای باشگاه بوک‌میت به صورت هفتگی گرد هم می‌آیند تا ساختار روایی، شخصیت‌پردازی، درون‌مایه‌های فلسفی و زمینه تاریخی شکل‌گیری این اثر را مورد بحث و تبادل نظر قرار دهند.`,
-      'تمامی اعضای ثبت‌نام‌شده در این دوره به برنامه مطالعه هفتگی، خلاصه مباحث مطرح‌شده در جلسات گذشته و تالار گفت‌وگوی اختصاصی دوره دسترسی خواهند داشت.',
-    ],
-    sessionsList: [
-      {
-        sessionNumber: 'جلسه اول',
-        title: `معرفی جهان فکری ${book.author} و خوانش فصول آغازین «${book.title}»`,
-        dateLabel: '۱۶ آبان ۱۴۰۵',
-        timeLabel: '۱۸:۰۰ تا ۲۰:۰۰',
-        pagesToRead: `صفحات ۱ تا ${toPersianDigits(Math.round(book.pages_count / 3))}`,
-        status: 'برگزار شده',
-      },
-      {
-        sessionNumber: 'جلسه دوم',
-        title: `کالبدشکافی پیرنگ، گره‌افکنی و تحول شخصیت‌ها در «${book.title}»`,
-        dateLabel: '۲۳ آبان ۱۴۰۵',
-        timeLabel: '۱۸:۰۰ تا ۲۰:۰۰',
-        pagesToRead: `صفحات ${toPersianDigits(Math.round(book.pages_count / 3) + 1)} تا ${toPersianDigits(Math.round((book.pages_count * 2) / 3))}`,
-        status: 'نشست پیش رو',
-      },
-      {
-        sessionNumber: 'جلسه سوم',
-        title: `جمع‌بندی نهایی، نقد تطبیقی و گفت‌وگوی آزاد اعضا درباره «${book.title}»`,
-        dateLabel: '۳۰ آبان ۱۴۰۵',
-        timeLabel: '۱۸:۰۰ تا ۲۰:۰۰',
-        pagesToRead: `صفحات ${toPersianDigits(Math.round((book.pages_count * 2) / 3) + 1)} تا ${toPersianDigits(book.pages_count)} (پایان کتاب)`,
-        status: 'نشست پیش رو',
-      },
-    ],
-    comments: [
-      {
-        id: 600 + book.id,
-        authorName: 'پرنیا فرهمند',
-        roleLabel: 'عضو باشگاه بوک‌میت',
-        dateLabel: '۱۱ آبان ۱۴۰۵',
-        rating: 5,
-        commentText: `انتخاب کتاب «${book.title}» با ترجمه روان ${book.translator} برای هم‌خوانی گروهی بسیار هوشمندانه بود و مباحث جلسات زاویه دید جدیدی به من بخشید.`,
-      },
-    ],
+    id: session.id,
+    badge: session.category || 'نشست هم‌خوانی',
+    category: session.category || '',
+    publicationYear: Number(session.publication_year || 0),
+    title: session.title || session.book_title || '',
+    bookTitle: session.book_title || session.title || '',
+    bookOriginalTitle: '',
+    bookAuthor: session.book_author || '',
+    bookTranslator: translatorName,
+    bookPublisher: session.publisher || '',
+    pagesCount: Number(session.pages_count || 0),
+    dateText: session.session_date || '',
+    timeText: session.session_time || '',
+    hostName: translatorName,
+    capacityText: session.status === 'فعال' ? 'ظرفیت باز' : session.status,
+    locationLabel: session.meeting_link_or_room || session.location_type || '',
+    coverUrl: session.cover_url || '/assets/book-current.png',
+    summary: shortDesc,
+    fullDescription: fullDescParagraphs,
+    bookIntroduction: fullDescRaw || shortDesc,
+    sessionsList: mappedSubSessions,
+    comments: matchingComments,
   };
 }
 
-export interface LibrarySectionProps {
-  libraryBooks: LibraryBook[];
-  onOpenEventDetail?: (eventItem: ClubEventDetailItem) => void;
-  onRegisterEvent?: (eventItem: ClubEventDetailItem) => void;
+export function buildEventFromLibraryBook(
+  book: LibraryBook,
+  approvedComments: UserComment[] = []
+): UpcomingEventCard {
+  const matchingComments: EventAudienceComment[] = approvedComments
+    .filter((c) => c.status === 'تایید شده' && c.target_title === book.title)
+    .map((c) => ({
+      id: c.id,
+      authorName: c.author_name,
+      authorRole: 'عضو باشگاه کتابخوانی',
+      createdDate: c.created_date,
+      rating: c.rating || 5,
+      commentText: c.comment_text,
+      adminReply: c.admin_reply || undefined,
+    }));
+
+  return {
+    id: 100 + book.id,
+    badge: book.category || 'کتاب در حال مطالعه باشگاه',
+    category: book.category || '',
+    publicationYear: Number(book.publication_year || 0),
+    title: book.title,
+    bookTitle: book.title,
+    bookOriginalTitle: book.original_title || '',
+    bookAuthor: book.author || '',
+    bookTranslator: book.translator || '',
+    bookPublisher: '',
+    pagesCount: Number(book.pages_count || 0),
+    dateText: book.session_schedule || '',
+    timeText: '',
+    hostName: book.translator || '',
+    capacityText: 'ظرفیت باز',
+    locationLabel: '',
+    coverUrl: book.cover_url || '/assets/book-current.png',
+    summary: book.short_description || '',
+    fullDescription: book.short_description ? [book.short_description] : [],
+    bookIntroduction: book.short_description || '',
+    sessionsList: [],
+    comments: matchingComments,
+  };
 }
 
-export function createLibrarySectionComponent(
-  props: LibrarySectionProps
-): JQuery<HTMLElement> {
-  const initialCurrent =
-    props.libraryBooks.find((b) => b.is_current === 1) || props.libraryBooks[0];
-  let activeBook = initialCurrent;
-  let selectedCategory: 'همه' | 'کلاسیک' | 'معاصر' = 'همه';
-  let hasEnteredViewport = false;
+export const buildBookEventDetail = buildEventFromLibraryBook;
+
+export interface LibrarySectionCallbacks {
+  onOpenEventDetail?: (eventItem: UpcomingEventCard) => void;
+  onRegisterEvent?: (eventItem: UpcomingEventCard) => void;
+}
+
+export function createLibrarySectionComponent(props: {
+  libraryBooks: LibraryBook[];
+  publicSessions?: MemberSession[];
+  approvedComments?: UserComment[];
+  onOpenEventDetail?: (eventItem: UpcomingEventCard) => void;
+  onRegisterEvent?: (eventItem: UpcomingEventCard) => void;
+}): JQuery {
+  return createLibrarySection(
+    props.libraryBooks,
+    {
+      onOpenEventDetail: props.onOpenEventDetail,
+      onRegisterEvent: props.onRegisterEvent,
+    },
+    props.publicSessions || [],
+    props.approvedComments || []
+  );
+}
+
+export function createLibrarySection(
+  books: LibraryBook[],
+  callbacks?: LibrarySectionCallbacks,
+  activeSessions: MemberSession[] = [],
+  approvedComments: UserComment[] = []
+): JQuery {
+  const validActiveSessions = (activeSessions || []).filter(
+    (s) => s.status !== 'غیرفعال'
+  );
+  const dynamicEvents: UpcomingEventCard[] = validActiveSessions.map((s) =>
+    mapSessionToEventCard(s, approvedComments)
+  );
+
+  const primarySession = validActiveSessions[0];
+  const currentBookFromLibrary =
+    books.find((b) => Number(b.is_current) === 1) || books[0];
+
+  const archiveBooks = books.filter((b) =>
+    currentBookFromLibrary ? b.id !== currentBookFromLibrary.id : true
+  );
+
+  // Derive the "Current Reading Book" card from the primary active session if available,
+  // or fall back to an active library book if one exists.
+  const currentBookDisplay = primarySession
+    ? {
+        title: primarySession.book_title || primarySession.title,
+        original_title: '',
+        author: primarySession.book_author || '',
+        translator: primarySession.translator || primarySession.mentor_name || '',
+        category: primarySession.category || '',
+        publication_year: Number(primarySession.publication_year || 0),
+        pages_count: Number(primarySession.pages_count || 0),
+        reading_progress_percent: 0,
+        session_schedule: [primarySession.session_date, primarySession.session_time]
+          .filter(Boolean)
+          .join(' · '),
+        cover_url: primarySession.cover_url || '/assets/book-current.png',
+        short_description:
+          primarySession.short_description || primarySession.full_description || '',
+      }
+    : currentBookFromLibrary || null;
+
+  const currentBookEvent: UpcomingEventCard | null = primarySession
+    ? mapSessionToEventCard(primarySession, approvedComments)
+    : currentBookFromLibrary
+    ? buildEventFromLibraryBook(currentBookFromLibrary, approvedComments)
+    : null;
 
   const $section = $(`
     <section
-      dir="rtl"
-      aria-labelledby="library-section-heading"
-      class="w-full max-w-[1140px] mx-auto px-6 sm:px-10 py-16 sm:py-24 border-t border-[#ddd4c0] space-y-16"
+      id="library"
+      aria-label="کتابخانه باشگاه و آثار منتخب"
+      class="relative w-full bg-[#F6EFE4] text-[#221811] py-20 sm:py-28 lg:py-32 px-5 sm:px-10 lg:px-20 border-t border-[#E6D9C6]"
     >
-      <!-- PART 1: رویدادها و کتاب در حال مطالعه (Connected to #events in Navbar) -->
-      <div id="events" class="space-y-10 scroll-mt-24">
+      <div class="max-w-7xl mx-auto">
         <!-- Section Header -->
-        <div class="space-y-3 text-right">
-          <div class="text-xs font-medium text-[#755f4b]">
-            ۰۳ · رویدادها و کتاب در حال مطالعه باشگاه بوک‌میت
-          </div>
-          <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <h2
-              id="library-section-heading"
-              class="text-[24px] sm:text-[32px] font-bold text-[#38281b] leading-[1.38]"
-            >
-              کتاب در حال مطالعه و رویدادهای پیش رو
-            </h2>
-            <p class="text-xs sm:text-sm text-[#695645] max-w-md text-justify" style="text-align: justify; text-justify: inter-word;">
-              مروری بر کتاب منتخب این ماه در حلقه‌های هم‌خوانی و نشست‌های پیش روی باشگاه کتابخوانی بوک‌میت.
-            </p>
-          </div>
-        </div>
-
-        <!-- نمایش کتاب در حال مطالعه (Currently Reading Book Showcase) -->
-        <div class="js-current-book-container bg-[#e6decb]/65 border border-[#d5cab6] rounded-2xl p-6 sm:p-8 lg:p-10">
-        </div>
-
-        <!-- رویدادهای پیش رو (۳ کارت زیر کتاب در حال مطالعه) -->
-        <div class="space-y-5">
-          <div class="border-b border-[#dbd1bd] pb-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h3 class="text-lg sm:text-xl font-bold text-[#38281b]">
-                رویدادهای پیش رو در باشگاه
-              </h3>
-              <p class="text-xs sm:text-sm text-[#695645] mt-1">
-                برنامه سه نشست و کارگاه آتی حلقه‌های مطالعاتی بوک‌میت
-              </p>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            ${UPCOMING_EVENTS_DATA.slice(0, 3)
-              .map(
-                (ev) => `
-              <article class="bg-[#e6decb]/55 border border-[#d5cab6] hover:border-[#8a725a] rounded-xl p-5 flex flex-col justify-between space-y-4 transition-colors">
-                <div class="space-y-3 text-right">
-                  <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-[#755f4b] border-b border-[#d8ceba] pb-2.5">
-                    <span>${toPersianDigits(ev.dateLabel)}</span>
-                    <span>${toPersianDigits(ev.timeLabel)}</span>
-                  </div>
-                  <h4 class="text-base sm:text-[17px] font-bold text-[#38281b] leading-[1.55] text-justify">
-                    ${toPersianDigits(ev.title)}
-                  </h4>
-                  <p class="text-[13px] leading-[1.9] text-[#4e3e30] font-normal text-justify" style="text-align: justify; text-justify: inter-word;">
-                    ${toPersianDigits(ev.shortDescription)}
-                  </p>
-                </div>
-                <div class="pt-3 border-t border-[#d8ceba] space-y-3 text-xs text-[#5f4d3d]">
-                  <div class="space-y-1.5">
-                    <div>تسهیل‌گر: <strong class="text-[#38281b]">${toPersianDigits(ev.mentor)}</strong></div>
-                    <div>محل برگزاری: <span class="text-[#4e3e30]">${toPersianDigits(ev.location)}</span></div>
-                  </div>
-                  <!-- Action Buttons: مشاهده جزئیات & ثبت‌نام -->
-                  <div class="pt-2 border-t border-[#ded4c1] grid grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      data-event-id="${ev.id}"
-                      class="js-event-detail-btn px-3 py-2.5 rounded-lg border border-[#7c624a] text-[#38281b] hover:bg-[#dfd5c0] text-xs font-semibold text-center transition-colors cursor-pointer"
-                    >
-                      مشاهده جزئیات
-                    </button>
-                    <button
-                      type="button"
-                      data-event-id="${ev.id}"
-                      class="js-event-register-btn px-3 py-2.5 rounded-lg bg-[#3e2d1f] hover:bg-[#2b1e14] text-[#faf6ec] text-xs font-semibold text-center transition-colors cursor-pointer"
-                    >
-                      ثبت‌نام در نشست
-                    </button>
-                  </div>
-                </div>
-              </article>
-            `
-              )
-              .join('')}
-          </div>
-        </div>
-      </div>
-
-      <!-- PART 2: کتابخانه و نمایش کتاب‌های اخیر معرفی‌شده (Connected to #library in Navbar) -->
-      <div id="library" class="space-y-6 pt-6 border-t border-[#ddd4c0] scroll-mt-24">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#dbd1bd] pb-4">
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 sm:mb-16">
           <div>
-            <h3 class="text-lg sm:text-xl font-bold text-[#38281b]">
-              کتابخانه و کتاب‌های اخیر معرفی‌شده در باشگاه
-            </h3>
-            <p class="text-xs sm:text-sm text-[#695645] mt-1 text-justify" style="text-align: justify; text-justify: inter-word;">
-              آثاری که در دوره‌های گذشته توسط اعضای باشگاه مطالعه و تحلیل شده‌اند.
-            </p>
+            <h2 class="font-display text-[28px] sm:text-[36px] lg:text-[42px] font-bold leading-[1.3] text-[#1E150F] text-justify">
+              قفسه کتاب‌های خوانده‌شده و کتابِ در حال مطالعه
+            </h2>
           </div>
 
-          <!-- Interactive Category Filter Tabs -->
-          <div class="flex items-center gap-1 p-1 bg-[#dfd6c2] rounded-lg self-start sm:self-auto">
+          <!-- Category Filter Tabs -->
+          <div class="flex flex-wrap items-center gap-2 self-start md:self-end" role="tablist" aria-label="فیلتر دسته‌بندی کتاب‌ها">
             <button
               type="button"
-              data-cat="همه"
-              class="js-lib-filter px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer bg-[#faf6ec] text-[#23180f] shadow-xs"
+              data-filter="all"
+              class="js-lib-filter px-4 py-2 rounded-xl text-[13px] font-semibold transition-all cursor-pointer bg-[#5A3A22] text-[#FAF5EC] shadow-xs"
             >
-              همه آثار
+              همه آثار (${toPersianDigits(archiveBooks.length)})
             </button>
             <button
               type="button"
-              data-cat="کلاسیک"
-              class="js-lib-filter px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer text-[#5c4b3c] hover:text-[#23180f]"
+              data-filter="کلاسیک"
+              class="js-lib-filter px-4 py-2 rounded-xl text-[13px] font-medium transition-all cursor-pointer bg-[#EFE5D6] text-[#4E3B2B] hover:bg-[#E5D7C3]"
             >
               ادبیات کلاسیک
             </button>
             <button
               type="button"
-              data-cat="معاصر"
-              class="js-lib-filter px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer text-[#5c4b3c] hover:text-[#23180f]"
+              data-filter="معاصر"
+              class="js-lib-filter px-4 py-2 rounded-xl text-[13px] font-medium transition-all cursor-pointer bg-[#EFE5D6] text-[#4E3B2B] hover:bg-[#E5D7C3]"
             >
               ادبیات معاصر
             </button>
           </div>
         </div>
 
-        <div class="js-recent-books-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- Current Reading Book Showcase (Connected to #events navigation) -->
+        ${
+          currentBookDisplay
+            ? `
+          <div id="events" class="mb-14 sm:mb-16 rounded-3xl bg-[#EFE4D3] border border-[#DECBB2] p-6 sm:p-8 lg:p-10 shadow-[0_20px_50px_rgba(45,30,18,0.08)] scroll-mt-24">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+              <!-- Book Cover -->
+              <div class="lg:col-span-4 xl:col-span-3">
+                <div class="relative mx-auto max-w-[240px] lg:max-w-none aspect-[3/4] rounded-2xl overflow-hidden shadow-[0_18px_40px_rgba(30,18,10,0.22)] border border-[#D4BEA2] bg-[#2D1F14]">
+                  <img
+                    src="${currentBookDisplay.cover_url}"
+                    alt="${currentBookDisplay.title}"
+                    class="w-full h-full object-cover"
+                  />
+                  <div class="absolute top-3 right-3 px-3 py-1 rounded-lg bg-[#1F150E]/85 backdrop-blur-md text-[#F5E6D3] text-[11.5px] font-semibold border border-[#C69B6D]/40">
+                    در حال هم‌خوانی
+                  </div>
+                </div>
+              </div>
+
+              <!-- Book Details & Progress -->
+              <div class="lg:col-span-8 xl:col-span-9 space-y-5">
+                <div class="flex flex-wrap items-center gap-2.5 text-[12.5px] text-[#7A5130] font-semibold">
+                  ${
+                    currentBookDisplay.category
+                      ? `<span class="px-3 py-1 rounded-lg bg-[#F8F2E8] border border-[#DFCBB0]">
+                          ${toPersianDigits(currentBookDisplay.category)}
+                        </span>`
+                      : ''
+                  }
+                  ${
+                    currentBookDisplay.publication_year
+                      ? `<span>•</span><span>انتشار: ${toPersianDigits(currentBookDisplay.publication_year)}</span>`
+                      : ''
+                  }
+                  ${
+                    currentBookDisplay.pages_count
+                      ? `<span>•</span><span>${toPersianDigits(currentBookDisplay.pages_count)} صفحه</span>`
+                      : ''
+                  }
+                </div>
+
+                <div>
+                  <h3 class="font-display text-[24px] sm:text-[30px] font-bold text-[#1E150F] leading-snug text-justify">
+                    ${toPersianDigits(currentBookDisplay.title)}
+                  </h3>
+                  <p class="text-[14px] sm:text-[15px] text-[#5C4738] mt-1 font-medium text-justify">
+                    ${
+                      currentBookDisplay.author
+                        ? `نوشتهٔ ${toPersianDigits(currentBookDisplay.author)}`
+                        : ''
+                    }${
+                currentBookDisplay.author && currentBookDisplay.translator ? ' · ' : ''
+              }${
+                currentBookDisplay.translator
+                  ? `ترجمهٔ ${toPersianDigits(currentBookDisplay.translator)}`
+                  : ''
+              }
+                  </p>
+                </div>
+
+                ${
+                  currentBookDisplay.short_description
+                    ? `<p class="text-[15px] sm:text-[16px] leading-[1.95] text-[#3B2C22] text-justify">
+                        ${toPersianDigits(currentBookDisplay.short_description)}
+                      </p>`
+                    : ''
+                }
+
+                <!-- Schedule & Actions Row -->
+                <div class="pt-3 border-t border-[#DCC8AE] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div class="flex items-center gap-2 text-[13px] text-[#4B382A]">
+                    <span class="w-2 h-2 rounded-full bg-[#3B7A57]"></span>
+                    <span>${
+                      currentBookDisplay.session_schedule
+                        ? toPersianDigits(currentBookDisplay.session_schedule)
+                        : 'برنامه جلسات در جزئیات دوره'
+                    }</span>
+                  </div>
+
+                  <div class="flex flex-wrap items-center gap-2.5">
+                    <button
+                      type="button"
+                      class="js-current-book-details px-4 py-2.5 rounded-xl bg-[#FAF5EC] hover:bg-[#EFE2CE] text-[#3F2E21] border border-[#D5C0A5] text-[12.5px] font-semibold transition-colors cursor-pointer"
+                    >
+                      مشاهده جزئیات
+                    </button>
+                    <button
+                      type="button"
+                      class="js-current-book-register px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold transition-colors shadow-xs cursor-pointer"
+                    >
+                      ثبت نام در این نشست
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+            : `
+          <div id="events" class="mb-14 sm:mb-16 rounded-3xl bg-[#EFE4D3] border border-[#DECBB2] p-8 sm:p-10 text-center scroll-mt-24">
+            <h3 class="font-display text-[20px] sm:text-[24px] font-bold text-[#1E150F]">
+              در حال حاضر دوره هم‌خوانی فعالی ثبت نشده است
+            </h3>
+            <p class="text-[14px] text-[#5C4738] mt-2">
+              به محض تعریف دوره هم‌خوانی جدید توسط مدیریت باشگاه، مشخصات کتاب و برنامه جلسات در این بخش نمایش داده می‌شود.
+            </p>
+          </div>
+        `
+        }
+
+        <!-- Upcoming Events Subsection -->
+        <div class="mb-16 sm:mb-20">
+          <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+            <div>
+              <div class="inline-flex items-center gap-2 mb-2">
+                <span class="w-2 h-2 rounded-full bg-[#7A4B2A]"></span>
+                <span class="text-[12.5px] font-semibold text-[#7A4B2A]">برنامه نشست‌های حضوری و آنلاین</span>
+              </div>
+              <h3 class="font-display text-[22px] sm:text-[28px] font-bold text-[#1E150F] text-justify">
+                رویدادهای پیش رو در باشگاه بوک‌میت
+              </h3>
+            </div>
+            <p class="text-[13.5px] text-[#5E493A] text-justify">
+              نشست‌های فعال ثبت‌شده در باشگاه کتابخوانی
+            </p>
+          </div>
+
+          ${
+            dynamicEvents.length > 0
+              ? `
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-7">
+              ${dynamicEvents
+                .map(
+                  (ev) => `
+                <article class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 flex flex-col justify-between shadow-[0_10px_28px_rgba(45,30,18,0.05)] hover:border-[#C5A480] transition-all duration-300">
+                  <div class="space-y-4">
+                    <div class="flex items-center justify-between gap-2">
+                      ${
+                        ev.badge
+                          ? `<span class="px-3 py-1 rounded-lg bg-[#EFE2CE] text-[#5A3A22] text-[11.5px] font-bold">
+                              ${toPersianDigits(ev.badge)}
+                            </span>`
+                          : '<span></span>'
+                      }
+                      <span class="text-[11.5px] font-semibold text-[#235332] bg-[#E4F2E7] px-2.5 py-1 rounded-md">
+                        ${toPersianDigits(ev.capacityText)}
+                      </span>
+                    </div>
+
+                    <h4 class="font-display text-[18px] sm:text-[19px] font-bold text-[#20160F] leading-[1.6] text-justify">
+                      ${toPersianDigits(ev.title)}
+                    </h4>
+
+                    ${
+                      ev.summary
+                        ? `<p class="text-[13.5px] leading-[1.85] text-[#524033] text-justify">
+                            ${toPersianDigits(ev.summary)}
+                          </p>`
+                        : ''
+                    }
+                  </div>
+
+                  <div class="pt-4 mt-5 border-t border-[#E8DAC6] space-y-3">
+                    <div class="space-y-1.5 text-[12.5px] text-[#4E3B2D]">
+                      ${
+                        ev.dateText
+                          ? `<div class="flex items-center justify-between">
+                              <span class="text-[#786150]">زمان برگزاری:</span>
+                              <strong class="text-[#231912]">${toPersianDigits(ev.dateText)}</strong>
+                            </div>`
+                          : ''
+                      }
+                      ${
+                        ev.timeText
+                          ? `<div class="flex items-center justify-between">
+                              <span class="text-[#786150]">ساعت نشست:</span>
+                              <strong class="text-[#231912]">${toPersianDigits(ev.timeText)}</strong>
+                            </div>`
+                          : ''
+                      }
+                      ${
+                        ev.hostName
+                          ? `<div class="flex items-center justify-between">
+                              <span class="text-[#786150]">مترجم:</span>
+                              <strong class="text-[#231912]">${toPersianDigits(ev.hostName)}</strong>
+                            </div>`
+                          : ''
+                      }
+                    </div>
+
+                    <!-- Event Action Buttons -->
+                    <div class="pt-3 border-t border-[#E8DAC6] grid grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        data-event-details="${ev.id}"
+                        class="js-event-view-details py-2.5 px-3 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] text-[#3F2E21] text-[12px] font-semibold transition-colors text-center cursor-pointer"
+                      >
+                        مشاهده جزئیات
+                      </button>
+                      <button
+                        type="button"
+                        data-event-register="${ev.id}"
+                        class="js-event-register-btn py-2.5 px-3 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold transition-colors text-center shadow-xs cursor-pointer"
+                      >
+                        ثبت نام
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              `
+                )
+                .join('')}
+            </div>
+          `
+              : `
+            <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-8 text-center">
+              <p class="text-[14px] text-[#5E493A] font-medium">
+                در حال حاضر رویداد فعالی برای نمایش وجود ندارد.
+              </p>
+            </div>
+          `
+          }
         </div>
+
+        <!-- Archive Grid -->
+        ${
+          archiveBooks.length > 0
+            ? `
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-7 js-library-grid">
+            ${archiveBooks
+              .map(
+                (book) => `
+              <article
+                data-category="${book.category}"
+                class="js-library-card group rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] overflow-hidden shadow-[0_10px_28px_rgba(45,30,18,0.05)] hover:shadow-[0_18px_38px_rgba(45,30,18,0.11)] hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
+              >
+                <div>
+                  <!-- Cover Container -->
+                  <div class="relative aspect-[4/4.6] overflow-hidden bg-[#E5D7C3]">
+                    <img
+                      src="${book.cover_url}"
+                      alt="${book.title}"
+                      class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      loading="lazy"
+                    />
+                    ${
+                      book.category
+                        ? `<div class="absolute top-3 right-3 px-2.5 py-1 rounded-md bg-[#1F150E]/80 backdrop-blur-xs text-[#F5E9DA] text-[11px] font-medium">
+                            ${toPersianDigits(book.category)}
+                          </div>`
+                        : ''
+                    }
+                  </div>
+
+                  <!-- Content -->
+                  <div class="p-5">
+                    <h4 class="font-display text-[19px] font-bold text-[#1F1610] leading-snug text-justify">
+                      ${toPersianDigits(book.title)}
+                    </h4>
+                    <p class="text-[12.5px] text-[#6E5746] mt-1 font-medium text-justify">
+                      ${toPersianDigits(book.author)}${
+                  book.translator ? ` · ترجمهٔ ${toPersianDigits(book.translator)}` : ''
+                }
+                    </p>
+                    ${
+                      book.short_description
+                        ? `<p class="text-[13.5px] leading-[1.85] text-[#423226] mt-3 line-clamp-3 text-justify">
+                            ${toPersianDigits(book.short_description)}
+                          </p>`
+                        : ''
+                    }
+                  </div>
+                </div>
+
+                <!-- Card Footer -->
+                <div class="px-5 py-3.5 bg-[#F2E8D9]/70 border-t border-[#E6D8C4] flex items-center justify-between text-[12px] text-[#5B4637]">
+                  <span>${book.pages_count ? `${toPersianDigits(book.pages_count)} صفحه` : ''}</span>
+                  <span class="font-medium text-[#7A4B2A]">${toPersianDigits(book.session_schedule)}</span>
+                </div>
+              </article>
+            `
+              )
+              .join('')}
+          </div>
+        `
+            : `
+          <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-8 text-center">
+            <p class="text-[14px] text-[#5E493A]">
+              هنوز کتابی در آرشیو کتابخانه ثبت نشده است.
+            </p>
+          </div>
+        `
+        }
       </div>
     </section>
   `);
 
-  const $currentContainer = $section.find('.js-current-book-container');
-  const $recentGrid = $section.find('.js-recent-books-grid');
+  // Interactive Category Filtering
+  $section.on('click', '.js-lib-filter', function () {
+    const selectedCategory = String($(this).data('filter'));
 
-  function animateProgressBar(targetPercent: number) {
-    const $bar = $currentContainer.find('.js-reading-progress-bar');
-    const $label = $currentContainer.find('.js-reading-progress-text');
+    $section
+      .find('.js-lib-filter')
+      .removeClass('bg-[#5A3A22] text-[#FAF5EC] shadow-xs font-semibold')
+      .addClass('bg-[#EFE5D6] text-[#4E3B2B] font-medium');
 
-    $bar.stop(true, true).css('width', '0%');
-    $label.text(`پیشرفت هم‌خوانی: ${toPersianDigits(0)}٪`);
+    $(this)
+      .removeClass('bg-[#EFE5D6] text-[#4E3B2B] font-medium')
+      .addClass('bg-[#5A3A22] text-[#FAF5EC] shadow-xs font-semibold');
 
-    $({ pct: 0 })
-      .stop(true, true)
-      .animate(
-        { pct: targetPercent },
-        {
-          duration: 1450,
-          easing: 'swing',
-          step(now) {
-            const current = Math.round(now);
-            $bar.css('width', `${current}%`);
-            $label.text(`پیشرفت هم‌خوانی: ${toPersianDigits(current)}٪`);
-          },
-          complete() {
-            $bar.css('width', `${targetPercent}%`);
-            $label.text(`پیشرفت هم‌خوانی: ${toPersianDigits(targetPercent)}٪`);
-          },
-        }
-      );
-  }
-
-  function renderCurrentBook(book: LibraryBook | undefined, shouldAnimateNow = false) {
-    $currentContainer.empty();
-    if (!book) {
-      $currentContainer.append(`
-        <div class="py-10 px-6 text-center text-sm text-[#6b5643]">
-          هنوز کتابی برای دوره هم‌خوانی جاری در دیتابیس ثبت نشده است.
-        </div>
-      `);
-      return;
-    }
-
-    const statusLabel =
-      book.is_current === 1
-        ? 'کتاب در حال مطالعه این ماه'
-        : 'مرور شناسنامه و چکیده کتاب';
-
-    const $card = $(`
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-stretch">
-        <!-- Right Column in RTL: Book Cover Showcase -->
-        <div class="lg:col-span-4 flex flex-col">
-          <div class="relative w-full h-full min-h-[290px] sm:min-h-[340px] rounded-xl overflow-hidden border border-[#d0c3ac] bg-[#dfd6c1] flex items-center justify-center group">
-            <img
-              src="${book.cover_url}"
-              alt="${toPersianDigits(book.title)} — ${toPersianDigits(book.author)}"
-              referrerpolicy="no-referrer"
-              class="js-current-cover-img w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-            />
-          </div>
-        </div>
-
-        <!-- Left Column in RTL: Book Details, Justified Short Description, Animated Progress & Action Buttons -->
-        <div class="lg:col-span-8 flex flex-col justify-between text-right space-y-6">
-          <div class="space-y-3">
-            <!-- Unboxed Metadata Kicker -->
-            <div class="flex flex-wrap items-center gap-2 text-xs font-medium text-[#755f4b]">
-              <span>${statusLabel}</span>
-              <span aria-hidden="true">·</span>
-              <span>ادبیات ${toPersianDigits(book.category)}</span>
-              <span aria-hidden="true">·</span>
-              <span class="tabular-nums">سال انتشار ${toPersianDigits(book.publication_year)}</span>
-            </div>
-
-            <div>
-              <h3 class="text-[22px] sm:text-[28px] font-bold text-[#38281b] leading-[1.35]">
-                ${toPersianDigits(book.title)}
-              </h3>
-              <div class="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-[#5f4d3d] mt-1">
-                <span>نویسنده: ${toPersianDigits(book.author)}</span>
-                <span aria-hidden="true">·</span>
-                <span>ترجمه: ${toPersianDigits(book.translator)}</span>
-                <span aria-hidden="true">·</span>
-                <span class="tabular-nums">${toPersianDigits(book.pages_count)} صفحه</span>
-              </div>
-            </div>
-
-            <p
-              class="pt-2 text-[14.5px] sm:text-[15.5px] leading-[2.05] text-[#4e3e30] font-normal text-justify"
-              style="text-align: justify; text-justify: inter-word;"
-            >
-              ${toPersianDigits(book.short_description)}
-            </p>
-          </div>
-
-          <!-- Group Reading Progress & Action Buttons -->
-          <div class="pt-5 border-t border-[#d6cbb7] space-y-4">
-            <div class="space-y-2.5">
-              <div class="flex items-center justify-between text-xs font-medium text-[#4a392b]">
-                <span>${toPersianDigits(book.session_schedule)}</span>
-                <span class="js-reading-progress-text tabular-nums font-bold text-[#38281b]">
-                  پیشرفت هم‌خوانی: ۰٪
-                </span>
-              </div>
-
-              <div class="w-full h-2.5 bg-[#d5cab6] rounded-full overflow-hidden">
-                <div
-                  class="js-reading-progress-bar h-full bg-[#3e2d1f] rounded-full"
-                  style="width: 0%;"
-                ></div>
-              </div>
-            </div>
-
-            <!-- Action Buttons on Currently Reading Book: مشاهده جزئیات & ثبت‌نام -->
-            <div class="pt-2 flex flex-wrap items-center justify-end gap-3">
-              <button
-                type="button"
-                class="js-current-book-detail-btn px-5 py-2.5 rounded-xl border border-[#7c624a] text-[#38281b] hover:bg-[#dfd5c0] text-xs sm:text-[13px] font-semibold transition-colors cursor-pointer"
-              >
-                مشاهده جزئیات نشست و معرفی کتاب
-              </button>
-              <button
-                type="button"
-                class="js-current-book-register-btn px-6 py-2.5 rounded-xl bg-[#3e2d1f] hover:bg-[#2b1e14] text-[#faf6ec] text-xs sm:text-[13px] font-semibold transition-colors cursor-pointer"
-              >
-                ثبت‌نام در دوره هم‌خوانی این کتاب
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `);
-
-    $card.find('.js-current-book-detail-btn').on('click', () => {
-      if (props.onOpenEventDetail) {
-        props.onOpenEventDetail(buildBookEventDetail(book));
+    const $cards = $section.find('.js-library-card');
+    $cards.each(function () {
+      const cardCategory = String($(this).data('category'));
+      if (selectedCategory === 'all' || cardCategory === selectedCategory) {
+        $(this).stop(true, true).fadeIn(220);
+      } else {
+        $(this).stop(true, true).fadeOut(160);
       }
     });
+  });
 
-    $card.find('.js-current-book-register-btn').on('click', () => {
-      if (props.onRegisterEvent) {
-        props.onRegisterEvent(buildBookEventDetail(book));
-      }
-    });
-
-    $currentContainer.append($card);
-
-    if (shouldAnimateNow || hasEnteredViewport) {
-      animateProgressBar(book.reading_progress_percent);
+  // Current Reading Book handlers
+  $section.on('click', '.js-current-book-details', function () {
+    if (currentBookEvent && callbacks?.onOpenEventDetail) {
+      callbacks.onOpenEventDetail(currentBookEvent);
     }
-  }
+  });
 
-  function renderRecentBooksGrid() {
-    $recentGrid.empty();
-
-    const recentBooks = props.libraryBooks.filter((b) => {
-      const isRecent = b.is_current === 0;
-      const matchesCat =
-        selectedCategory === 'همه' || b.category === selectedCategory;
-      return isRecent && matchesCat;
-    });
-
-    if (recentBooks.length === 0) {
-      $recentGrid.append(`
-        <div class="col-span-full bg-[#e6decb]/45 border border-[#d5cab6] rounded-xl p-8 text-center text-sm text-[#6b5643]">
-          هنوز کتابی در آرشیو کتابخانه باشگاه ثبت نشده است.
-        </div>
-      `);
-      return;
+  $section.on('click', '.js-current-book-register', function () {
+    if (currentBookEvent && callbacks?.onRegisterEvent) {
+      callbacks.onRegisterEvent(currentBookEvent);
     }
+  });
 
-    recentBooks.forEach((book) => {
-      const isInspecting = activeBook?.id === book.id;
-      const $item = $(`
-        <article
-          class="bg-[#e6decb]/55 border ${
-            isInspecting ? 'border-[#3e2d1f]' : 'border-[#d5cab6]'
-          } rounded-xl p-4 flex flex-col justify-between space-y-4 transition-colors hover:border-[#8a725a]"
-        >
-          <div class="space-y-3.5">
-            <!-- Cover Thumbnail -->
-            <div class="relative w-full aspect-[3/4] rounded-lg overflow-hidden bg-[#dfd6c1] border border-[#d2c5ae]">
-              <img
-                src="${book.cover_url}"
-                alt="${toPersianDigits(book.title)} — ${toPersianDigits(book.author)}"
-                referrerpolicy="no-referrer"
-                class="w-full h-full object-cover transition-transform duration-300 hover:scale-[1.03]"
-              />
-            </div>
-
-            <!-- Unboxed Metadata -->
-            <div class="space-y-1 text-right">
-              <div class="flex items-center gap-1.5 text-[11.5px] text-[#755f4b]">
-                <span>${toPersianDigits(book.author)}</span>
-                <span aria-hidden="true">·</span>
-                <span>ترجمه ${toPersianDigits(book.translator)}</span>
-              </div>
-
-              <h4 class="text-base font-bold text-[#38281b] leading-snug">
-                ${toPersianDigits(book.title)}
-              </h4>
-            </div>
-
-            <!-- Justified Short Description -->
-            <p
-              class="text-[13px] leading-[1.9] text-[#4e3e30] font-normal text-justify"
-              style="text-align: justify; text-justify: inter-word;"
-            >
-              ${toPersianDigits(book.short_description)}
-            </p>
-          </div>
-
-          <div class="pt-3 border-t border-[#d8ceba] flex items-center justify-between gap-2 text-xs">
-            <span class="text-[#695645] tabular-nums">
-              ${toPersianDigits(book.pages_count)} صفحه · چاپ ${toPersianDigits(book.publication_year)}
-            </span>
-            <button
-              type="button"
-              class="js-inspect-book text-xs font-semibold text-[#3d2c1e] hover:text-[#23180f] underline underline-offset-4 whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              نمایش در قاب اصلی
-            </button>
-          </div>
-        </article>
-      `);
-
-      $item.find('.js-inspect-book').on('click', () => {
-        activeBook = book;
-        renderCurrentBook(activeBook, true);
-        renderRecentBooksGrid();
-      });
-
-      $recentGrid.append($item);
-    });
-  }
-
-  // Wire Upcoming Events Action Buttons
-  $section.on('click', '.js-event-detail-btn', function () {
-    const id = Number($(this).attr('data-event-id'));
-    const found = UPCOMING_EVENTS_DATA.find((e) => e.id === id);
-    if (found && props.onOpenEventDetail) {
-      props.onOpenEventDetail(found);
+  // Upcoming Events cards handlers
+  $section.on('click', '.js-event-view-details', function () {
+    const id = Number($(this).data('event-details'));
+    const found = dynamicEvents.find((e) => e.id === id);
+    if (found && callbacks?.onOpenEventDetail) {
+      callbacks.onOpenEventDetail(found);
     }
   });
 
   $section.on('click', '.js-event-register-btn', function () {
-    const id = Number($(this).attr('data-event-id'));
-    const found = UPCOMING_EVENTS_DATA.find((e) => e.id === id);
-    if (found && props.onRegisterEvent) {
-      props.onRegisterEvent(found);
+    const id = Number($(this).data('event-register'));
+    const found = dynamicEvents.find((e) => e.id === id);
+    if (found && callbacks?.onRegisterEvent) {
+      callbacks.onRegisterEvent(found);
     }
   });
-
-  // Wire Category Filter Buttons
-  $section.find('.js-lib-filter').on('click', function () {
-    const cat = $(this).attr('data-cat') as 'همه' | 'کلاسیک' | 'معاصر';
-    selectedCategory = cat;
-
-    $section
-      .find('.js-lib-filter')
-      .removeClass('bg-[#faf6ec] text-[#23180f] shadow-xs')
-      .addClass('text-[#5c4b3c]');
-
-    $(this)
-      .removeClass('text-[#5c4b3c]')
-      .addClass('bg-[#faf6ec] text-[#23180f] shadow-xs');
-
-    renderRecentBooksGrid();
-  });
-
-  renderCurrentBook(activeBook, false);
-  renderRecentBooksGrid();
-
-  // Trigger progress bar motion graphic when section enters viewport
-  const sectionEl = $section[0];
-  if (sectionEl && 'IntersectionObserver' in window) {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && !hasEnteredViewport) {
-            hasEnteredViewport = true;
-            if (activeBook) {
-              animateProgressBar(activeBook.reading_progress_percent);
-            }
-            observer.disconnect();
-          }
-        });
-      },
-      { threshold: 0.2 }
-    );
-    observer.observe(sectionEl);
-  } else {
-    hasEnteredViewport = true;
-    window.setTimeout(() => {
-      if (activeBook) {
-        animateProgressBar(activeBook.reading_progress_percent);
-      }
-    }, 350);
-  }
 
   return $section;
 }

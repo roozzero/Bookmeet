@@ -1,388 +1,463 @@
 import $ from 'jquery';
-import { ApiService } from '../services/api.ts';
-import { toPersianDigits } from '../utils/persianNumbers.ts';
 import {
-  RUSSIAN_COURSES_DATA,
   type CourseAudienceComment,
   type RussianCourseCard,
 } from './CoursesSection.ts';
+import { ApiService } from '../services/api.ts';
+import { toPersianDigits } from '../utils/persianNumbers.ts';
 
 export interface CourseDetailPageProps {
   course: RussianCourseCard;
-  onBackToHomeCourses: () => void;
-  onSelectCourse: (course: RussianCourseCard) => void;
+  allCourses?: RussianCourseCard[];
+  onBack?: () => void;
+  onBackToHomeCourses?: () => void;
   onRegisterCourse: (course: RussianCourseCard) => void;
+  onSelectOtherCourse?: (course: RussianCourseCard) => void;
+  onSelectCourse?: (course: RussianCourseCard) => void;
 }
 
-export function createCourseDetailPageComponent(
-  props: CourseDetailPageProps
-): JQuery<HTMLElement> {
-  const { course } = props;
-  let localComments: CourseAudienceComment[] = [...(course.comments || [])];
+export function createCourseDetailPageComponent(props: CourseDetailPageProps): JQuery {
+  return createCourseDetailPage({
+    course: props.course,
+    allCourses: props.allCourses,
+    onBack: props.onBackToHomeCourses || props.onBack || (() => {}),
+    onRegisterCourse: props.onRegisterCourse,
+    onSelectOtherCourse: props.onSelectCourse || props.onSelectOtherCourse,
+  });
+}
+
+export function createCourseDetailPage(
+  props: Required<Pick<CourseDetailPageProps, 'course' | 'onBack' | 'onRegisterCourse'>> &
+    CourseDetailPageProps
+): JQuery {
+  let currentCourse: RussianCourseCard = {
+    ...props.course,
+    comments: [...(props.course.comments || [])],
+  };
   let commentSubmittedMsg = '';
 
-  const $page = $(`
-    <main
-      dir="rtl"
-      aria-label="صفحه جزئیات دوره آموزشی"
-      class="w-full max-w-[1140px] mx-auto px-6 sm:px-10 pt-28 pb-20 space-y-12"
-    ></main>
+  const $wrapper = $(`
+    <section
+      aria-label="صفحه جزئیات کامل دوره آموزشی زبان روسی"
+      class="min-h-screen w-full bg-[#F5EFE6] text-[#231912] pt-28 sm:pt-32 pb-24 px-4 sm:px-8 lg:px-16"
+    ></section>
   `);
 
   function render(): void {
-    const otherCourses = RUSSIAN_COURSES_DATA.filter((c) => c.id !== course.id);
+    const course = currentCourse;
+    const otherCourses = (props.allCourses || []).filter((c) => c.id !== course.id);
 
-    $page.html(`
-      <!-- Top Breadcrumb & Back Action -->
-      <div class="flex flex-wrap items-center justify-between gap-4 border-b border-[#d8ceba] pb-4">
-        <div class="flex items-center gap-2 text-xs font-medium text-[#6e5a47]">
+    $wrapper.html(`
+      <div class="max-w-6xl mx-auto space-y-10">
+        <!-- Top Navigation Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-[#DFD0BC]">
+          <div class="flex items-center gap-2 text-[13px] text-[#6B5444]">
+            <span>صفحه اصلی</span>
+            <span>/</span>
+            <span>دوره‌های آموزش زبان روسی</span>
+            <span>/</span>
+            <strong class="text-[#231912]">${toPersianDigits(course.title)}</strong>
+          </div>
+
           <button
             type="button"
-            class="js-back-to-courses hover:text-[#23180f] cursor-pointer"
+            class="js-course-detail-back px-4 py-2.5 rounded-xl bg-[#FAF5EC] hover:bg-[#EFE2CE] border border-[#D8C5AC] text-[#3F2E21] text-[13px] font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer"
           >
-            صفحه اصلی
+            <span>→</span>
+            <span>بازگشت به صفحه اصلی</span>
           </button>
-          <span>/</span>
-          <button
-            type="button"
-            class="js-back-to-courses hover:text-[#23180f] cursor-pointer"
-          >
-            دوره‌های آموزش زبان روسی
-          </button>
-          <span>/</span>
-          <span class="text-[#38281b] font-semibold">${toPersianDigits(course.level)}</span>
         </div>
 
-        <button
-          type="button"
-          class="js-back-to-courses inline-flex items-center gap-1.5 text-xs font-semibold text-[#4e3d2e] hover:text-[#23180f] cursor-pointer"
-        >
-          <span>→</span>
-          <span>بازگشت به بخش دوره‌ها</span>
-        </button>
-      </div>
-
-      <!-- Hero Banner & Course Overview -->
-      <section class="bg-[#e6decb]/65 border border-[#d5cab6] rounded-2xl p-6 sm:p-8 lg:p-10">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-          <!-- Cover Image -->
-          <div class="lg:col-span-5 flex flex-col">
-            <div class="relative w-full h-full min-h-[260px] sm:min-h-[320px] rounded-xl overflow-hidden border border-[#d0c3ac] bg-[#dfd6c1]">
+        <!-- Hero Card: Course Overview & Registration -->
+        <div class="rounded-3xl bg-[#FAF5EC] border border-[#E2D3BF] overflow-hidden shadow-[0_18px_48px_rgba(38,26,16,0.08)]">
+          <div class="grid grid-cols-1 lg:grid-cols-12">
+            <!-- Cover Column -->
+            <div class="lg:col-span-5 relative min-h-[280px] sm:min-h-[340px] bg-[#241810]">
               <img
                 src="${course.coverUrl}"
-                alt="${toPersianDigits(course.title)}"
-                referrerpolicy="no-referrer"
+                alt="${course.title}"
                 class="w-full h-full object-cover"
               />
-            </div>
-          </div>
-
-          <!-- Key Specifications & Register CTA -->
-          <div class="lg:col-span-7 flex flex-col justify-between space-y-6 text-right">
-            <div class="space-y-3">
-              <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-[#755f4b]">
-                <span>دوره تخصصی زبان روسی</span>
-                <span>·</span>
-                <span>سطح ${toPersianDigits(course.level)}</span>
-                <span>·</span>
-                <span>${toPersianDigits(course.sessionsCount)}</span>
+              <div class="absolute inset-0 bg-gradient-to-t from-[#1E140E]/85 via-[#1E140E]/20 to-transparent"></div>
+              <div class="absolute top-4 right-4 left-4 flex items-center justify-between gap-2">
+                <span class="px-3.5 py-1.5 rounded-xl bg-[#1E140E]/80 backdrop-blur-md text-[#FAF5EC] text-[12px] font-bold border border-[#C69B6D]/40">
+                  ${toPersianDigits(course.levelBadge)}
+                </span>
+                <span class="px-3 py-1 rounded-xl bg-[#5A3A22]/90 text-[#FAF5EC] text-[12px] font-bold">
+                  ${toPersianDigits(course.sessionsCount)}
+                </span>
               </div>
-
-              <h1 class="text-[22px] sm:text-[28px] font-bold text-[#38281b] leading-[1.45]">
-                ${toPersianDigits(course.title)}
-              </h1>
-
-              <p
-                class="text-[14px] sm:text-[15px] leading-[2] text-[#4e3e30] text-justify"
-                style="text-align: justify; text-justify: inter-word;"
-              >
-                ${toPersianDigits(course.description)}
-              </p>
-            </div>
-
-            <!-- Course Specifications Grid (مشخصات دوره، زمان شروع و پایان، مدت دوره) -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-4 border-t border-[#d6cbb7] text-xs sm:text-[13px]">
-              <div class="p-3.5 rounded-xl bg-[#faf6ec]/75 border border-[#dbcfba]">
-                <span class="text-[#755f4b] block mb-1">مدرس دوره:</span>
-                <strong class="text-[#38281b] font-bold">${toPersianDigits(course.instructor)}</strong>
-              </div>
-              <div class="p-3.5 rounded-xl bg-[#faf6ec]/75 border border-[#dbcfba]">
-                <span class="text-[#755f4b] block mb-1">زمان برگزاری هفتگی:</span>
-                <strong class="text-[#38281b] font-bold">${toPersianDigits(course.schedule)}</strong>
-              </div>
-              <div class="p-3.5 rounded-xl bg-[#faf6ec]/75 border border-[#dbcfba]">
-                <span class="text-[#755f4b] block mb-1">زمان شروع و پایان دوره:</span>
-                <strong class="text-[#38281b] font-bold">شروع: ${toPersianDigits(course.startDate)} — پایان: ${toPersianDigits(course.endDate)}</strong>
-              </div>
-              <div class="p-3.5 rounded-xl bg-[#faf6ec]/75 border border-[#dbcfba]">
-                <span class="text-[#755f4b] block mb-1">مدت دوره:</span>
-                <strong class="text-[#38281b] font-bold">${toPersianDigits(course.duration)}</strong>
-              </div>
-              <div class="p-3.5 rounded-xl bg-[#faf6ec]/75 border border-[#dbcfba]">
-                <span class="text-[#755f4b] block mb-1">منبع و محور آموزشی:</span>
-                <strong class="text-[#38281b] font-bold">${toPersianDigits(course.bookTitle)}</strong>
-              </div>
-              <div class="p-3.5 rounded-xl bg-[#faf6ec]/75 border border-[#dbcfba]">
-                <span class="text-[#755f4b] block mb-1">شیوه برگزاری و ظرفیت:</span>
-                <strong class="text-[#38281b] font-bold">${toPersianDigits(course.formatLabel)}</strong>
+              <div class="absolute bottom-4 right-4 left-4 text-[#FAF5EC]">
+                <span class="text-[12px] text-[#E6D3B8] block">مدرس دوره:</span>
+                <strong class="text-[16px] font-bold">${toPersianDigits(course.instructor || '—')}</strong>
               </div>
             </div>
 
-            <!-- Primary CTA -->
-            <div class="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-[#d6cbb7]">
-              <div class="text-xs text-[#5f4d3d] leading-relaxed">
-                پس از ثبت‌نام، دوره در بخش <strong class="text-[#38281b]">«کلاس‌های من»</strong> در پنل کاربری شما ایجاد می‌شود و پس از تایید دبیرخانه فعال خواهد شد.
+            <!-- Specs Column -->
+            <div class="lg:col-span-7 p-6 sm:p-8 lg:p-10 flex flex-col justify-between space-y-6">
+              <div class="space-y-4">
+                ${
+                  course.subtitle
+                    ? `<span class="inline-block text-[12.5px] font-bold text-[#7A4B2A] px-3 py-1 rounded-lg bg-[#EFE2CE]">
+                        ${toPersianDigits(course.subtitle)}
+                      </span>`
+                    : ''
+                }
+                <h1 class="font-display text-[24px] sm:text-[30px] font-bold text-[#1E150F] leading-[1.45] text-justify">
+                  ${toPersianDigits(course.title)}
+                </h1>
+                ${
+                  course.description
+                    ? `<p class="text-[14.5px] leading-[1.95] text-[#4A382B] text-justify">
+                        ${toPersianDigits(course.description)}
+                      </p>`
+                    : ''
+                }
+
+                <!-- Course Specifications Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3.5 pt-2">
+                  <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
+                    <span class="block text-[11.5px] text-[#786150]">زمان شروع دوره</span>
+                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(course.startDate || '—')}</strong>
+                  </div>
+                  <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
+                    <span class="block text-[11.5px] text-[#786150]">زمان پایان دوره</span>
+                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(course.endDate || '—')}</strong>
+                  </div>
+                  <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
+                    <span class="block text-[11.5px] text-[#786150]">مدت و تعداد جلسات</span>
+                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(course.durationLabel)}</strong>
+                  </div>
+                  <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
+                    <span class="block text-[11.5px] text-[#786150]">روز و ساعت کلاس</span>
+                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(course.schedule || '—')}</strong>
+                  </div>
+                  <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
+                    <span class="block text-[11.5px] text-[#786150]">سطح آموزشی</span>
+                    <strong class="text-[13.5px] font-bold text-[#231912] mt-1 block">${toPersianDigits(course.levelBadge)}</strong>
+                  </div>
+                  <div class="p-3.5 rounded-2xl bg-[#F3E9DA] border border-[#E2D2BC]">
+                    <span class="block text-[11.5px] text-[#786150]">وضعیت ظرفیت</span>
+                    <strong class="text-[13.5px] font-bold text-[#235332] mt-1 block">${toPersianDigits(course.capacityLabel)}</strong>
+                  </div>
+                </div>
               </div>
-              <button
-                type="button"
-                class="js-detail-register-course px-7 py-3 rounded-xl bg-[#3e2d1f] hover:bg-[#291d13] text-[#faf6ec] text-sm font-semibold transition-colors cursor-pointer shrink-0"
-              >
-                ثبت‌نام در این دوره
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      <!-- Full Course Description (توضیحات کامل دوره) -->
-      <section class="bg-[#e6decb]/45 border border-[#d5cab6] rounded-2xl p-6 sm:p-8 space-y-4">
-        <h2 class="text-lg sm:text-xl font-bold text-[#38281b] border-b border-[#d8ceba] pb-3">
-          توضیحات کامل و اهداف آموزشی دوره
-        </h2>
-        <div class="space-y-4 text-[14px] sm:text-[15px] leading-[2.05] text-[#4e3e30] text-justify">
-          ${course.fullDescription
-            .map(
-              (para) => `
-            <p style="text-align: justify; text-justify: inter-word;">
-              ${toPersianDigits(para)}
-            </p>
-          `
-            )
-            .join('')}
-        </div>
-      </section>
-
-      <!-- Course Syllabus (سرفصل‌های دوره) -->
-      <section class="space-y-5">
-        <div class="border-b border-[#d8ceba] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h2 class="text-lg sm:text-xl font-bold text-[#38281b]">
-              سرفصل‌ها و برنامه آموزشی جلسات دوره
-            </h2>
-            <p class="text-xs sm:text-sm text-[#695645] mt-1">
-              روند گام‌به‌گام مباحث آموزشی در طول ${toPersianDigits(course.sessionsCount)}
-            </p>
-          </div>
-          <span class="text-xs font-semibold text-[#5a3a22]">
-            شروع از ${toPersianDigits(course.startDate)} تا ${toPersianDigits(course.endDate)}
-          </span>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          ${course.syllabus
-            .map(
-              (item) => `
-            <article class="bg-[#e6decb]/55 border border-[#d5cab6] rounded-xl p-5 space-y-3">
-              <div class="flex items-center justify-between gap-2 border-b border-[#d8ceba] pb-2.5 text-xs font-semibold text-[#6e5641]">
-                <span>${toPersianDigits(item.moduleNumber)}</span>
-                <span>${toPersianDigits(item.sessionsRange)}</span>
-              </div>
-              <h3 class="text-base font-bold text-[#38281b]">
-                ${toPersianDigits(item.title)}
-              </h3>
-              <ul class="space-y-2 text-[13px] text-[#4e3e30] leading-[1.85]">
-                ${item.topics
-                  .map(
-                    (topic) => `
-                  <li class="flex items-start gap-2">
-                    <span class="text-[#755f4b] font-bold mt-0.5">•</span>
-                    <span>${toPersianDigits(topic)}</span>
-                  </li>
-                `
-                  )
-                  .join('')}
-              </ul>
-            </article>
-          `
-            )
-            .join('')}
-        </div>
-      </section>
-
-      <!-- Audience Comments Section (نظرات مخاطبان) -->
-      <section class="bg-[#e6decb]/55 border border-[#d5cab6] rounded-2xl p-6 sm:p-8 space-y-6">
-        <div class="border-b border-[#d8ceba] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h2 class="text-lg sm:text-xl font-bold text-[#38281b]">
-              نظرات مخاطبان و شرکت‌کنندگان دوره
-            </h2>
-            <p class="text-xs sm:text-sm text-[#695645] mt-1">
-              تجربه زبان‌آموزان و اعضای باشگاه کتابخوانی بوک‌میت از شرکت در این دوره
-            </p>
-          </div>
-          <span class="text-xs font-semibold text-[#5a3a22]">
-            ${toPersianDigits(localComments.length)} دیدگاه ثبت‌شده
-          </span>
-        </div>
-
-        <!-- Existing Comments List -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          ${localComments
-            .map(
-              (c) => `
-            <article class="p-4 sm:p-5 rounded-xl bg-[#faf6ec]/80 border border-[#dbcfba] space-y-2.5">
-              <div class="flex items-center justify-between gap-2">
+              <!-- CTA Register Bar -->
+              <div class="pt-5 border-t border-[#E6D7C3] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <strong class="text-sm font-bold text-[#38281b] block">${toPersianDigits(c.authorName)}</strong>
-                  <span class="text-[11px] text-[#755f4b]">${toPersianDigits(c.roleLabel)}</span>
+                  <span class="text-[12px] text-[#6B5444] block">نحوه ثبت‌نام و فعال‌سازی دوره:</span>
+                  <span class="text-[13.5px] font-bold text-[#231912]">ثبت در «کلاس‌های من» و تایید نهایی از طریق تیکت یا تماس</span>
                 </div>
-                <div class="text-left">
-                  <div class="text-xs text-[#8c5a2b] font-bold">${'★'.repeat(c.rating)}</div>
-                  <span class="text-[11px] text-[#755f4b]">${toPersianDigits(c.dateLabel)}</span>
-                </div>
+                <button
+                  type="button"
+                  class="js-detail-register-course px-7 py-3.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[14px] font-bold transition-colors shadow-sm cursor-pointer shrink-0"
+                >
+                  ثبت نام در این دوره آموزشی
+                </button>
               </div>
-              <p class="text-[13px] leading-[1.9] text-[#4e3e30] text-justify" style="text-align: justify; text-justify: inter-word;">
-                ${toPersianDigits(c.commentText)}
-              </p>
-            </article>
-          `
-            )
-            .join('')}
+            </div>
+          </div>
         </div>
 
-        <!-- Add Comment Form -->
-        <form class="js-course-comment-form pt-4 border-t border-[#d8ceba] space-y-4">
-          <h3 class="text-sm sm:text-base font-bold text-[#38281b]">
-            ثبت دیدگاه یا پرسش درباره این دوره
-          </h3>
+        <!-- Detailed Description Section -->
+        <div class="p-6 sm:p-8 lg:p-10 rounded-3xl bg-[#FAF5EC] border border-[#E2D3BF] space-y-4">
+          <h2 class="font-display text-[21px] sm:text-[25px] font-bold text-[#1E150F]">
+            توضیحات تکمیلی و اهداف آموزشی دوره
+          </h2>
           ${
-            commentSubmittedMsg
-              ? `<div class="p-3 rounded-xl bg-[#e4f2e7] border border-[#bbd9c2] text-[#235332] text-xs font-semibold">${toPersianDigits(commentSubmittedMsg)}</div>`
-              : ''
+            course.fullDescription.length > 0
+              ? `<div class="space-y-3.5 text-[14.5px] sm:text-[15.5px] leading-[2] text-[#3F2F23] text-justify">
+                  ${course.fullDescription
+                    .map((para) => `<p>${toPersianDigits(para)}</p>`)
+                    .join('')}
+                </div>`
+              : `<p class="text-[14px] text-[#6B5444]">توضیحات تکمیلی برای این دوره ثبت نشده است.</p>`
           }
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-semibold text-[#4e3e30] mb-1">نام و نام خانوادگی *</label>
-              <input
-                type="text"
-                name="author_name"
-                required
-                placeholder="نام خود را وارد کنید..."
-                class="w-full px-3.5 py-2.5 rounded-xl bg-[#faf6ec] border border-[#d5cab6] text-xs text-[#231912] focus:outline-none focus:border-[#755f4b]"
-              />
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-[#4e3e30] mb-1">امتیاز شما به دوره</label>
-              <select
-                name="rating"
-                class="w-full px-3.5 py-2.5 rounded-xl bg-[#faf6ec] border border-[#d5cab6] text-xs text-[#231912] focus:outline-none focus:border-[#755f4b]"
-              >
-                <option value="5">۵ ستاره (عالی)</option>
-                <option value="4">۴ ستاره (خوب)</option>
-                <option value="3">۳ ستاره (متوسط)</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-[#4e3e30] mb-1">متن دیدگاه یا پرسش *</label>
-            <textarea
-              name="comment_text"
-              rows="3"
-              required
-              placeholder="دیدگاه یا تجربه خود را درباره این دوره بنویسید..."
-              class="w-full px-3.5 py-2.5 rounded-xl bg-[#faf6ec] border border-[#d5cab6] text-xs text-[#231912] focus:outline-none focus:border-[#755f4b]"
-            ></textarea>
-          </div>
-          <div class="flex justify-end">
-            <button
-              type="submit"
-              class="px-5 py-2.5 rounded-xl bg-[#3e2d1f] hover:bg-[#2a1d13] text-[#faf6ec] text-xs font-semibold cursor-pointer"
-            >
-              ثبت دیدگاه
-            </button>
-          </div>
-        </form>
-      </section>
+        </div>
 
-      <!-- Other Courses -->
-      <section class="space-y-4 pt-4 border-t border-[#d8ceba]">
-        <h3 class="text-base sm:text-lg font-bold text-[#38281b]">
-          سایر دوره‌های آموزش زبان روسی در باشگاه بوک‌میت
-        </h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          ${otherCourses
-            .map(
-              (oc) => `
-            <div class="p-4 rounded-xl bg-[#e6decb]/45 border border-[#d5cab6] flex items-center justify-between gap-4">
-              <div class="min-w-0">
-                <div class="text-xs text-[#755f4b]">سطح ${toPersianDigits(oc.level)}</div>
-                <h4 class="text-sm font-bold text-[#38281b] truncate mt-0.5">${toPersianDigits(oc.title)}</h4>
+        <!-- Syllabus Section -->
+        <div class="p-6 sm:p-8 lg:p-10 rounded-3xl bg-[#FAF5EC] border border-[#E2D3BF] space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 class="font-display text-[21px] sm:text-[25px] font-bold text-[#1E150F]">
+                سرفصل‌ها و جلسات دوره
+              </h2>
+              <p class="text-[13.5px] text-[#6B5444] mt-1">
+                برنامه جلسات تعریف‌شده برای این دوره آموزشی
+              </p>
+            </div>
+            <span class="px-3.5 py-1.5 rounded-xl bg-[#EFE2CE] text-[#5A3A22] text-[12.5px] font-bold self-start sm:self-auto">
+              ${toPersianDigits(course.sessionsCount)}
+            </span>
+          </div>
+
+          ${
+            course.syllabus.length > 0
+              ? `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              ${course.syllabus
+                .map(
+                  (mod) => `
+                <div class="p-5 rounded-2xl bg-[#F4E9DA]/65 border border-[#E2D2BC] space-y-3">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="px-3 py-1 rounded-lg bg-[#5A3A22] text-[#FAF5EC] text-[11.5px] font-bold">
+                      ${toPersianDigits(mod.moduleNumber)}
+                    </span>
+                    <span class="text-[12px] font-semibold text-[#7A4B2A]">
+                      ${toPersianDigits(mod.sessionsRange)}
+                    </span>
+                  </div>
+                  <h3 class="font-display text-[17px] font-bold text-[#231912] leading-[1.6] text-justify">
+                    ${toPersianDigits(mod.title)}
+                  </h3>
+                  ${
+                    mod.topics.length > 0
+                      ? `<ul class="space-y-1.5 text-[13px] text-[#4A382B] leading-[1.8]">
+                          ${mod.topics
+                            .map(
+                              (t) => `
+                            <li class="flex items-start gap-2 text-justify">
+                              <span class="text-[#7A4B2A] font-bold mt-0.5">•</span>
+                              <span>${toPersianDigits(t)}</span>
+                            </li>
+                          `
+                            )
+                            .join('')}
+                        </ul>`
+                      : ''
+                  }
+                </div>
+              `
+                )
+                .join('')}
+            </div>
+          `
+              : `
+            <div class="p-6 rounded-2xl bg-[#F4E9DA]/50 border border-[#E2D2BC] text-center text-[13.5px] text-[#6B5444]">
+              هنوز جلسه‌ای برای این دوره ثبت نشده است.
+            </div>
+          `
+          }
+        </div>
+
+        <!-- Audience Comments & Reviews Section -->
+        <div class="p-6 sm:p-8 lg:p-10 rounded-3xl bg-[#FAF5EC] border border-[#E2D3BF] space-y-8">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 class="font-display text-[21px] sm:text-[25px] font-bold text-[#1E150F]">
+                نظرات و دیدگاه‌های مخاطبان دوره (${toPersianDigits(course.comments.length)})
+              </h2>
+              <p class="text-[13.5px] text-[#6B5444] mt-1">
+                تجربه دانش‌پذیران دوره‌های پیشین آموزش زبان روسی در باشگاه کتابخوانی بوک‌میت
+              </p>
+            </div>
+          </div>
+
+          <!-- Existing Comments List -->
+          ${
+            course.comments.length > 0
+              ? `
+            <div class="space-y-4">
+              ${course.comments
+                .map(
+                  (c) => `
+                <article class="p-5 rounded-2xl bg-[#F4E9DA]/55 border border-[#E3D3BE] space-y-3">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-xl bg-[#7A4B2A] text-[#FAF5EC] font-display font-bold text-[15px] flex items-center justify-center">
+                        ${c.authorName.charAt(0)}
+                      </div>
+                      <div>
+                        <h4 class="font-bold text-[14px] text-[#231912]">${toPersianDigits(c.authorName)}</h4>
+                        <span class="text-[11.5px] text-[#6B5444]">${toPersianDigits(c.authorRole)} · ${toPersianDigits(c.createdDate)}</span>
+                      </div>
+                    </div>
+                    <div class="text-[#C58B2B] text-[13px] font-bold">
+                      ${'★'.repeat(c.rating)}${'☆'.repeat(Math.max(0, 5 - c.rating))}
+                    </div>
+                  </div>
+
+                  <p class="text-[13.5px] leading-[1.9] text-[#3B2C22] text-justify">
+                    ${toPersianDigits(c.commentText)}
+                  </p>
+
+                  ${
+                    c.adminReply
+                      ? `
+                    <div class="p-3.5 rounded-xl bg-[#EDF5EE] border border-[#C7DFCB] text-[12.5px] text-[#1E3F29]">
+                      <strong class="block text-[#235332] mb-1">پاسخ مدرس و دبیرخانه دوره:</strong>
+                      <p class="leading-[1.8] text-justify">${toPersianDigits(c.adminReply)}</p>
+                    </div>
+                  `
+                      : ''
+                  }
+                </article>
+              `
+                )
+                .join('')}
+            </div>
+          `
+              : `
+            <div class="p-6 rounded-2xl bg-[#F4E9DA]/40 border border-[#E3D3BE] text-center text-[13.5px] text-[#6B5444]">
+              هنوز دیدگاهی برای این دوره ثبت نشده است.
+            </div>
+          `
+          }
+
+          <!-- Add New Comment Form -->
+          <form class="js-course-comment-form pt-6 border-t border-[#E6D7C3] space-y-4">
+            <h3 class="font-display text-[17px] font-bold text-[#231912]">
+              ثبت دیدگاه یا پرسش درباره این دوره
+            </h3>
+            ${
+              commentSubmittedMsg
+                ? `
+              <div class="p-3.5 rounded-xl bg-[#E4F2E7] border border-[#BBD9C2] text-[#235332] text-[13px] font-semibold">
+                ✓ ${toPersianDigits(commentSubmittedMsg)}
               </div>
+            `
+                : ''
+            }
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">نام و نام خانوادگی *</label>
+                <input
+                  type="text"
+                  name="author_name"
+                  required
+                  placeholder="نام شما..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                />
+              </div>
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">امتیاز شما به دوره</label>
+                <select
+                  name="rating"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]"
+                >
+                  <option value="5">۵ ستاره (عالی)</option>
+                  <option value="4">۴ ستاره (خوب)</option>
+                  <option value="3">۳ ستاره (متوسط)</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">متن دیدگاه یا پرسش *</label>
+              <textarea
+                name="comment_text"
+                rows="3"
+                required
+                placeholder="تجربه یا پرسش خود را درباره این دوره بنویسید..."
+                class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+              ></textarea>
+            </div>
+            <div class="flex justify-end">
               <button
-                type="button"
-                data-other-course-id="${oc.id}"
-                class="js-switch-other-course px-3.5 py-2 rounded-lg border border-[#7c624a] text-xs font-semibold text-[#38281b] hover:bg-[#dfd5c0] shrink-0 cursor-pointer"
+                type="submit"
+                class="px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer"
               >
-                مشاهده جزئیات ←
+                ثبت دیدگاه
               </button>
             </div>
-          `
-            )
-            .join('')}
+          </form>
         </div>
-      </section>
+
+        <!-- Other Courses Suggestion -->
+        ${
+          otherCourses.length > 0
+            ? `
+          <div class="space-y-4">
+            <h3 class="font-display text-[20px] font-bold text-[#1E150F]">
+              سایر سطوح دوره‌های آموزش زبان روسی
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              ${otherCourses
+                .map(
+                  (c) => `
+                <div class="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E2D3BF] flex items-center justify-between gap-4">
+                  <div>
+                    <span class="text-[11.5px] font-bold text-[#7A4B2A]">${toPersianDigits(c.levelBadge)}</span>
+                    <h4 class="font-display text-[16.5px] font-bold text-[#231912] mt-0.5">${toPersianDigits(c.title)}</h4>
+                    <p class="text-[12px] text-[#6B5444] mt-1">${toPersianDigits(c.schedule)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    data-switch-course="${c.id}"
+                    class="js-switch-course-detail px-4 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] text-[#3F2E21] text-[12px] font-semibold shrink-0 cursor-pointer"
+                  >
+                    مشاهده جزئیات
+                  </button>
+                </div>
+              `
+                )
+                .join('')}
+            </div>
+          </div>
+        `
+            : ''
+        }
+      </div>
     `);
   }
 
-  $page.on('click', '.js-back-to-courses', () => {
-    props.onBackToHomeCourses();
+  $wrapper.on('click', '.js-course-detail-back', () => {
+    props.onBack();
   });
 
-  $page.on('click', '.js-detail-register-course', () => {
-    props.onRegisterCourse(course);
+  $wrapper.on('click', '.js-detail-register-course', () => {
+    props.onRegisterCourse(currentCourse);
   });
 
-  $page.on('click', '.js-switch-other-course', function () {
-    const id = Number($(this).attr('data-other-course-id'));
-    const nextCourse = RUSSIAN_COURSES_DATA.find((c) => c.id === id);
+  $wrapper.on('click', '.js-switch-course-detail', function () {
+    const id = Number($(this).data('switch-course'));
+    const nextCourse = (props.allCourses || []).find((c) => c.id === id);
     if (nextCourse) {
-      props.onSelectCourse(nextCourse);
+      currentCourse = { ...nextCourse, comments: [...(nextCourse.comments || [])] };
+      commentSubmittedMsg = '';
+      if (props.onSelectOtherCourse) {
+        props.onSelectOtherCourse(nextCourse);
+      }
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   });
 
-  $page.on('submit', '.js-course-comment-form', function (e) {
+  $wrapper.on('submit', '.js-course-comment-form', function (e) {
     e.preventDefault();
     const $f = $(this);
     const authorName = String($f.find('[name="author_name"]').val() || '').trim();
-    const commentText = String($f.find('[name="comment_text"]').val() || '').trim();
     const rating = Number($f.find('[name="rating"]').val() || 5);
+    const commentText = String($f.find('[name="comment_text"]').val() || '').trim();
     if (!authorName || !commentText) return;
 
-    const newComment: CourseAudienceComment = {
-      id: Date.now(),
-      authorName,
-      roleLabel: 'مخاطب دوره',
-      dateLabel: '۱۴ آبان ۱۴۰۵',
-      rating,
-      commentText,
-    };
-    localComments = [newComment, ...localComments];
-    commentSubmittedMsg = 'دیدگاه شما با موفقیت ثبت شد و در لیست نظرات قرار گرفت.';
-
-    ApiService.saveAdminComment({
+    ApiService.submitPublicComment({
       author_name: authorName,
-      target_title: course.title,
+      target_title: currentCourse.title,
       target_type: 'دوره آموزشی',
       rating,
       comment_text: commentText,
-      status: 'تایید شده',
-    }).catch(() => {
-      // already added locally
-    });
-
-    render();
+    })
+      .then(() => {
+        const newComment: CourseAudienceComment = {
+          id: Date.now(),
+          authorName,
+          authorRole: 'متقاضی و مخاطب دوره',
+          createdDate: 'هم‌اکنون',
+          rating,
+          commentText,
+        };
+        currentCourse.comments = [newComment, ...currentCourse.comments];
+        commentSubmittedMsg =
+          'دیدگاه شما با موفقیت در دیتابیس ثبت شد و پس از تایید مدیریت نمایش داده می‌شود.';
+        render();
+      })
+      .catch(() => {
+        commentSubmittedMsg = 'دیدگاه شما ثبت شد.';
+        render();
+      });
   });
 
   render();
-  return $page;
+  return $wrapper;
 }

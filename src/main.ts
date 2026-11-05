@@ -7,13 +7,13 @@ import { createAboutClubSectionComponent } from './components/AboutClubSection.t
 import { createAboutManagerSectionComponent } from './components/AboutManagerSection.ts';
 import {
   createLibrarySectionComponent,
-  UPCOMING_EVENTS_DATA,
+  mapSessionToEventCard,
   buildBookEventDetail,
   type ClubEventDetailItem,
 } from './components/LibrarySection.ts';
 import {
   createCoursesSectionComponent,
-  RUSSIAN_COURSES_DATA,
+  mapClassToCourseCard,
   type RussianCourseCard,
 } from './components/CoursesSection.ts';
 import { createCourseDetailPageComponent } from './components/CourseDetailPage.ts';
@@ -38,6 +38,8 @@ import type {
   ClubMember,
   MemberPanelPayload,
 } from './types/models.ts';
+
+const ACTIVE_ROUTE_STORAGE_KEY = 'bookmeet_active_route';
 
 const FALLBACK_BOOTSTRAP: BootstrapPayload = {
   navigationLinks: [
@@ -97,6 +99,9 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
       'دکتری ادبیات تطبیقی · ۱۲ سال تجربه تسهیل‌گری نشست‌های کتاب · نویسنده و پژوهشگر روایت',
   },
   libraryBooks: [],
+  publicSessions: [],
+  publicClasses: [],
+  approvedComments: [],
   blogPosts: [],
   contactInfo: {
     id: 1,
@@ -112,9 +117,35 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
   },
 };
 
-function pushRoute(path: string, replace = false): void {
+function saveActiveRoute(cleanPath: string): void {
   try {
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    if (cleanPath === '/login') return;
+    window.sessionStorage.setItem(ACTIVE_ROUTE_STORAGE_KEY, cleanPath);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function getSavedActiveRoute(): string | null {
+  try {
+    return window.sessionStorage.getItem(ACTIVE_ROUTE_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function clearSavedActiveRoute(): void {
+  try {
+    window.sessionStorage.removeItem(ACTIVE_ROUTE_STORAGE_KEY);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function pushRoute(path: string, replace = false): void {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  saveActiveRoute(cleanPath);
+  try {
     if (window.location.pathname !== cleanPath) {
       if (replace) {
         window.history.replaceState({ path: cleanPath }, document.title, cleanPath);
@@ -140,6 +171,29 @@ function mountApplication(
   let allPosts = payload.blogPosts || [];
   let currentMember: ClubMember | null = initialSessionMember;
   let pendingEnrollment: PendingEnrollment = null;
+
+  function isAdminMember(member: ClubMember | null | undefined): boolean {
+    return Boolean(member && (member.role === 'admin' || member.phone === 'admin'));
+  }
+
+  function getActivePublicCourses(): RussianCourseCard[] {
+    return (payload.publicClasses || [])
+      .filter((c) => c.status !== 'غیرفعال')
+      .map((c) => mapClassToCourseCard(c, payload.approvedComments || []));
+  }
+
+  function getActivePublicEvents(): ClubEventDetailItem[] {
+    return (payload.publicSessions || [])
+      .filter((s) => s.status !== 'غیرفعال')
+      .map((s) => mapSessionToEventCard(s, payload.approvedComments || []));
+  }
+
+  function redirectToLoginPage(): void {
+    currentMember = null;
+    clearSavedActiveRoute();
+    pushRoute('/login', true);
+    renderMainHomeView(undefined, true, true);
+  }
 
   function scrollToSection(href: string): void {
     const sectionMap: Record<string, string> = {
@@ -175,7 +229,7 @@ function mountApplication(
 
   function getNavbarCtaLabel(): string {
     if (currentMember) {
-      if (currentMember.role === 'admin' || currentMember.phone === 'admin') {
+      if (isAdminMember(currentMember)) {
         return `پنل مدیریت · ${currentMember.first_name} ${currentMember.last_name}`;
       }
       return `پنل کاربری · ${currentMember.first_name} ${currentMember.last_name}`;
@@ -185,7 +239,7 @@ function mountApplication(
 
   function handleMemberAuthSuccess(member: ClubMember): void {
     currentMember = member;
-    if (pendingEnrollment && member.role !== 'admin' && member.phone !== 'admin') {
+    if (pendingEnrollment && !isAdminMember(member)) {
       const enrollmentToProcess = pendingEnrollment;
       pendingEnrollment = null;
 
@@ -223,12 +277,12 @@ function mountApplication(
           book_title: ev.bookTitle,
           book_author: ev.bookAuthor,
           pages_count: ev.pagesCount,
-          publisher: ev.publisher,
-          mentor_or_instructor: ev.mentor,
-          schedule_text: ev.dateLabel,
-          time_text: ev.timeLabel,
+          publisher: ev.bookPublisher,
+          mentor_or_instructor: ev.bookTranslator || ev.hostName,
+          schedule_text: ev.dateText,
+          time_text: ev.timeText,
           cover_url: ev.coverUrl,
-          description: ev.shortDescription,
+          description: ev.summary,
         })
           .then(() => {
             openMemberPanel(member.phone, 'sessions', undefined, false, noticeMsg);
@@ -245,10 +299,12 @@ function mountApplication(
 
   function openAppropriatePanel(member?: ClubMember | null): void {
     const target = member || currentMember;
-    if (target && (target.role === 'admin' || target.phone === 'admin')) {
+    if (isAdminMember(target)) {
       openAdminPanel('dashboard');
+    } else if (target) {
+      openMemberPanel(target.phone, 'dashboard');
     } else {
-      openMemberPanel(target?.phone, 'dashboard');
+      redirectToLoginPage();
     }
   }
 
@@ -257,11 +313,18 @@ function mountApplication(
     initialSubPath?: string,
     skipPush = false
   ): void {
+    if (currentMember && !isAdminMember(currentMember)) {
+      openMemberPanel(currentMember.phone, 'dashboard');
+      return;
+    }
+
+    const targetUrl = initialSubPath
+      ? `/admin/${initialTab}/${initialSubPath}`
+      : `/admin/${initialTab}`;
     if (!skipPush) {
-      const targetUrl = initialSubPath
-        ? `/admin/${initialTab}/${initialSubPath}`
-        : `/admin/${initialTab}`;
       pushRoute(targetUrl);
+    } else {
+      saveActiveRoute(targetUrl);
     }
 
     ApiService.fetchAdminPanelData()
@@ -270,10 +333,7 @@ function mountApplication(
         renderAdminPanelView(adminData, initialTab, initialSubPath);
       })
       .catch(() => {
-        currentMember = null;
-        pushRoute('/');
-        renderMainHomeView();
-        $('.js-login-modal').removeClass('hidden');
+        redirectToLoginPage();
       });
   }
 
@@ -293,7 +353,18 @@ function mountApplication(
       ctaText: getNavbarCtaLabel(),
       isStationaryCta: true,
       onNavigate: (href) => {
-        renderMainHomeView(href);
+        ApiService.fetchBootstrapData()
+          .then((fresh) => {
+            payload.libraryBooks = fresh.libraryBooks || [];
+            payload.publicSessions = fresh.publicSessions || [];
+            payload.publicClasses = fresh.publicClasses || [];
+            payload.approvedComments = fresh.approvedComments || [];
+            payload.blogPosts = fresh.blogPosts || [];
+            allPosts = payload.blogPosts;
+          })
+          .finally(() => {
+            renderMainHomeView(href);
+          });
       },
       onLoginClick: () => {
         openAdminPanel('dashboard');
@@ -308,12 +379,24 @@ function mountApplication(
         pushRoute(newPath);
       },
       onBackToSite: () => {
-        pushRoute('/');
-        renderMainHomeView();
+        ApiService.fetchBootstrapData()
+          .then((fresh) => {
+            payload.libraryBooks = fresh.libraryBooks || [];
+            payload.publicSessions = fresh.publicSessions || [];
+            payload.publicClasses = fresh.publicClasses || [];
+            payload.approvedComments = fresh.approvedComments || [];
+            payload.blogPosts = fresh.blogPosts || [];
+            allPosts = payload.blogPosts;
+          })
+          .finally(() => {
+            pushRoute('/');
+            renderMainHomeView();
+          });
       },
       onLogout: () => {
         ApiService.logoutClubMember().finally(() => {
           currentMember = null;
+          clearSavedActiveRoute();
           pushRoute('/');
           renderMainHomeView();
         });
@@ -331,6 +414,23 @@ function mountApplication(
           payload.blogPosts = updated.blogPosts;
           allPosts = updated.blogPosts;
         }
+        if (updated.sessions) {
+          payload.publicSessions = updated.sessions.filter(
+            (s) => s.status !== 'غیرفعال'
+          );
+          ApiService.fetchBootstrapData()
+            .then((fresh) => {
+              payload.libraryBooks = fresh.libraryBooks || [];
+              payload.publicSessions = fresh.publicSessions || [];
+              payload.approvedComments = fresh.approvedComments || [];
+            })
+            .catch(() => {
+              // ignore refresh error
+            });
+        }
+        if (updated.classes) {
+          payload.publicClasses = updated.classes.filter((c) => c.status !== 'غیرفعال');
+        }
       },
     });
 
@@ -347,11 +447,18 @@ function mountApplication(
     skipPush = false,
     initialEnrollmentNotice?: string
   ): void {
+    if (currentMember && isAdminMember(currentMember)) {
+      openAdminPanel('dashboard');
+      return;
+    }
+
+    const targetUrl = initialSubPath
+      ? `/panel/${initialTab}/${initialSubPath}`
+      : `/panel/${initialTab}`;
     if (!skipPush) {
-      const targetUrl = initialSubPath
-        ? `/panel/${initialTab}/${initialSubPath}`
-        : `/panel/${initialTab}`;
       pushRoute(targetUrl);
+    } else {
+      saveActiveRoute(targetUrl);
     }
 
     ApiService.fetchMemberPanelData(phone || currentMember?.phone)
@@ -365,10 +472,7 @@ function mountApplication(
         );
       })
       .catch(() => {
-        currentMember = null;
-        pushRoute('/');
-        renderMainHomeView();
-        $('.js-login-modal').removeClass('hidden');
+        redirectToLoginPage();
       });
   }
 
@@ -411,6 +515,7 @@ function mountApplication(
       onLogout: () => {
         ApiService.logoutClubMember().finally(() => {
           currentMember = null;
+          clearSavedActiveRoute();
           pushRoute('/');
           renderMainHomeView();
         });
@@ -427,7 +532,11 @@ function mountApplication(
     window.scrollTo(0, 0);
   }
 
-  function renderMainHomeView(scrollToSelector?: string, skipPush = false): void {
+  function renderMainHomeView(
+    scrollToSelector?: string,
+    skipPush = false,
+    openLoginModal = false
+  ): void {
     if (!skipPush && !scrollToSelector) {
       pushRoute('/');
     }
@@ -443,6 +552,10 @@ function mountApplication(
       },
     });
 
+    if (openLoginModal) {
+      $loginModal.removeClass('hidden');
+    }
+
     const $navbar = createNavbarComponent({
       navigationLinks: payload.navigationLinks,
       ctaText: getNavbarCtaLabel(),
@@ -455,6 +568,7 @@ function mountApplication(
         if (currentMember) {
           openAppropriatePanel(currentMember);
         } else {
+          pushRoute('/login');
           $loginModal.removeClass('hidden');
         }
       },
@@ -475,12 +589,14 @@ function mountApplication(
 
     const $library = createLibrarySectionComponent({
       libraryBooks: payload.libraryBooks || [],
+      publicSessions: payload.publicSessions || [],
+      approvedComments: payload.approvedComments || [],
       onOpenEventDetail: (eventItem) => {
         pushRoute(`/event/${eventItem.id}`);
         renderEventDetailPageView(eventItem, true);
       },
       onRegisterEvent: (eventItem) => {
-        if (currentMember && currentMember.role !== 'admin') {
+        if (currentMember && !isAdminMember(currentMember)) {
           pendingEnrollment = { type: 'event', eventItem };
           handleMemberAuthSuccess(currentMember);
           return;
@@ -491,12 +607,14 @@ function mountApplication(
     });
 
     const $courses = createCoursesSectionComponent({
+      publicClasses: payload.publicClasses || [],
+      approvedComments: payload.approvedComments || [],
       onOpenCourseDetail: (course) => {
         pushRoute(`/course/${course.id}`);
         renderCourseDetailPageView(course, true);
       },
       onRegisterCourse: (course) => {
-        if (currentMember && currentMember.role !== 'admin') {
+        if (currentMember && !isAdminMember(currentMember)) {
           pendingEnrollment = { type: 'course', course };
           handleMemberAuthSuccess(currentMember);
           return;
@@ -549,6 +667,8 @@ function mountApplication(
   ): void {
     if (!skipPush) {
       pushRoute(`/course/${course.id}`);
+    } else {
+      saveActiveRoute(`/course/${course.id}`);
     }
     $app.empty();
 
@@ -582,12 +702,13 @@ function mountApplication(
 
     const $courseDetailPage = createCourseDetailPageComponent({
       course,
+      allCourses: getActivePublicCourses(),
       onBackToHomeCourses: () => {
         pushRoute('/courses');
         renderMainHomeView('#courses', true);
       },
       onRegisterCourse: (targetCourse) => {
-        if (currentMember && currentMember.role !== 'admin') {
+        if (currentMember && !isAdminMember(currentMember)) {
           pendingEnrollment = { type: 'course', course: targetCourse };
           handleMemberAuthSuccess(currentMember);
           return;
@@ -619,6 +740,8 @@ function mountApplication(
   ): void {
     if (!skipPush) {
       pushRoute(`/event/${eventItem.id}`);
+    } else {
+      saveActiveRoute(`/event/${eventItem.id}`);
     }
     $app.empty();
 
@@ -652,12 +775,13 @@ function mountApplication(
 
     const $eventDetailPage = createEventDetailPageComponent({
       eventItem,
+      allEvents: getActivePublicEvents(),
       onBackToHomeEvents: () => {
         pushRoute('/events');
         renderMainHomeView('#events', true);
       },
       onRegisterEvent: (targetEvent) => {
-        if (currentMember && currentMember.role !== 'admin') {
+        if (currentMember && !isAdminMember(currentMember)) {
           pendingEnrollment = { type: 'event', eventItem: targetEvent };
           handleMemberAuthSuccess(currentMember);
           return;
@@ -686,6 +810,8 @@ function mountApplication(
   function renderBlogPostPageView(post: BlogPost, skipPush = false): void {
     if (!skipPush) {
       pushRoute(`/blog/${post.id}`);
+    } else {
+      saveActiveRoute(`/blog/${post.id}`);
     }
     $app.empty();
 
@@ -742,17 +868,46 @@ function mountApplication(
     $('html, body').stop(true).animate({ scrollTop: 0 }, 250);
   }
 
-  // Client-side URL Router handler (for popstate / direct path navigation)
-  function handleLocationRoute(): void {
-    const pathname = window.location.pathname || '/';
+  // Client-side URL Router handler (for popstate / direct path navigation / refresh restoration)
+  function handleLocationRoute(isInitialLoad = false): void {
+    let pathname = window.location.pathname || '/';
+
+    if (isInitialLoad && pathname === '/') {
+      const savedRoute = getSavedActiveRoute();
+      if (savedRoute && savedRoute !== '/' && savedRoute !== '/login') {
+        const savedFirst = savedRoute.split('/').filter(Boolean)[0];
+        if (savedFirst === 'admin' || savedFirst === 'panel') {
+          pathname = savedRoute;
+          pushRoute(savedRoute, true);
+        } else if (
+          savedFirst === 'event' ||
+          savedFirst === 'course' ||
+          savedFirst === 'blog'
+        ) {
+          pathname = savedRoute;
+          pushRoute(savedRoute, true);
+        }
+      }
+    }
+
     const segments = pathname.split('/').filter(Boolean);
 
     if (segments.length === 0) {
+      saveActiveRoute('/');
       renderMainHomeView(undefined, true);
       return;
     }
 
     const first = segments[0];
+
+    if (first === 'login') {
+      if (currentMember) {
+        openAppropriatePanel(currentMember);
+        return;
+      }
+      renderMainHomeView(undefined, true, true);
+      return;
+    }
 
     // Section routes on home page
     const sectionRoutes: Record<string, string> = {
@@ -764,6 +919,7 @@ function mountApplication(
       contact: '#contact',
     };
     if (sectionRoutes[first]) {
+      saveActiveRoute(`/${first}`);
       renderMainHomeView(sectionRoutes[first], true);
       return;
     }
@@ -771,7 +927,7 @@ function mountApplication(
     // Course detail routes: /course/:id
     if (first === 'course' && segments[1]) {
       const courseId = Number(segments[1]);
-      const targetCourse = RUSSIAN_COURSES_DATA.find((c) => c.id === courseId);
+      const targetCourse = getActivePublicCourses().find((c) => c.id === courseId);
       if (targetCourse) {
         renderCourseDetailPageView(targetCourse, true);
         return;
@@ -783,15 +939,19 @@ function mountApplication(
     // Event detail routes: /event/:id
     if (first === 'event' && segments[1]) {
       const eventId = Number(segments[1]);
-      const books = payload.libraryBooks || [];
-      const currentBook = books.find((b) => Number(b.is_current) === 1) || books[0];
-      if (currentBook && (eventId === 100 || eventId === currentBook.id)) {
-        renderEventDetailPageView(buildBookEventDetail(currentBook), true);
-        return;
-      }
-      const targetEvent = UPCOMING_EVENTS_DATA.find((ev) => ev.id === eventId);
+      const activeEvents = getActivePublicEvents();
+      const targetEvent = activeEvents.find((ev) => ev.id === eventId);
       if (targetEvent) {
         renderEventDetailPageView(targetEvent, true);
+        return;
+      }
+      const books = payload.libraryBooks || [];
+      const matchedBook = books.find((b) => b.id === eventId);
+      if (matchedBook) {
+        renderEventDetailPageView(
+          buildBookEventDetail(matchedBook, payload.approvedComments || []),
+          true
+        );
         return;
       }
       renderMainHomeView('#events', true);
@@ -814,6 +974,14 @@ function mountApplication(
 
     // Admin Panel routes: /admin/:tab/...
     if (first === 'admin') {
+      if (!currentMember) {
+        redirectToLoginPage();
+        return;
+      }
+      if (!isAdminMember(currentMember)) {
+        openMemberPanel(currentMember.phone, 'dashboard');
+        return;
+      }
       const tab = (segments[1] as AdminTabKey) || 'dashboard';
       const subPath = segments.slice(2).join('/');
       openAdminPanel(tab, subPath || undefined, true);
@@ -822,9 +990,17 @@ function mountApplication(
 
     // Member Panel routes: /panel/:tab/...
     if (first === 'panel') {
+      if (!currentMember) {
+        redirectToLoginPage();
+        return;
+      }
+      if (isAdminMember(currentMember)) {
+        openAdminPanel('dashboard');
+        return;
+      }
       const tab = (segments[1] as PanelTabKey) || 'dashboard';
       const subPath = segments.slice(2).join('/');
-      openMemberPanel(currentMember?.phone, tab, subPath || undefined, true);
+      openMemberPanel(currentMember.phone, tab, subPath || undefined, true);
       return;
     }
 
@@ -834,10 +1010,10 @@ function mountApplication(
   $(window)
     .off('popstate.bookmeetRouter')
     .on('popstate.bookmeetRouter', () => {
-      handleLocationRoute();
+      handleLocationRoute(false);
     });
 
-  handleLocationRoute();
+  handleLocationRoute(true);
 }
 
 $(function () {

@@ -61,7 +61,7 @@ export interface LibraryBook {
   original_title: string;
   author: string;
   translator: string;
-  category: 'کلاسیک' | 'معاصر';
+  category: string;
   publication_year: number;
   pages_count: number;
   reading_progress_percent: number;
@@ -122,9 +122,7 @@ export interface ClubMember {
   role?: 'member' | 'admin';
   status?: 'فعال' | 'غیرفعال';
   education: string;
-  favorite_genre: string;
   email?: string;
-  city?: string;
   avatar_url?: string;
   bio?: string;
   membership_code?: string;
@@ -175,12 +173,17 @@ export interface MemberSession {
   title: string;
   book_title: string;
   book_author?: string;
+  translator?: string;
+  category?: string;
+  publication_year?: number;
   pages_count?: number;
   publisher?: string;
   mentor_name: string;
   session_date: string;
   session_time: string;
   cover_url?: string;
+  short_description?: string;
+  full_description?: string;
   location_type: string;
   meeting_link_or_room: string;
   status: 'فعال' | 'غیرفعال' | 'ثبت‌نام‌شده' | 'برگزارشده' | 'ظرفیت باز';
@@ -300,7 +303,6 @@ export interface ClubRegisterInput {
   last_name: string;
   phone: string;
   education: string;
-  favorite_genre?: string;
   password: string;
   confirm_password: string;
 }
@@ -323,6 +325,9 @@ export interface BootstrapPayload {
   libraryBooks: LibraryBook[];
   blogPosts: BlogPost[];
   contactInfo: ContactInfoData;
+  publicSessions?: MemberSession[];
+  publicClasses?: MemberClassItem[];
+  approvedComments?: UserComment[];
 }
 
 
