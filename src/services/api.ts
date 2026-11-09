@@ -14,6 +14,7 @@ import type {
   ContactInfoData,
   ContactMessageInput,
   FeaturedBook,
+  FooterSettingsData,
   GalleryImage,
   HeroSettings,
   LibraryBook,
@@ -751,12 +752,14 @@ export const ApiService = {
     aboutClub?: Partial<AboutClubData>;
     aboutManager?: Partial<AboutManagerData>;
     contactInfo?: Partial<ContactInfoData>;
+    footerSettings?: Partial<FooterSettingsData>;
   }): Promise<{
     success: boolean;
     heroSettings: HeroSettings;
     aboutClub: AboutClubData;
     aboutManager: AboutManagerData;
     contactInfo: ContactInfoData;
+    footerSettings?: FooterSettingsData;
   }> {
     return new Promise((resolve, reject) => {
       $.ajax({

@@ -69,7 +69,9 @@ export interface LibraryBook {
   translator: string;
   category: string;
   publication_year: number;
+  edition_number?: string;
   pages_count: number;
+  publisher?: string;
   reading_progress_percent: number;
   session_schedule: string;
   cover_url: string;
@@ -117,6 +119,28 @@ export interface ContactInfoData {
   email: string;
   phone: string;
   telegram_handle: string;
+}
+
+export interface FooterLinkItem {
+  label: string;
+  href: string;
+}
+
+export interface FooterSettingsData {
+  id: number;
+  title: string;
+  description: string;
+  phone: string;
+  email: string;
+  address: string;
+  links: FooterLinkItem[];
+  instagram_url: string;
+  telegram_url: string;
+  twitter_url: string;
+  youtube_url: string;
+  linkedin_url: string;
+  copyright_text: string;
+  tagline_text: string;
 }
 
 export interface ContactMessageInput {
@@ -362,6 +386,7 @@ export interface AdminPanelPayload {
   aboutClub: AboutClubData;
   aboutManager: AboutManagerData;
   contactInfo: ContactInfoData;
+  footerSettings?: FooterSettingsData;
   libraryBooks: LibraryBook[];
   libraryCategories?: LibraryCategory[];
 }
@@ -393,6 +418,7 @@ export interface BootstrapPayload {
   libraryBooks: LibraryBook[];
   blogPosts: BlogPost[];
   contactInfo: ContactInfoData;
+  footerSettings?: FooterSettingsData;
   publicSessions?: MemberSession[];
   publicClasses?: MemberClassItem[];
   approvedComments?: UserComment[];

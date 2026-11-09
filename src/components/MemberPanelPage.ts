@@ -2807,12 +2807,12 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       { key: 'dashboard', label: 'داشبورد' },
       {
         key: 'sessions',
-        label: 'جلسات من',
+        label: 'نشست های من',
         badge: toPersianDigits(state.sessions.length),
       },
       {
         key: 'classes',
-        label: 'کلاس‌های من',
+        label: 'کلاس های من',
         badge: toPersianDigits(state.classes.length),
       },
       {
@@ -2822,7 +2822,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       },
       {
         key: 'announcements',
-        label: 'اطلاعیه‌ها',
+        label: 'اطلاعیه',
         badge:
           unreadAnnouncementsCount > 0
             ? toPersianDigits(unreadAnnouncementsCount)
@@ -2836,7 +2836,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       { key: 'profile', label: 'پروفایل' },
       {
         key: 'calendar',
-        label: 'تقویم باشگاه',
+        label: 'تقویم رویدادها',
         badge: toPersianDigits(state.calendarEvents.length),
       },
     ];

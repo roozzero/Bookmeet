@@ -1,5 +1,6 @@
 import $ from 'jquery';
-import type { LibraryBook, MemberSession, UserComment } from '../types/models.ts';
+import { ApiService } from '../services/api.ts';
+import type { ClubMember, LibraryBook, MemberSession, UserComment } from '../types/models.ts';
 import { formatPersianDateDisplay, toPersianDigits } from '../utils/persianNumbers.ts';
 
 export interface EventSubSession {
@@ -68,6 +69,7 @@ export function mapSessionToEventCard(
     .filter(
       (c) =>
         c.status === 'تایید شده' &&
+        c.target_type !== 'کتاب کتابخانه' &&
         (c.target_title === session.title || c.target_title === session.book_title)
     )
     .map((c) => ({
@@ -117,50 +119,6 @@ export function mapSessionToEventCard(
   };
 }
 
-export function buildEventFromLibraryBook(
-  book: LibraryBook,
-  approvedComments: UserComment[] = []
-): UpcomingEventCard {
-  const matchingComments: EventAudienceComment[] = approvedComments
-    .filter((c) => c.status === 'تایید شده' && c.target_title === book.title)
-    .map((c) => ({
-      id: c.id,
-      authorName: c.author_name,
-      authorRole: 'عضو باشگاه کتابخوانی',
-      createdDate: c.created_date,
-      rating: c.rating || 5,
-      commentText: c.comment_text,
-      adminReply: c.admin_reply || undefined,
-    }));
-
-  return {
-    id: 100 + book.id,
-    badge: book.category || 'کتاب در حال مطالعه باشگاه',
-    category: book.category || '',
-    publicationYear: Number(book.publication_year || 0),
-    title: book.title,
-    bookTitle: book.title,
-    bookOriginalTitle: book.original_title || '',
-    bookAuthor: book.author || '',
-    bookTranslator: book.translator || '',
-    bookPublisher: '',
-    pagesCount: Number(book.pages_count || 0),
-    dateText: book.session_schedule || '',
-    timeText: '',
-    hostName: book.translator || '',
-    capacityText: 'ظرفیت باز',
-    locationLabel: '',
-    coverUrl: book.cover_url || '/assets/book-current.png',
-    summary: book.short_description || '',
-    fullDescription: book.short_description ? [book.short_description] : [],
-    bookIntroduction: book.short_description || '',
-    sessionsList: [],
-    comments: matchingComments,
-  };
-}
-
-export const buildBookEventDetail = buildEventFromLibraryBook;
-
 export interface LibrarySectionCallbacks {
   onOpenEventDetail?: (eventItem: UpcomingEventCard) => void;
   onRegisterEvent?: (eventItem: UpcomingEventCard) => void;
@@ -204,9 +162,8 @@ export function createLibrarySection(
   );
 
   const primarySession = validActiveSessions[0];
-  const currentBookFromLibrary = books.find((b) => Number(b.is_current) === 1) || null;
 
-  // All actual books stored in MySQL library_books table
+  // All actual books stored in MySQL library_books table (completely independent from sessions/events)
   const allLibraryBooks: LibraryBook[] = Array.isArray(books) ? books : [];
 
   // Dynamic categories from MySQL library_categories and actual books
@@ -217,8 +174,7 @@ export function createLibrarySection(
     ])
   );
 
-  // Derive the "Current Reading Book" card from the primary active session if available,
-  // or fall back to an explicitly marked current library book if one exists.
+  // Derive the "Current Reading Book" card exclusively from active reading sessions (member_sessions)
   const currentBookDisplay = primarySession
     ? {
         title: primarySession.book_title || primarySession.title,
@@ -239,12 +195,10 @@ export function createLibrarySection(
         short_description:
           primarySession.short_description || primarySession.full_description || '',
       }
-    : currentBookFromLibrary || null;
+    : null;
 
   const currentBookEvent: UpcomingEventCard | null = primarySession
     ? mapSessionToEventCard(primarySession, approvedComments)
-    : currentBookFromLibrary
-    ? buildEventFromLibraryBook(currentBookFromLibrary, approvedComments)
     : null;
 
   const $section = $(`
@@ -528,10 +482,6 @@ export function createLibrarySection(
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-7 js-library-grid">
               ${allLibraryBooks
                 .map((book) => {
-                  const bookTags = String(book.tags || '')
-                    .split(/[،,]/)
-                    .map((t) => t.trim())
-                    .filter(Boolean);
                   return `
                     <article
                       data-category="${book.category || ''}"
@@ -579,21 +529,6 @@ export function createLibrarySection(
                               ? `<p class="text-[13.5px] leading-[1.85] text-[#423226] mt-3 line-clamp-3 text-justify">
                                   ${toPersianDigits(book.short_description)}
                                 </p>`
-                              : ''
-                          }
-                          ${
-                            bookTags.length > 0
-                              ? `
-                            <div class="flex flex-wrap gap-1.5 mt-3">
-                              ${bookTags
-                                .slice(0, 3)
-                                .map(
-                                  (tag) =>
-                                    `<span class="px-2 py-0.5 rounded-md bg-[#F2E8D9] border border-[#E2D3BF] text-[#4E3B2D] text-[11px] font-medium">#${toPersianDigits(tag)}</span>`
-                                )
-                                .join('')}
-                            </div>
-                          `
                               : ''
                           }
                         </div>
@@ -695,18 +630,68 @@ export function createLibrarySection(
   return $section;
 }
 
+export function parseNotesToBulletItems(rawNotes?: string): string[] {
+  if (!rawNotes) return [];
+  return String(rawNotes)
+    .split(/\r?\n|•/)
+    .map((line) => line.replace(/^[\s\-*•●▪▫–—]+/, '').trim())
+    .filter(Boolean);
+}
+
 export function createLibraryBookDetailPageComponent(props: {
   book: LibraryBook;
+  approvedComments?: UserComment[];
+  currentMember?: ClubMember | null;
   onBack: () => void;
 }): JQuery {
-  const { book } = props;
+  const { book, approvedComments = [], currentMember = null } = props;
+
   const tagsList = String(book.tags || '')
     .split(/[،,]/)
     .map((t) => t.trim())
     .filter(Boolean);
 
+  const noteItems = parseNotesToBulletItems(book.notes);
+
+  const bookComments = approvedComments.filter(
+    (c) =>
+      c.status === 'تایید شده' &&
+      (c.target_type === 'کتاب کتابخانه' || c.target_type === 'کتاب') &&
+      String(c.target_title || '').trim() === String(book.title || '').trim()
+  );
+
+  const defaultAuthorName = currentMember
+    ? `${currentMember.first_name || ''} ${currentMember.last_name || ''}`.trim()
+    : '';
+
+  const specItems: Array<{ label: string; value: string }> = [
+    { label: 'نام نویسنده', value: book.author ? toPersianDigits(book.author) : '—' },
+    { label: 'مترجم', value: book.translator ? toPersianDigits(book.translator) : '—' },
+    { label: 'نام ناشر', value: book.publisher ? toPersianDigits(book.publisher) : '—' },
+    {
+      label: 'سال انتشار',
+      value:
+        book.publication_year && Number(book.publication_year) > 0
+          ? toPersianDigits(book.publication_year)
+          : '—',
+    },
+    {
+      label: 'نوبت چاپ',
+      value: book.edition_number ? toPersianDigits(book.edition_number) : '—',
+    },
+    {
+      label: 'تعداد صفحات',
+      value:
+        book.pages_count && Number(book.pages_count) > 0
+          ? `${toPersianDigits(book.pages_count)} صفحه`
+          : '—',
+    },
+    { label: 'دسته‌بندی', value: book.category ? toPersianDigits(book.category) : '—' },
+  ];
+
   const $page = $(`
     <section
+      dir="rtl"
       aria-label="جزئیات کتاب در کتابخانه باشگاه"
       class="relative w-full bg-[#F6EFE4] text-[#221811] py-10 sm:py-14 px-5 sm:px-10 lg:px-20"
     >
@@ -722,8 +707,8 @@ export function createLibraryBookDetailPageComponent(props: {
           </button>
         </div>
 
-        <!-- Hero Book Card -->
-        <div class="rounded-3xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-8 lg:p-10 shadow-[0_20px_50px_rgba(45,30,18,0.06)]">
+        <!-- 1. Book Cover and Main Information + 2. Book Specifications -->
+        <div class="rounded-3xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-8 lg:p-10 shadow-[0_20px_50px_rgba(45,30,18,0.06)] space-y-8">
           <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
             <div class="md:col-span-4">
               <div class="mx-auto max-w-[240px] md:max-w-none aspect-[3/4] rounded-2xl overflow-hidden border border-[#D4BEA2] bg-[#EFE3D2] shadow-[0_14px_34px_rgba(30,18,10,0.16)]">
@@ -735,7 +720,7 @@ export function createLibraryBookDetailPageComponent(props: {
               </div>
             </div>
 
-            <div class="md:col-span-8 space-y-5">
+            <div class="md:col-span-8 space-y-6">
               ${
                 book.category
                   ? `<div>
@@ -761,41 +746,66 @@ export function createLibraryBookDetailPageComponent(props: {
                 }
               </div>
 
-              ${
-                book.short_description
-                  ? `
-                <div class="p-4 sm:p-5 rounded-2xl bg-[#F3E9DA]/80 border border-[#E2D2BC] space-y-1.5">
-                  <h2 class="font-display text-[16px] font-bold text-[#231912]">خلاصه کتاب</h2>
-                  <p class="text-[14.5px] leading-[1.95] text-[#3B2C22] whitespace-pre-line text-justify">
-                    ${toPersianDigits(book.short_description)}
-                  </p>
+              <!-- 2. Book Specifications Grid -->
+              <div class="rounded-2xl bg-[#F3E9DA]/85 border border-[#E2D2BC] p-4 sm:p-5 space-y-3">
+                <h2 class="font-display text-[16px] font-bold text-[#231912]">مشخصات کتاب</h2>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+                  ${specItems
+                    .map(
+                      (spec) => `
+                    <div class="rounded-xl bg-[#FAF5EC] border border-[#E4D6C3] px-3.5 py-2.5">
+                      <span class="block text-[11.5px] text-[#7A6452] font-medium">${spec.label}</span>
+                      <strong class="block text-[13.5px] text-[#1E150F] font-bold mt-0.5">${spec.value}</strong>
+                    </div>
+                  `
+                    )
+                    .join('')}
                 </div>
-              `
-                  : ''
-              }
-
-              ${
-                tagsList.length > 0
-                  ? `
-                <div class="space-y-2 pt-1">
-                  <span class="block text-[12.5px] font-bold text-[#5C4738]">برچسب‌ها:</span>
-                  <div class="flex flex-wrap gap-2">
-                    ${tagsList
-                      .map(
-                        (tag) =>
-                          `<span class="px-3 py-1 rounded-xl bg-[#EFE3D2] border border-[#D8C4AA] text-[#4E3B2D] text-[12px] font-semibold">#${toPersianDigits(tag)}</span>`
-                      )
-                      .join('')}
-                  </div>
-                </div>
-              `
-                  : ''
-              }
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Memorable Quote -->
+        <!-- 3. Book Description and Summary -->
+        ${
+          book.short_description || book.description
+            ? `
+          <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-8 space-y-6">
+            ${
+              book.short_description
+                ? `
+              <div class="space-y-2.5">
+                <h2 class="font-display text-[20px] font-bold text-[#1E150F]">خلاصه کتاب</h2>
+                <div class="text-[15px] leading-[2] text-[#3B2C22] whitespace-pre-line text-justify">
+                  ${toPersianDigits(book.short_description)}
+                </div>
+              </div>
+            `
+                : ''
+            }
+            ${
+              book.short_description && book.description
+                ? `<div class="border-t border-[#E6D8C4]"></div>`
+                : ''
+            }
+            ${
+              book.description
+                ? `
+              <div class="space-y-2.5">
+                <h2 class="font-display text-[20px] font-bold text-[#1E150F]">توضیحات</h2>
+                <div class="text-[15px] leading-[2] text-[#3B2C22] whitespace-pre-line text-justify">
+                  ${toPersianDigits(book.description)}
+                </div>
+              </div>
+            `
+                : ''
+            }
+          </div>
+        `
+            : ''
+        }
+
+        <!-- 4. Memorable Quote -->
         ${
           book.memorable_quote
             ? `
@@ -809,21 +819,7 @@ export function createLibraryBookDetailPageComponent(props: {
             : ''
         }
 
-        <!-- Full Description -->
-        ${
-          book.description
-            ? `
-          <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-8 space-y-3">
-            <h2 class="font-display text-[20px] font-bold text-[#1E150F]">توضیحات</h2>
-            <div class="text-[15px] leading-[2] text-[#3B2C22] whitespace-pre-line text-justify">
-              ${toPersianDigits(book.description)}
-            </div>
-          </div>
-        `
-            : ''
-        }
-
-        <!-- Recommended For -->
+        <!-- 5. Recommended Audience -->
         ${
           book.recommended_for
             ? `
@@ -837,14 +833,161 @@ export function createLibraryBookDetailPageComponent(props: {
             : ''
         }
 
-        <!-- Notes -->
+        <!-- 6. Notes and Remarks (Displayed with Circular Bullets) -->
         ${
-          book.notes
+          noteItems.length > 0
             ? `
-          <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-8 space-y-3">
+          <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-8 space-y-4">
             <h2 class="font-display text-[20px] font-bold text-[#1E150F]">نکات و یادداشت‌ها</h2>
-            <div class="text-[15px] leading-[2] text-[#3B2C22] whitespace-pre-line text-justify">
-              ${toPersianDigits(book.notes)}
+            <ul class="space-y-3 pr-1">
+              ${noteItems
+                .map(
+                  (item) => `
+                <li class="flex items-start gap-3 text-[15px] leading-[2] text-[#3B2C22] text-justify">
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#7A4B2A] shrink-0 mt-3"></span>
+                  <span class="flex-1">${toPersianDigits(item)}</span>
+                </li>
+              `
+                )
+                .join('')}
+            </ul>
+          </div>
+        `
+            : ''
+        }
+
+        <!-- 7. User Comments Section -->
+        <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-8 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E6D8C4] pb-4">
+            <div>
+              <h2 class="font-display text-[20px] font-bold text-[#1E150F]">دیدگاه‌های کاربران درباره این کتاب</h2>
+              <p class="text-[13px] text-[#6E5746] mt-1">
+                نظرات و برداشت‌های اعضای باشگاه پیرامون کتاب «${toPersianDigits(book.title)}»
+              </p>
+            </div>
+            <span class="inline-flex items-center px-3 py-1 rounded-xl bg-[#EFE3D2] text-[#5A3A22] text-[12px] font-bold self-start sm:self-auto">
+              ${toPersianDigits(bookComments.length)} دیدگاه ثبت‌شده
+            </span>
+          </div>
+
+          ${
+            bookComments.length > 0
+              ? `
+            <div class="space-y-4">
+              ${bookComments
+                .map(
+                  (comment) => `
+                <article class="rounded-2xl bg-[#F3E9DA]/65 border border-[#E2D2BC] p-5 space-y-3">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2.5">
+                      <div class="w-9 h-9 rounded-full bg-[#5A3A22] text-[#FAF5EC] flex items-center justify-center font-bold text-[13px]">
+                        ${String(comment.author_name || 'ک').trim().charAt(0)}
+                      </div>
+                      <div>
+                        <h3 class="text-[14px] font-bold text-[#1E150F]">${toPersianDigits(comment.author_name)}</h3>
+                        <span class="text-[11.5px] text-[#7A6452]">${toPersianDigits(comment.created_date || '')}</span>
+                      </div>
+                    </div>
+                    <div class="text-[12px] font-semibold text-[#8A5A2B]">
+                      امتیاز: ${toPersianDigits(comment.rating || 5)} از ۵
+                    </div>
+                  </div>
+                  <p class="text-[14px] leading-[1.95] text-[#3B2C22] whitespace-pre-line text-justify">
+                    ${toPersianDigits(comment.comment_text)}
+                  </p>
+                  ${
+                    comment.admin_reply
+                      ? `
+                    <div class="mt-3 mr-4 p-3.5 rounded-xl bg-[#FAF5EC] border-r-4 border-[#7A4B2A] space-y-1">
+                      <div class="text-[12px] font-bold text-[#7A4B2A]">پاسخ مدیریت باشگاه:</div>
+                      <p class="text-[13.5px] leading-[1.9] text-[#3B2C22] whitespace-pre-line text-justify">
+                        ${toPersianDigits(comment.admin_reply)}
+                      </p>
+                    </div>
+                  `
+                      : ''
+                  }
+                </article>
+              `
+                )
+                .join('')}
+            </div>
+          `
+              : `
+            <div class="rounded-2xl bg-[#F3E9DA]/50 border border-[#E4D6C3] p-6 text-center">
+              <p class="text-[14px] text-[#5E493A] font-medium !text-center text-center mx-auto">
+                هنوز دیدگاهی برای این کتاب ثبت نشده است. نخستین نفری باشید که نظر خود را درباره این اثر می‌نویسد.
+              </p>
+            </div>
+          `
+          }
+
+          <!-- Submit New Book Comment Form -->
+          <div class="pt-4 border-t border-[#E6D8C4]">
+            <h3 class="font-display text-[17px] font-bold text-[#1E150F] mb-3">ثبت دیدگاه جدید درباره این کتاب</h3>
+            <form class="js-library-book-comment-form space-y-4" novalidate>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-[12.5px] font-semibold text-[#4B382A] mb-1.5">نام و نام خانوادگی *</label>
+                  <input
+                    type="text"
+                    name="author_name"
+                    value="${defaultAuthorName}"
+                    required
+                    placeholder="نام خود را وارد کنید"
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#FDFBF7] border border-[#D8C7B0] text-[13.5px] text-[#221811] focus:outline-none focus:border-[#5A3A22]"
+                  />
+                </div>
+                <div>
+                  <label class="block text-[12.5px] font-semibold text-[#4B382A] mb-1.5">امتیاز شما به این کتاب</label>
+                  <select
+                    name="rating"
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#FDFBF7] border border-[#D8C7B0] text-[13.5px] text-[#221811] focus:outline-none focus:border-[#5A3A22]"
+                  >
+                    <option value="5">۵ از ۵ (عالی و ماندگار)</option>
+                    <option value="4">۴ از ۵ (بسیار خوب)</option>
+                    <option value="3">۳ از ۵ (قابل قبول)</option>
+                    <option value="2">۲ از ۵ (متوسط)</option>
+                    <option value="1">۱ از ۵ (ضعیف)</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="block text-[12.5px] font-semibold text-[#4B382A] mb-1.5">متن دیدگاه و برداشت شما *</label>
+                <textarea
+                  name="comment_text"
+                  rows="3"
+                  required
+                  placeholder="نظر، تجربه خوانش یا نقد کوتاه خود را درباره این کتاب بنویسید..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#FDFBF7] border border-[#D8C7B0] text-[13.5px] text-[#221811] focus:outline-none focus:border-[#5A3A22]"
+                ></textarea>
+              </div>
+              <div class="js-book-comment-feedback hidden rounded-xl px-4 py-2.5 text-[12.5px] font-medium"></div>
+              <div class="flex justify-end">
+                <button
+                  type="submit"
+                  class="js-submit-book-comment-btn px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer"
+                >
+                  ارسال دیدگاه
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- 8. Tags at the Very Bottom -->
+        ${
+          tagsList.length > 0
+            ? `
+          <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-7 space-y-3">
+            <h2 class="font-display text-[17px] font-bold text-[#1E150F]">برچسب‌های کتاب</h2>
+            <div class="flex flex-wrap gap-2">
+              ${tagsList
+                .map(
+                  (tag) =>
+                    `<span class="px-3.5 py-1.5 rounded-xl bg-[#EFE3D2] border border-[#D8C4AA] text-[#4E3B2D] text-[12.5px] font-semibold">#${toPersianDigits(tag)}</span>`
+                )
+                .join('')}
             </div>
           </div>
         `
@@ -858,5 +1001,51 @@ export function createLibraryBookDetailPageComponent(props: {
     props.onBack();
   });
 
+  $page.on('submit', '.js-library-book-comment-form', async function (e) {
+    e.preventDefault();
+    const $form = $(this);
+    const $feedback = $form.find('.js-book-comment-feedback');
+    const $btn = $form.find('.js-submit-book-comment-btn');
+
+    const authorName = String($form.find('input[name="author_name"]').val() || '').trim();
+    const rating = Number($form.find('select[name="rating"]').val() || 5);
+    const commentText = String($form.find('textarea[name="comment_text"]').val() || '').trim();
+
+    if (!authorName || !commentText) {
+      $feedback
+        .removeClass('hidden bg-emerald-50 text-emerald-900 border-emerald-200')
+        .addClass('bg-amber-50 text-amber-900 border border-amber-200')
+        .text('لطفاً نام خود و متن دیدگاه را کامل وارد نمایید.');
+      return;
+    }
+
+    $btn.prop('disabled', true).text('در حال ثبت دیدگاه...');
+    try {
+      await ApiService.submitPublicComment({
+        author_name: authorName,
+        target_title: book.title,
+        target_type: 'کتاب کتابخانه',
+        rating,
+        comment_text: commentText,
+      });
+      $feedback
+        .removeClass('hidden bg-amber-50 text-amber-900 border-amber-200')
+        .addClass('bg-emerald-50 text-emerald-900 border border-emerald-200')
+        .text(
+          'دیدگاه شما درباره این کتاب با موفقیت ثبت شد و پس از تایید مدیریت باشگاه در این صفحه نمایش داده خواهد شد.'
+        );
+      $form.find('textarea[name="comment_text"]').val('');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'خطا در ثبت دیدگاه';
+      $feedback
+        .removeClass('hidden bg-emerald-50 text-emerald-900 border-emerald-200')
+        .addClass('bg-amber-50 text-amber-900 border border-amber-200')
+        .text(msg);
+    } finally {
+      $btn.prop('disabled', false).text('ارسال دیدگاه');
+    }
+  });
+
   return $page;
 }
+

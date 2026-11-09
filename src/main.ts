@@ -9,7 +9,6 @@ import {
   createLibrarySectionComponent,
   createLibraryBookDetailPageComponent,
   mapSessionToEventCard,
-  buildBookEventDetail,
   type ClubEventDetailItem,
 } from './components/LibrarySection.ts';
 import {
@@ -117,6 +116,30 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
     email: 'hello@bookmeet.ir',
     phone: '۰۲۱-۸۸۹۴۳۲۱۰',
     telegram_handle: '@BookmeetClub',
+  },
+  footerSettings: {
+    id: 1,
+    title: 'باشگاه کتابخوانی بوک‌میت',
+    description:
+      'محفلی صمیمی برای خوانش آهسته، نقد ادبی و هم‌اندیشی پیرامون ماندگارترین آثار داستانی و فلسفی جهان.',
+    phone: '۰۲۱-۸۸۹۴۳۲۱۰',
+    email: 'hello@bookmeet.ir',
+    address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات بوک‌میت',
+    links: [
+      { label: 'درباره باشگاه', href: '#about-club' },
+      { label: 'کتابخانه', href: '#library' },
+      { label: 'نشست‌ها', href: '#events' },
+      { label: 'کلاس‌ها و دوره‌ها', href: '#courses' },
+      { label: 'وبلاگ', href: '#blog' },
+      { label: 'تماس با ما', href: '#contact' },
+    ],
+    instagram_url: '',
+    telegram_url: '',
+    twitter_url: '',
+    youtube_url: '',
+    linkedin_url: '',
+    copyright_text: 'تمامی حقوق مادی و معنوی برای باشگاه کتابخوانی بوک‌میت محفوظ است · ۱۴۰۵',
+    tagline_text: 'حلقه‌های مطالعاتی و نقد ادبیات داستانی',
   },
 };
 
@@ -366,6 +389,7 @@ function mountApplication(
             payload.publicClasses = fresh.publicClasses || [];
             payload.approvedComments = fresh.approvedComments || [];
             payload.blogPosts = fresh.blogPosts || [];
+            if (fresh.footerSettings) payload.footerSettings = fresh.footerSettings;
             allPosts = payload.blogPosts;
           })
           .finally(() => {
@@ -393,6 +417,7 @@ function mountApplication(
             payload.publicClasses = fresh.publicClasses || [];
             payload.approvedComments = fresh.approvedComments || [];
             payload.blogPosts = fresh.blogPosts || [];
+            if (fresh.footerSettings) payload.footerSettings = fresh.footerSettings;
             allPosts = payload.blogPosts;
           })
           .finally(() => {
@@ -417,6 +442,7 @@ function mountApplication(
         if (updated.aboutClub) payload.aboutClub = updated.aboutClub;
         if (updated.aboutManager) payload.aboutManager = updated.aboutManager;
         if (updated.contactInfo) payload.contactInfo = updated.contactInfo;
+        if (updated.footerSettings) payload.footerSettings = updated.footerSettings;
         if (updated.blogPosts) {
           payload.blogPosts = updated.blogPosts;
           allPosts = updated.blogPosts;
@@ -653,6 +679,7 @@ function mountApplication(
 
     const $contact = createContactSectionComponent({
       contactInfo: payload.contactInfo || FALLBACK_BOOTSTRAP.contactInfo,
+      footerSettings: payload.footerSettings || FALLBACK_BOOTSTRAP.footerSettings,
     });
 
     const $scrollToTopBtn = createScrollToTopButtonComponent();
@@ -721,6 +748,8 @@ function mountApplication(
 
     const $bookDetailPage = createLibraryBookDetailPageComponent({
       book,
+      approvedComments: payload.approvedComments || [],
+      currentMember,
       onBack: () => {
         pushRoute('/library');
         renderMainHomeView('#library', true);
@@ -1018,15 +1047,6 @@ function mountApplication(
       const targetEvent = activeEvents.find((ev) => ev.id === eventId);
       if (targetEvent) {
         renderEventDetailPageView(targetEvent, true);
-        return;
-      }
-      const books = payload.libraryBooks || [];
-      const matchedBook = books.find((b) => b.id === eventId);
-      if (matchedBook) {
-        renderEventDetailPageView(
-          buildBookEventDetail(matchedBook, payload.approvedComments || []),
-          true
-        );
         return;
       }
       renderMainHomeView('#events', true);

@@ -91,7 +91,9 @@ CREATE TABLE IF NOT EXISTS `library_books` (
   `translator` VARCHAR(150) NOT NULL DEFAULT '',
   `category` VARCHAR(80) NOT NULL DEFAULT '',
   `publication_year` INT NOT NULL DEFAULT 0,
+  `edition_number` VARCHAR(80) NOT NULL DEFAULT '',
   `pages_count` INT NOT NULL DEFAULT 0,
+  `publisher` VARCHAR(150) NOT NULL DEFAULT '',
   `reading_progress_percent` INT NOT NULL DEFAULT 0,
   `session_schedule` VARCHAR(180) NOT NULL DEFAULT '',
   `cover_url` LONGTEXT NOT NULL,
@@ -152,6 +154,25 @@ CREATE TABLE IF NOT EXISTS `contact_info` (
   `email` VARCHAR(150) NOT NULL,
   `phone` VARCHAR(80) NOT NULL,
   `telegram_handle` VARCHAR(100) NOT NULL,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 9.5. Footer Settings
+CREATE TABLE IF NOT EXISTS `footer_settings` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `title` VARCHAR(220) NOT NULL DEFAULT 'باشگاه کتابخوانی بوک‌میت',
+  `description` TEXT NOT NULL,
+  `phone` VARCHAR(80) NOT NULL DEFAULT '',
+  `email` VARCHAR(150) NOT NULL DEFAULT '',
+  `address` VARCHAR(255) NOT NULL DEFAULT '',
+  `links_json` LONGTEXT NULL,
+  `instagram_url` VARCHAR(255) NOT NULL DEFAULT 'https://instagram.com/bookmeet.club',
+  `telegram_url` VARCHAR(255) NOT NULL DEFAULT 'https://t.me/BookmeetClub',
+  `twitter_url` VARCHAR(255) NOT NULL DEFAULT 'https://x.com/bookmeetclub',
+  `youtube_url` VARCHAR(255) NOT NULL DEFAULT 'https://youtube.com/@bookmeetclub',
+  `linkedin_url` VARCHAR(255) NOT NULL DEFAULT 'https://linkedin.com/company/bookmeet-club',
+  `copyright_text` VARCHAR(255) NOT NULL DEFAULT '© ۱۴۰۵ باشگاه کتابخوانی بوک‌میت (Bookmeet) · تمامی حقوق برای اعضای باشگاه محفوظ است.',
+  `tagline_text` VARCHAR(255) NOT NULL DEFAULT 'طراحی‌شده با الهام از کتابخانه‌های کلاسیک و اشتیاق بی‌پایان به روایت‌های ماندگار',
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

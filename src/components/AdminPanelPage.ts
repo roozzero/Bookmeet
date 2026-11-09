@@ -10,6 +10,8 @@ import type {
   ContactInfoData,
   CourseSyllabusItem,
   EnrollmentRecord,
+  FooterLinkItem,
+  FooterSettingsData,
   GalleryImage,
   HeroSettings,
   LibraryBook,
@@ -58,6 +60,7 @@ export interface AdminPanelPageProps {
     aboutClub?: AboutClubData;
     aboutManager?: AboutManagerData;
     contactInfo?: ContactInfoData;
+    footerSettings?: FooterSettingsData;
     blogPosts?: BlogPost[];
     sessions?: MemberSession[];
     classes?: MemberClassItem[];
@@ -309,6 +312,31 @@ function renderTicketAttachmentsHtml(
 }
 
 export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuery {
+  const defaultFooterSettings: FooterSettingsData = {
+    id: 1,
+    title: 'باشگاه کتابخوانی بوک‌میت',
+    description:
+      'محفلی صمیمی برای خوانش آهسته، نقد ادبی و هم‌اندیشی پیرامون ماندگارترین آثار داستانی و فلسفی جهان.',
+    phone: '۰۲۱-۸۸۹۴۳۲۱۰',
+    email: 'hello@bookmeet.ir',
+    address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات بوک‌میت',
+    links: [
+      { label: 'درباره باشگاه', href: '#about-club' },
+      { label: 'کتابخانه', href: '#library' },
+      { label: 'نشست‌ها', href: '#events' },
+      { label: 'کلاس‌ها و دوره‌ها', href: '#courses' },
+      { label: 'وبلاگ', href: '#blog' },
+      { label: 'تماس با ما', href: '#contact' },
+    ],
+    instagram_url: '',
+    telegram_url: '',
+    twitter_url: '',
+    youtube_url: '',
+    linkedin_url: '',
+    copyright_text: 'تمامی حقوق مادی و معنوی برای باشگاه کتابخوانی بوک‌میت محفوظ است · ۱۴۰۵',
+    tagline_text: 'حلقه‌های مطالعاتی و نقد ادبیات داستانی',
+  };
+
   let state: AdminPanelPayload = {
     admin: { ...props.initialData.admin },
     sessions: [...(props.initialData.sessions || [])],
@@ -323,6 +351,18 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     aboutClub: { ...props.initialData.aboutClub },
     aboutManager: { ...props.initialData.aboutManager },
     contactInfo: { ...props.initialData.contactInfo },
+    footerSettings: props.initialData.footerSettings
+      ? {
+          ...defaultFooterSettings,
+          ...props.initialData.footerSettings,
+          links: Array.isArray(props.initialData.footerSettings.links)
+            ? props.initialData.footerSettings.links.map((l) => ({ ...l }))
+            : defaultFooterSettings.links.map((l) => ({ ...l })),
+        }
+      : {
+          ...defaultFooterSettings,
+          links: defaultFooterSettings.links.map((l) => ({ ...l })),
+        },
     libraryBooks: [...(props.initialData.libraryBooks || [])],
     libraryCategories: [...(props.initialData.libraryCategories || [])],
   };
@@ -685,9 +725,21 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
 
     const $libForm = $wrapper.find('.js-admin-library-book-form');
     if (editingLibraryBook && $libForm.length) {
+      const rawPubYear = toEnglishDigits(
+        String($libForm.find('[name="publication_year"]').val() || '').trim()
+      );
+      const rawPagesCount = toEnglishDigits(
+        String($libForm.find('[name="pages_count"]').val() || '').trim()
+      );
       editingLibraryBook = {
         ...editingLibraryBook,
         title: String($libForm.find('[name="title"]').val() || ''),
+        author: String($libForm.find('[name="author"]').val() || ''),
+        translator: String($libForm.find('[name="translator"]').val() || ''),
+        publisher: String($libForm.find('[name="publisher"]').val() || ''),
+        publication_year: rawPubYear ? Number(rawPubYear) : 0,
+        edition_number: String($libForm.find('[name="edition_number"]').val() || ''),
+        pages_count: rawPagesCount ? Number(rawPagesCount) : 0,
         short_description: String($libForm.find('[name="short_description"]').val() || ''),
         description: String($libForm.find('[name="description"]').val() || ''),
         memorable_quote: String($libForm.find('[name="memorable_quote"]').val() || ''),
@@ -1323,9 +1375,14 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         .split(/[،,]/)
         .map((t) => t.trim())
         .filter(Boolean);
+      const bNoteItems = String(b.notes || '')
+        .split(/\r?\n|•/)
+        .map((line) => line.replace(/^[\s\-*•●▪▫–—]+/, '').trim())
+        .filter(Boolean);
+
       html += `
         <div class="js-admin-view-lib-book-backdrop fixed inset-0 z-50 bg-[#1B120C]/65 backdrop-blur-[2px] flex items-center justify-center p-4">
-          <div class="w-full max-w-[740px] max-h-[88vh] rounded-2xl bg-[#FAF5EC] border-2 border-[#DEC8AC] shadow-[0_24px_60px_rgba(27,18,12,0.35)] flex flex-col overflow-hidden">
+          <div class="w-full max-w-[760px] max-h-[88vh] rounded-2xl bg-[#FAF5EC] border-2 border-[#DEC8AC] shadow-[0_24px_60px_rgba(27,18,12,0.35)] flex flex-col overflow-hidden">
             <div class="px-6 py-4 border-b border-[#E5D7C5] flex items-center justify-between gap-3">
               <div class="min-w-0">
                 <h3 class="font-display text-[18px] font-bold text-[#231912] truncate">
@@ -1352,40 +1409,51 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     ? `<img src="${b.cover_url}" alt="${b.title}" class="w-32 h-44 object-cover rounded-xl border border-[#D8C4AA] shrink-0" />`
                     : `<div class="w-32 h-44 rounded-xl bg-[#EFE3D2] border border-[#D8C4AA] flex items-center justify-center text-[12px] text-[#6B5444] shrink-0">بدون تصویر کاور</div>`
                 }
-                <div class="flex-1 min-w-0 space-y-3">
+                <div class="flex-1 min-w-0 space-y-3 w-full">
                   <div>
                     <span class="text-[11.5px] font-semibold text-[#7A6352] block">عنوان کتاب:</span>
                     <div class="font-display text-[18px] font-bold text-[#231912] mt-0.5">${toPersianDigits(b.title)}</div>
                   </div>
-                  ${
-                    b.short_description
-                      ? `
-                    <div>
-                      <span class="text-[11.5px] font-semibold text-[#7A6352] block">خلاصه کتاب:</span>
-                      <p class="text-[13px] text-[#3F2E21] leading-[1.85] mt-1 whitespace-pre-line">${toPersianDigits(b.short_description)}</p>
+
+                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                    <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
+                      <span class="block text-[11px] text-[#7A6352]">نام نویسنده:</span>
+                      <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.author ? toPersianDigits(b.author) : '—'}</strong>
                     </div>
-                  `
-                      : ''
-                  }
-                  ${
-                    bTags.length > 0
-                      ? `
-                    <div>
-                      <span class="text-[11.5px] font-semibold text-[#7A6352] block mb-1.5">برچسب‌ها:</span>
-                      <div class="flex flex-wrap gap-1.5">
-                        ${bTags
-                          .map(
-                            (tag) =>
-                              `<span class="px-2.5 py-1 rounded-lg bg-[#F3E7D6] border border-[#D8C4AA] text-[#4E3B2D] text-[11.5px] font-semibold">#${toPersianDigits(tag)}</span>`
-                          )
-                          .join('')}
-                      </div>
+                    <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
+                      <span class="block text-[11px] text-[#7A6352]">مترجم:</span>
+                      <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.translator ? toPersianDigits(b.translator) : '—'}</strong>
                     </div>
-                  `
-                      : ''
-                  }
+                    <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
+                      <span class="block text-[11px] text-[#7A6352]">نام ناشر:</span>
+                      <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.publisher ? toPersianDigits(b.publisher) : '—'}</strong>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
+                      <span class="block text-[11px] text-[#7A6352]">سال انتشار:</span>
+                      <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.publication_year && Number(b.publication_year) > 0 ? toPersianDigits(b.publication_year) : '—'}</strong>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
+                      <span class="block text-[11px] text-[#7A6352]">نوبت چاپ:</span>
+                      <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.edition_number ? toPersianDigits(b.edition_number) : '—'}</strong>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
+                      <span class="block text-[11px] text-[#7A6352]">تعداد صفحات:</span>
+                      <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.pages_count && Number(b.pages_count) > 0 ? `${toPersianDigits(b.pages_count)} صفحه` : '—'}</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              ${
+                b.short_description
+                  ? `
+                <div class="p-4 rounded-xl bg-[#F4E9DA]/60 border border-[#E5D7C5]">
+                  <h4 class="font-bold text-[13.5px] text-[#231912] mb-1.5">خلاصه کتاب</h4>
+                  <p class="text-[13px] text-[#3F2E21] leading-[1.9] whitespace-pre-line">${toPersianDigits(b.short_description)}</p>
+                </div>
+              `
+                  : ''
+              }
 
               ${
                 b.description
@@ -1421,11 +1489,40 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               }
 
               ${
-                b.notes
+                bNoteItems.length > 0
                   ? `
                 <div class="p-4 rounded-xl bg-[#F4E9DA]/60 border border-[#E5D7C5]">
-                  <h4 class="font-bold text-[13.5px] text-[#231912] mb-1.5">نکات و یادداشت‌ها</h4>
-                  <p class="text-[13px] text-[#3F2E21] leading-[1.9] whitespace-pre-line">${toPersianDigits(b.notes)}</p>
+                  <h4 class="font-bold text-[13.5px] text-[#231912] mb-2">نکات و یادداشت‌ها</h4>
+                  <ul class="space-y-2 pr-1">
+                    ${bNoteItems
+                      .map(
+                        (item) => `
+                      <li class="flex items-start gap-2.5 text-[13px] text-[#3F2E21] leading-[1.9] text-justify">
+                        <span class="w-2 h-2 rounded-full bg-[#7A4B2A] shrink-0 mt-2.5"></span>
+                        <span class="flex-1">${toPersianDigits(item)}</span>
+                      </li>
+                    `
+                      )
+                      .join('')}
+                  </ul>
+                </div>
+              `
+                  : ''
+              }
+
+              ${
+                bTags.length > 0
+                  ? `
+                <div class="p-4 rounded-xl bg-[#F4E9DA]/60 border border-[#E5D7C5]">
+                  <h4 class="font-bold text-[13.5px] text-[#231912] mb-2">برچسب‌ها</h4>
+                  <div class="flex flex-wrap gap-1.5">
+                    ${bTags
+                      .map(
+                        (tag) =>
+                          `<span class="px-2.5 py-1 rounded-lg bg-[#F3E7D6] border border-[#D8C4AA] text-[#4E3B2D] text-[11.5px] font-semibold">#${toPersianDigits(tag)}</span>`
+                      )
+                      .join('')}
+                  </div>
                 </div>
               `
                   : ''
@@ -1723,7 +1820,9 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         return false;
       }
       if (!q) return true;
-      const haystack = `${b.title || ''} ${b.short_description || ''} ${b.description || ''} ${
+      const haystack = `${b.title || ''} ${b.author || ''} ${b.translator || ''} ${
+        b.publisher || ''
+      } ${b.short_description || ''} ${b.description || ''} ${
         b.category || ''
       } ${b.tags || ''} ${b.memorable_quote || ''} ${b.recommended_for || ''} ${
         b.notes || ''
@@ -1774,8 +1873,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
 
             <input type="hidden" name="id" value="${editingLibraryBook.id || ''}" />
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div class="sm:col-span-2">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">عنوان کتاب *</label>
                 <input
                   type="text"
@@ -1787,7 +1886,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 />
               </div>
 
-              <div>
+              <div class="sm:col-span-2">
                 <div class="flex items-center justify-between mb-1.5">
                   <label class="block text-[12px] font-semibold text-[#4E3B2D]">دسته‌بندی</label>
                   <button
@@ -1813,8 +1912,85 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 </select>
               </div>
 
-              <!-- Cover Image Upload & Gallery Picker -->
+              <!-- 6 Specification Fields: Author, Translator, Publisher, Publication Year, Edition Number, Page Count -->
               <div class="sm:col-span-2">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">نام نویسنده</label>
+                <input
+                  type="text"
+                  name="author"
+                  value="${toPersianDigits(editingLibraryBook.author || '')}"
+                  placeholder="مثلاً: فیودور داستایفسکی"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                />
+              </div>
+
+              <div class="sm:col-span-2">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">مترجم</label>
+                <input
+                  type="text"
+                  name="translator"
+                  value="${toPersianDigits(editingLibraryBook.translator || '')}"
+                  placeholder="مثلاً: سروش حبیبی"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                />
+              </div>
+
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">نام ناشر</label>
+                <input
+                  type="text"
+                  name="publisher"
+                  value="${toPersianDigits(editingLibraryBook.publisher || '')}"
+                  placeholder="مثلاً: نشر ماهی"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                />
+              </div>
+
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">سال انتشار</label>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  name="publication_year"
+                  value="${
+                    editingLibraryBook.publication_year && Number(editingLibraryBook.publication_year) > 0
+                      ? toPersianDigits(editingLibraryBook.publication_year)
+                      : ''
+                  }"
+                  placeholder="مثلاً: ۱۴۰۲"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                />
+              </div>
+
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">نوبت چاپ</label>
+                <input
+                  type="text"
+                  name="edition_number"
+                  value="${toPersianDigits(editingLibraryBook.edition_number || '')}"
+                  placeholder="مثلاً: چاپ دوازدهم"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                />
+              </div>
+
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">تعداد صفحات</label>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  name="pages_count"
+                  value="${
+                    editingLibraryBook.pages_count && Number(editingLibraryBook.pages_count) > 0
+                      ? toPersianDigits(editingLibraryBook.pages_count)
+                      : ''
+                  }"
+                  placeholder="مثلاً: ۴۸۰"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                />
+              </div>
+
+              <!-- Cover Image Upload & Gallery Picker -->
+              <div class="sm:col-span-2 lg:col-span-4">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">تصویر کاور جلد کتاب</label>
                 <input type="hidden" name="cover_url" value="${editingLibraryBook.cover_url || ''}" />
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9]">
@@ -1865,7 +2041,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </div>
 
               <!-- Multi-Tag Management -->
-              <div class="sm:col-span-2">
+              <div class="sm:col-span-2 lg:col-span-4">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">برچسب‌ها</label>
                 <div class="p-3.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] space-y-3">
                   <div class="flex items-center gap-2">
@@ -1918,7 +2094,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </div>
 
               <!-- خلاصه کتاب -->
-              <div class="sm:col-span-2">
+              <div class="sm:col-span-2 lg:col-span-4">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">خلاصه کتاب</label>
                 <textarea
                   name="short_description"
@@ -1929,7 +2105,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </div>
 
               <!-- توضیحات -->
-              <div class="sm:col-span-2">
+              <div class="sm:col-span-2 lg:col-span-4">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">توضیحات</label>
                 <textarea
                   name="description"
@@ -1940,7 +2116,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </div>
 
               <!-- جمله‌ای که به یادگار ماند -->
-              <div class="sm:col-span-2">
+              <div class="sm:col-span-2 lg:col-span-4">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">جمله‌ای که به یادگار ماند</label>
                 <textarea
                   name="memorable_quote"
@@ -1951,7 +2127,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </div>
 
               <!-- به چه کسانی توصیه می‌شود -->
-              <div class="sm:col-span-2">
+              <div class="sm:col-span-2 lg:col-span-4">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">به چه کسانی توصیه می‌شود</label>
                 <textarea
                   name="recommended_for"
@@ -1962,12 +2138,12 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </div>
 
               <!-- نکات و یادداشت‌ها -->
-              <div class="sm:col-span-2">
-                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">نکات و یادداشت‌ها</label>
+              <div class="sm:col-span-2 lg:col-span-4">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">نکات و یادداشت‌ها (هر نکته را در یک خط جداگانه وارد نمایید)</label>
                 <textarea
                   name="notes"
-                  rows="3"
-                  placeholder="نکات، محورهای تحلیلی و یادداشت‌های مربوط به کتاب..."
+                  rows="4"
+                  placeholder="هر نکته را در یک سطر بنویسید تا در صفحه کتاب به‌صورت بالت دایره‌ای نمایش داده شود..."
                   class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
                 >${toPersianDigits(editingLibraryBook.notes || '')}</textarea>
               </div>
@@ -2070,6 +2246,17 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                               : ''
                           }
                         </div>
+                        ${
+                          book.author || book.translator || book.publisher
+                            ? `<p class="text-[11.5px] font-semibold text-[#6B5444] truncate">
+                                ${book.author ? `نویسنده: ${toPersianDigits(book.author)}` : ''}${
+                                book.author && book.translator ? ' · ' : ''
+                              }${book.translator ? `مترجم: ${toPersianDigits(book.translator)}` : ''}${
+                                (book.author || book.translator) && book.publisher ? ' · ' : ''
+                              }${book.publisher ? `ناشر: ${toPersianDigits(book.publisher)}` : ''}
+                              </p>`
+                            : ''
+                        }
                         ${
                           book.short_description
                             ? `<p class="text-[12.5px] text-[#5B4739] line-clamp-2 leading-[1.75]">${toPersianDigits(book.short_description)}</p>`
@@ -4559,13 +4746,15 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     const ac = state.aboutClub;
     const am = state.aboutManager;
     const ci = state.contactInfo;
+    const fs = state.footerSettings || defaultFooterSettings;
+    const footerLinks = Array.isArray(fs.links) ? fs.links : [];
 
     return `
       <div class="space-y-6">
         <div>
           <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">تنظیمات صفحه اصلی سایت</h2>
           <p class="text-[13.5px] text-[#6B5444] mt-1 text-justify">
-            تمامی متون، تیترها، آمارها و اطلاعات تماس صفحه اصلی سایت را در این بخش ویرایش کرده و مستقیماً در دیتابیس ذخیره نمایید.
+            تمامی متون، تیترها، آمارها، اطلاعات تماس و تنظیمات فوتر صفحه اصلی سایت را در این بخش ویرایش کرده و مستقیماً در دیتابیس ذخیره نمایید.
           </p>
         </div>
 
@@ -4691,6 +4880,202 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             </div>
           </div>
 
+          <!-- 5. تنظیمات فوتر -->
+          <div class="p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] space-y-5">
+            <h3 class="font-display text-[17px] font-bold text-[#231912] border-b border-[#E6D8C5] pb-2.5">
+              تنظیمات فوتر
+            </h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="sm:col-span-2">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">عنوان فوتر</label>
+                <input
+                  type="text"
+                  name="footer_title"
+                  value="${toPersianDigits(fs.title || '')}"
+                  placeholder="مثلاً: باشگاه کتابخوانی بوک‌میت"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px]"
+                />
+              </div>
+
+              <div class="sm:col-span-2">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">توضیحات / درباره باشگاه در فوتر</label>
+                <textarea
+                  name="footer_description"
+                  rows="2"
+                  placeholder="توضیحات کوتاه معرفی باشگاه در فوتر..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px]"
+                >${toPersianDigits(fs.description || '')}</textarea>
+              </div>
+
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">شماره تماس در فوتر</label>
+                <input
+                  type="text"
+                  name="footer_phone"
+                  value="${toPersianDigits(fs.phone || '')}"
+                  placeholder="مثلاً: ۰۲۱-۸۸۹۴۳۲۱۰"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px]"
+                />
+              </div>
+
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">ایمیل در فوتر</label>
+                <input
+                  type="text"
+                  dir="ltr"
+                  name="footer_email"
+                  value="${fs.email || ''}"
+                  placeholder="hello@bookmeet.ir"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-left"
+                />
+              </div>
+
+              <div class="sm:col-span-2">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">نشانی در فوتر</label>
+                <input
+                  type="text"
+                  name="footer_address"
+                  value="${toPersianDigits(fs.address || '')}"
+                  placeholder="نشانی نمایش داده شده در فوتر سایت..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px]"
+                />
+              </div>
+
+              <!-- Footer Navigation Links -->
+              <div class="sm:col-span-2 space-y-2.5 pt-2">
+                <div class="flex items-center justify-between">
+                  <label class="block text-[12.5px] font-bold text-[#231912]">لینک‌های فوتر و عناوین آن‌ها</label>
+                  <button
+                    type="button"
+                    class="js-admin-add-footer-link px-3.5 py-1.5 rounded-xl bg-[#EFE3D2] hover:bg-[#E2D0B7] text-[#3F2E21] text-[12px] font-semibold cursor-pointer"
+                  >
+                    + افزودن لینک جدید به فوتر
+                  </button>
+                </div>
+                <div class="js-admin-footer-links-list space-y-2">
+                  ${footerLinks
+                    .map(
+                      (link, idx) => `
+                    <div class="js-admin-footer-link-row flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2.5 rounded-xl bg-[#F4E9DA]/50 border border-[#DFCEB9]">
+                      <input
+                        type="text"
+                        name="footer_link_label_${idx}"
+                        data-footer-link-label
+                        value="${toPersianDigits(link.label || '')}"
+                        placeholder="عنوان لینک (مثلاً: کتابخانه)"
+                        class="flex-1 px-3 py-2 rounded-lg bg-[#FAF5EC] border border-[#DFCEB9] text-[12.5px]"
+                      />
+                      <input
+                        type="text"
+                        dir="ltr"
+                        name="footer_link_href_${idx}"
+                        data-footer-link-href
+                        value="${link.href || ''}"
+                        placeholder="مسیر یا آدرس لینک (مثلاً: #library یا /library)"
+                        class="flex-1 px-3 py-2 rounded-lg bg-[#FAF5EC] border border-[#DFCEB9] text-[12.5px] text-left"
+                      />
+                      <button
+                        type="button"
+                        data-remove-footer-link="${idx}"
+                        class="js-admin-remove-footer-link px-3 py-2 rounded-lg border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[11.5px] font-semibold cursor-pointer shrink-0"
+                      >
+                        حذف
+                      </button>
+                    </div>
+                  `
+                    )
+                    .join('')}
+                </div>
+              </div>
+
+              <!-- Social Media Links -->
+              <div class="sm:col-span-2 pt-2">
+                <label class="block text-[12.5px] font-bold text-[#231912] mb-2">لینک شبکه‌های اجتماعی در فوتر</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div>
+                    <label class="block text-[11.5px] font-semibold text-[#4E3B2D] mb-1">لینک اینستاگرام</label>
+                    <input
+                      type="text"
+                      dir="ltr"
+                      name="footer_instagram"
+                      value="${fs.instagram_url || ''}"
+                      placeholder="https://instagram.com/..."
+                      class="w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px] text-left"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11.5px] font-semibold text-[#4E3B2D] mb-1">لینک تلگرام</label>
+                    <input
+                      type="text"
+                      dir="ltr"
+                      name="footer_telegram"
+                      value="${fs.telegram_url || ''}"
+                      placeholder="https://t.me/..."
+                      class="w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px] text-left"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11.5px] font-semibold text-[#4E3B2D] mb-1">لینک ایکس (توییتر)</label>
+                    <input
+                      type="text"
+                      dir="ltr"
+                      name="footer_twitter"
+                      value="${fs.twitter_url || ''}"
+                      placeholder="https://x.com/..."
+                      class="w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px] text-left"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11.5px] font-semibold text-[#4E3B2D] mb-1">لینک یوتیوب</label>
+                    <input
+                      type="text"
+                      dir="ltr"
+                      name="footer_youtube"
+                      value="${fs.youtube_url || ''}"
+                      placeholder="https://youtube.com/..."
+                      class="w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px] text-left"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11.5px] font-semibold text-[#4E3B2D] mb-1">لینک لینکدین</label>
+                    <input
+                      type="text"
+                      dir="ltr"
+                      name="footer_linkedin"
+                      value="${fs.linkedin_url || ''}"
+                      placeholder="https://linkedin.com/..."
+                      class="w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px] text-left"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Copyright & Tagline -->
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">متن کپی‌رایت فوتر</label>
+                <input
+                  type="text"
+                  name="footer_copyright"
+                  value="${toPersianDigits(fs.copyright_text || '')}"
+                  placeholder="© ۱۴۰۵ باشگاه کتابخوانی بوک‌میت · تمامی حقوق محفوظ است."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px]"
+                />
+              </div>
+
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">عبارت مکمل پایین فوتر</label>
+                <input
+                  type="text"
+                  name="footer_tagline"
+                  value="${toPersianDigits(fs.tagline_text || '')}"
+                  placeholder="حلقه‌های مطالعاتی و نقد ادبیات داستانی"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px]"
+                />
+              </div>
+            </div>
+          </div>
+
           ${
             homeSettingsSavedBanner
               ? `
@@ -4706,7 +5091,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               type="button"
               class="js-admin-save-home-settings px-7 py-3 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[14px] font-semibold cursor-pointer shadow-sm"
             >
-              ذخیره تمامی تنظیمات صفحه اصلی در دیتابیس
+              ذخیره تمامی تنظیمات صفحه اصلی و فوتر در دیتابیس
             </button>
           </div>
         </form>
@@ -4749,18 +5134,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     const navItems: { key: AdminTabKey; label: string; badge?: string }[] = [
       { key: 'dashboard', label: 'داشبورد' },
       {
-        key: 'gallery',
-        label: 'گالری تصاویر',
-        badge: toPersianDigits(state.gallery.length),
-      },
-      {
-        key: 'library',
-        label: 'کتابخانه',
-        badge: toPersianDigits(state.libraryBooks.length),
-      },
-      {
         key: 'sessions',
-        label: 'مدیریت جلسات',
+        label: 'مدیریت نشستها',
         badge: toPersianDigits(state.sessions.length),
       },
       {
@@ -4769,24 +5144,18 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         badge: toPersianDigits(state.classes.length),
       },
       {
+        key: 'library',
+        label: 'کتابخانه',
+        badge: toPersianDigits(state.libraryBooks.length),
+      },
+      {
         key: 'users',
         label: 'مدیریت کاربران',
         badge: toPersianDigits(state.users.length),
       },
       {
-        key: 'tickets',
-        label: 'تیکت',
-        badge: toPersianDigits(state.tickets.length),
-      },
-      {
-        key: 'announcements',
-        label: 'اطلاعیه ها',
-        badge: toPersianDigits(state.announcements.length),
-      },
-      { key: 'profile', label: 'پروفایل' },
-      {
         key: 'blog',
-        label: 'وبلاگ و مقالات',
+        label: 'وبلاگ',
         badge: toPersianDigits(state.blogPosts.length),
       },
       {
@@ -4794,6 +5163,22 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         label: 'نظرات کاربران',
         badge: toPersianDigits(state.comments.length),
       },
+      {
+        key: 'gallery',
+        label: 'گالری تصاویر',
+        badge: toPersianDigits(state.gallery.length),
+      },
+      {
+        key: 'announcements',
+        label: 'اطلاعیه ها',
+        badge: toPersianDigits(state.announcements.length),
+      },
+      {
+        key: 'tickets',
+        label: 'تیکت ها',
+        badge: toPersianDigits(state.tickets.length),
+      },
+      { key: 'profile', label: 'پروفایل' },
       { key: 'home_settings', label: 'تنظیمات صفحه اصلی' },
     ];
 
@@ -5060,6 +5445,12 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   $wrapper.on('click', '.js-admin-new-lib-book-btn', () => {
     editingLibraryBook = {
       title: '',
+      author: '',
+      translator: '',
+      publisher: '',
+      publication_year: 0,
+      edition_number: '',
+      pages_count: 0,
       short_description: '',
       description: '',
       memorable_quote: '',
@@ -5227,9 +5618,27 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       return;
     }
 
+    const pubYearNum = Number(editingLibraryBook.publication_year || 0);
+    if (Number.isNaN(pubYearNum) || pubYearNum < 0) {
+      showToast('سال انتشار باید یک عدد معتبر باشد.', true);
+      return;
+    }
+
+    const pagesCountNum = Number(editingLibraryBook.pages_count || 0);
+    if (Number.isNaN(pagesCountNum) || pagesCountNum < 0) {
+      showToast('تعداد صفحات باید یک عدد معتبر باشد.', true);
+      return;
+    }
+
     const payload: Partial<LibraryBook> & { id?: number } = {
       id: editingLibraryBook.id ? Number(editingLibraryBook.id) : undefined,
       title,
+      author: String(editingLibraryBook.author || '').trim(),
+      translator: String(editingLibraryBook.translator || '').trim(),
+      publisher: String(editingLibraryBook.publisher || '').trim(),
+      publication_year: pubYearNum,
+      edition_number: String(editingLibraryBook.edition_number || '').trim(),
+      pages_count: pagesCountNum,
       short_description: String(editingLibraryBook.short_description || '').trim(),
       description: String(editingLibraryBook.description || '').trim(),
       memorable_quote: String(editingLibraryBook.memorable_quote || '').trim(),
@@ -7121,10 +7530,16 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     );
   });
 
-  // --- Home Settings Handlers ---
-  function handleSaveHomeSettings(): void {
+  // --- Home Settings & Footer Settings Handlers ---
+  function readHomeSettingsFormIntoState(): {
+    heroSettings: Partial<HeroSettings>;
+    aboutClub: Partial<AboutClubData>;
+    aboutManager: Partial<AboutManagerData>;
+    contactInfo: Partial<ContactInfoData>;
+    footerSettings: Partial<FooterSettingsData>;
+  } | null {
     const $f = $wrapper.find('.js-admin-home-settings-form');
-    if (!$f.length) return;
+    if (!$f.length) return null;
 
     const heroSettings: Partial<HeroSettings> = {
       headline: String($f.find('[name="hero_headline"]').val() || '').trim(),
@@ -7161,27 +7576,108 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       telegram_handle: String($f.find('[name="contact_telegram"]').val() || '').trim(),
     };
 
-    ApiService.updateAdminHomeSettings({
+    const links: FooterLinkItem[] = [];
+    $f.find('.js-admin-footer-link-row').each(function () {
+      const label = String($(this).find('[data-footer-link-label]').val() || '').trim();
+      const href = String($(this).find('[data-footer-link-href]').val() || '').trim();
+      if (label || href) {
+        links.push({ label, href: href || '#' });
+      }
+    });
+
+    const footerSettings: Partial<FooterSettingsData> = {
+      title: String($f.find('[name="footer_title"]').val() || '').trim(),
+      description: String($f.find('[name="footer_description"]').val() || '').trim(),
+      phone: String($f.find('[name="footer_phone"]').val() || '').trim(),
+      email: String($f.find('[name="footer_email"]').val() || '').trim(),
+      address: String($f.find('[name="footer_address"]').val() || '').trim(),
+      links,
+      instagram_url: String($f.find('[name="footer_instagram"]').val() || '').trim(),
+      telegram_url: String($f.find('[name="footer_telegram"]').val() || '').trim(),
+      twitter_url: String($f.find('[name="footer_twitter"]').val() || '').trim(),
+      youtube_url: String($f.find('[name="footer_youtube"]').val() || '').trim(),
+      linkedin_url: String($f.find('[name="footer_linkedin"]').val() || '').trim(),
+      copyright_text: String($f.find('[name="footer_copyright"]').val() || '').trim(),
+      tagline_text: String($f.find('[name="footer_tagline"]').val() || '').trim(),
+    };
+
+    state.heroSettings = { ...state.heroSettings, ...heroSettings };
+    state.aboutClub = { ...state.aboutClub, ...aboutClub };
+    state.aboutManager = { ...state.aboutManager, ...aboutManager };
+    state.contactInfo = { ...state.contactInfo, ...contactInfo };
+    state.footerSettings = {
+      ...(state.footerSettings || defaultFooterSettings),
+      ...footerSettings,
+      links,
+    };
+
+    return {
       heroSettings,
       aboutClub,
       aboutManager,
       contactInfo,
-    })
+      footerSettings,
+    };
+  }
+
+  $wrapper.on('click', '.js-admin-add-footer-link', () => {
+    readHomeSettingsFormIntoState();
+    const currentLinks = Array.isArray(state.footerSettings?.links)
+      ? [...state.footerSettings!.links]
+      : [];
+    currentLinks.push({ label: 'لینک جدید', href: '#' });
+    state.footerSettings = {
+      ...(state.footerSettings || defaultFooterSettings),
+      links: currentLinks,
+    };
+    render();
+  });
+
+  $wrapper.on('click', '.js-admin-remove-footer-link', function () {
+    readHomeSettingsFormIntoState();
+    const idx = Number($(this).data('remove-footer-link'));
+    const currentLinks = Array.isArray(state.footerSettings?.links)
+      ? [...state.footerSettings!.links]
+      : [];
+    if (!Number.isNaN(idx) && idx >= 0 && idx < currentLinks.length) {
+      currentLinks.splice(idx, 1);
+      state.footerSettings = {
+        ...(state.footerSettings || defaultFooterSettings),
+        links: currentLinks,
+      };
+      render();
+    }
+  });
+
+  function handleSaveHomeSettings(): void {
+    const collected = readHomeSettingsFormIntoState();
+    if (!collected) return;
+
+    const cleanLinks = (collected.footerSettings.links || []).filter((l) =>
+      Boolean(String(l.label || '').trim())
+    );
+    collected.footerSettings.links = cleanLinks;
+
+    ApiService.updateAdminHomeSettings(collected)
       .then((res) => {
         state.heroSettings = res.heroSettings;
         state.aboutClub = res.aboutClub;
         state.aboutManager = res.aboutManager;
         state.contactInfo = res.contactInfo;
+        if (res.footerSettings) {
+          state.footerSettings = res.footerSettings;
+        }
         homeSettingsSavedBanner =
-          'تمامی تنظیمات صفحه اصلی با موفقیت در دیتابیس ذخیره و در سایت اعمال شد.';
+          'تمامی تنظیمات صفحه اصلی و فوتر با موفقیت در دیتابیس ذخیره و در سایت اعمال شد.';
         props.onSiteDataUpdated({
           heroSettings: res.heroSettings,
           aboutClub: res.aboutClub,
           aboutManager: res.aboutManager,
           contactInfo: res.contactInfo,
+          footerSettings: res.footerSettings,
         });
         render();
-        showToast('تنظیمات صفحه اصلی سایت با موفقیت ذخیره شد.');
+        showToast('تنظیمات صفحه اصلی و فوتر سایت با موفقیت ذخیره شد.');
       })
       .catch((err) => showToast(err.message || 'خطا در ذخیره تنظیمات صفحه اصلی', true));
   }

@@ -74,7 +74,9 @@ export interface LibraryBookRow {
   translator: string;
   category: string;
   publication_year: number;
+  edition_number?: string;
   pages_count: number;
+  publisher?: string;
   reading_progress_percent: number;
   session_schedule: string;
   cover_url: string;
@@ -114,6 +116,28 @@ export interface ContactInfoRow {
   email: string;
   phone: string;
   telegram_handle: string;
+}
+
+export interface FooterLinkItemRow {
+  label: string;
+  href: string;
+}
+
+export interface FooterSettingsRow {
+  id: number;
+  title: string;
+  description: string;
+  phone: string;
+  email: string;
+  address: string;
+  links: FooterLinkItemRow[];
+  instagram_url: string;
+  telegram_url: string;
+  twitter_url: string;
+  youtube_url: string;
+  linkedin_url: string;
+  copyright_text: string;
+  tagline_text: string;
 }
 
 export interface ContactMessageRow {
@@ -411,6 +435,30 @@ const EMPTY_CONTACT_INFO: ContactInfoRow = {
   telegram_handle: '@BookmeetClub',
 };
 
+const EMPTY_FOOTER_SETTINGS: FooterSettingsRow = {
+  id: 1,
+  title: 'باشگاه کتابخوانی بوک‌میت',
+  description: 'حلقه‌ای صمیمی برای خواندن عمیق، گفت‌وگوی انتقادی و تجربه زیستن در جهان ادبیات.',
+  phone: '۰۲۱-۸۸۹۴۳۲۱۰',
+  email: 'hello@bookmeet.ir',
+  address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات بوک‌میت',
+  links: [
+    { label: 'درباره باشگاه', href: '#about-club' },
+    { label: 'کتابخانه', href: '/library' },
+    { label: 'نشست‌ها', href: '#events' },
+    { label: 'کلاس‌ها و دوره‌ها', href: '#courses' },
+    { label: 'وبلاگ', href: '/blog' },
+    { label: 'تماس با ما', href: '#contact' },
+  ],
+  instagram_url: '',
+  telegram_url: '',
+  twitter_url: '',
+  youtube_url: '',
+  linkedin_url: '',
+  copyright_text: '© ۱۴۰۵ باشگاه کتابخوانی بوک‌میت · تمامی حقوق برای اعضا و نویسندگان محفوظ است.',
+  tagline_text: 'طراحی با الهام از چاپخانه‌های کلاسیک و زیبایی‌شناسی مینیمالیستی نوردیک',
+};
+
 export function normalizeIdentifierDigits(input: string): string {
   return String(input || '')
     .trim()
@@ -591,7 +639,9 @@ class MySQLDatabaseManager {
         translator VARCHAR(150) NOT NULL DEFAULT '',
         category VARCHAR(80) NOT NULL DEFAULT '',
         publication_year INT NOT NULL DEFAULT 0,
+        edition_number VARCHAR(80) NOT NULL DEFAULT '',
         pages_count INT NOT NULL DEFAULT 0,
+        publisher VARCHAR(150) NOT NULL DEFAULT '',
         reading_progress_percent INT NOT NULL DEFAULT 0,
         session_schedule VARCHAR(180) NOT NULL DEFAULT '',
         cover_url LONGTEXT NOT NULL,
@@ -646,6 +696,24 @@ class MySQLDatabaseManager {
         email VARCHAR(150) NOT NULL,
         phone VARCHAR(80) NOT NULL,
         telegram_handle VARCHAR(100) NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS footer_settings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(200) NOT NULL DEFAULT 'باشگاه کتابخوانی بوک‌میت',
+        description TEXT NOT NULL,
+        phone VARCHAR(80) NOT NULL DEFAULT '',
+        email VARCHAR(150) NOT NULL DEFAULT '',
+        address VARCHAR(255) NOT NULL DEFAULT '',
+        links_json LONGTEXT NOT NULL,
+        instagram_url VARCHAR(255) NOT NULL DEFAULT '',
+        telegram_url VARCHAR(255) NOT NULL DEFAULT '',
+        twitter_url VARCHAR(255) NOT NULL DEFAULT '',
+        youtube_url VARCHAR(255) NOT NULL DEFAULT '',
+        linkedin_url VARCHAR(255) NOT NULL DEFAULT '',
+        copyright_text VARCHAR(255) NOT NULL DEFAULT '',
+        tagline_text VARCHAR(255) NOT NULL DEFAULT '',
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
@@ -955,6 +1023,8 @@ class MySQLDatabaseManager {
 
     // 6. Safely add extended book metadata columns to library_books if missing
     const libraryBookColumnsToEnsure: Array<{ name: string; definition: string }> = [
+      { name: 'edition_number', definition: "VARCHAR(80) NOT NULL DEFAULT ''" },
+      { name: 'publisher', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
       { name: 'description', definition: 'LONGTEXT NULL' },
       { name: 'memorable_quote', definition: 'TEXT NULL' },
       { name: 'recommended_for', definition: 'TEXT NULL' },
@@ -1190,6 +1260,8 @@ class MySQLDatabaseManager {
     );
     return (rows as LibraryBookRow[]).map((b) => ({
       ...b,
+      edition_number: b.edition_number ?? '',
+      publisher: b.publisher ?? '',
       description: b.description ?? '',
       memorable_quote: b.memorable_quote ?? '',
       recommended_for: b.recommended_for ?? '',
@@ -1241,6 +1313,36 @@ class MySQLDatabaseManager {
       return EMPTY_CONTACT_INFO;
     }
     return rows[0] as ContactInfoRow;
+  }
+
+  public async getFooterSettings(): Promise<FooterSettingsRow> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM footer_settings ORDER BY id ASC LIMIT 1'
+    );
+    if (rows.length === 0) {
+      return {
+        ...EMPTY_FOOTER_SETTINGS,
+        links: EMPTY_FOOTER_SETTINGS.links.map((item) => ({ ...item })),
+      };
+    }
+    const row = rows[0];
+    const parsedLinks = safeJsonParse<FooterLinkItemRow[]>(row.links_json, EMPTY_FOOTER_SETTINGS.links);
+    return {
+      id: Number(row.id || 1),
+      title: String(row.title ?? EMPTY_FOOTER_SETTINGS.title),
+      description: String(row.description ?? EMPTY_FOOTER_SETTINGS.description),
+      phone: String(row.phone ?? EMPTY_FOOTER_SETTINGS.phone),
+      email: String(row.email ?? EMPTY_FOOTER_SETTINGS.email),
+      address: String(row.address ?? EMPTY_FOOTER_SETTINGS.address),
+      links: Array.isArray(parsedLinks) ? parsedLinks : EMPTY_FOOTER_SETTINGS.links,
+      instagram_url: String(row.instagram_url ?? ''),
+      telegram_url: String(row.telegram_url ?? ''),
+      twitter_url: String(row.twitter_url ?? ''),
+      youtube_url: String(row.youtube_url ?? ''),
+      linkedin_url: String(row.linkedin_url ?? ''),
+      copyright_text: String(row.copyright_text ?? EMPTY_FOOTER_SETTINGS.copyright_text),
+      tagline_text: String(row.tagline_text ?? EMPTY_FOOTER_SETTINGS.tagline_text),
+    };
   }
 
   public async createContactMessage(input: {
@@ -3095,40 +3197,6 @@ class MySQLDatabaseManager {
     }
 
     if (existingSessions.length === 0) {
-      // Check if this event originated from library_books and create a matching member_sessions record
-      const fallbackBookId =
-        input.target_id && Number(input.target_id) > 100 ? Number(input.target_id) - 100 : 0;
-      const [bookRows] = await this.pool.execute<RowDataPacket[]>(
-        'SELECT * FROM library_books WHERE id = ? OR title = ? OR title = ? LIMIT 1',
-        [fallbackBookId, String(input.book_title || '').trim(), String(input.title || '').trim()]
-      );
-      if (bookRows.length > 0) {
-        const b = bookRows[0];
-        const createdSession = await this.saveAdminSession({
-          title: String(input.title || `نشست کتاب «${b.title}»`),
-          book_title: String(b.title || input.book_title || input.title || ''),
-          book_author: String(b.author || input.book_author || ''),
-          translator: String(b.translator || input.mentor_or_instructor || ''),
-          category: String(b.category || ''),
-          publication_year: Number(b.publication_year || 1405),
-          pages_count: Number(b.pages_count || input.pages_count || 0),
-          publisher: String(input.publisher || ''),
-          mentor_name: String(b.translator || input.mentor_or_instructor || ''),
-          session_date: String(input.schedule_text || b.session_schedule || ''),
-          session_time: String(input.time_text || ''),
-          cover_url: String(b.cover_url || input.cover_url || '/assets/book-current.png'),
-          short_description: String(b.short_description || input.description || ''),
-          full_description: String(b.short_description || input.description || ''),
-          status: 'فعال',
-        });
-        [existingSessions] = await this.pool.execute<RowDataPacket[]>(
-          'SELECT * FROM member_sessions WHERE id = ? LIMIT 1',
-          [createdSession.id]
-        );
-      }
-    }
-
-    if (existingSessions.length === 0) {
       throw new Error('نشست یا دوره هم‌خوانی مورد نظر در سیستم یافت نشد.');
     }
 
@@ -3186,6 +3254,7 @@ class MySQLDatabaseManager {
     aboutClub: AboutClubRow;
     aboutManager: AboutManagerRow;
     contactInfo: ContactInfoRow;
+    footerSettings: FooterSettingsRow;
     libraryBooks: LibraryBookRow[];
     libraryCategories: LibraryCategoryRow[];
   }> {
@@ -3202,6 +3271,7 @@ class MySQLDatabaseManager {
       aboutClub,
       aboutManager,
       contactInfo,
+      footerSettings,
       libraryBooks,
       libraryCategories,
     ] = await Promise.all([
@@ -3233,6 +3303,7 @@ class MySQLDatabaseManager {
       this.getAboutClub(),
       this.getAboutManager(),
       this.getContactInfo(),
+      this.getFooterSettings(),
       this.getLibraryBooks(),
       this.getLibraryCategories(),
     ]);
@@ -3256,6 +3327,7 @@ class MySQLDatabaseManager {
       aboutClub,
       aboutManager,
       contactInfo,
+      footerSettings,
       libraryBooks,
       libraryCategories,
     };
@@ -3499,6 +3571,13 @@ class MySQLDatabaseManager {
       throw new Error('عنوان کتاب الزامی است.');
     }
 
+    const parseNumericInput = (val: unknown, fallback = 0): number => {
+      if (val === undefined || val === null || String(val).trim() === '') return fallback;
+      const normalized = normalizeIdentifierDigits(String(val));
+      const num = Number(normalized.replace(/[^0-9.-]/g, ''));
+      return Number.isFinite(num) && num >= 0 ? Math.floor(num) : fallback;
+    };
+
     if (input.id) {
       const [rows] = await this.pool.execute<RowDataPacket[]>(
         'SELECT * FROM library_books WHERE id = ? LIMIT 1',
@@ -3520,6 +3599,22 @@ class MySQLDatabaseManager {
         input.category !== undefined
           ? String(input.category).trim()
           : String(current.category || '');
+      const nextPublicationYear =
+        input.publication_year !== undefined
+          ? parseNumericInput(input.publication_year, Number(current.publication_year || 0))
+          : Number(current.publication_year || 0);
+      const nextEditionNumber =
+        input.edition_number !== undefined
+          ? String(input.edition_number).trim()
+          : String(current.edition_number || '');
+      const nextPagesCount =
+        input.pages_count !== undefined
+          ? parseNumericInput(input.pages_count, Number(current.pages_count || 0))
+          : Number(current.pages_count || 0);
+      const nextPublisher =
+        input.publisher !== undefined
+          ? String(input.publisher).trim()
+          : String(current.publisher || '');
       const nextCoverUrl =
         input.cover_url !== undefined
           ? String(input.cover_url).trim()
@@ -3547,8 +3642,9 @@ class MySQLDatabaseManager {
 
       await this.pool.execute(
         `UPDATE library_books
-         SET title = ?, author = ?, translator = ?, category = ?, cover_url = ?,
-             short_description = ?, description = ?, memorable_quote = ?,
+         SET title = ?, author = ?, translator = ?, category = ?,
+             publication_year = ?, edition_number = ?, pages_count = ?, publisher = ?,
+             cover_url = ?, short_description = ?, description = ?, memorable_quote = ?,
              recommended_for = ?, tags = ?, notes = ?
          WHERE id = ?`,
         [
@@ -3556,6 +3652,10 @@ class MySQLDatabaseManager {
           nextAuthor,
           nextTranslator,
           nextCategory,
+          nextPublicationYear,
+          nextEditionNumber,
+          nextPagesCount,
+          nextPublisher,
           nextCoverUrl,
           nextShortDesc,
           nextDescription,
@@ -3571,12 +3671,26 @@ class MySQLDatabaseManager {
         'SELECT * FROM library_books WHERE id = ? LIMIT 1',
         [Number(input.id)]
       );
-      return updated[0] as LibraryBookRow;
+      const row = updated[0] as LibraryBookRow;
+      return {
+        ...row,
+        edition_number: row.edition_number ?? '',
+        publisher: row.publisher ?? '',
+        description: row.description ?? '',
+        memorable_quote: row.memorable_quote ?? '',
+        recommended_for: row.recommended_for ?? '',
+        tags: row.tags ?? '',
+        notes: row.notes ?? '',
+      };
     }
 
     const author = String(input.author || '').trim();
     const translator = String(input.translator || '').trim();
     const category = String(input.category || '').trim();
+    const publicationYear = parseNumericInput(input.publication_year, 0);
+    const editionNumber = String(input.edition_number || '').trim();
+    const pagesCount = parseNumericInput(input.pages_count, 0);
+    const publisher = String(input.publisher || '').trim();
     const coverUrl = String(input.cover_url || '').trim();
     const shortDescription = String(input.short_description || '').trim();
     const description = String(input.description || '').trim();
@@ -3587,13 +3701,17 @@ class MySQLDatabaseManager {
 
     const [result] = await this.pool.execute<ResultSetHeader>(
       `INSERT INTO library_books
-        (is_current, title, original_title, author, translator, category, publication_year, pages_count, reading_progress_percent, session_schedule, cover_url, short_description, description, memorable_quote, recommended_for, tags, notes, sort_order)
-       VALUES (0, ?, '', ?, ?, ?, 0, 0, 0, '', ?, ?, ?, ?, ?, ?, ?, 0)`,
+        (is_current, title, original_title, author, translator, category, publication_year, edition_number, pages_count, publisher, reading_progress_percent, session_schedule, cover_url, short_description, description, memorable_quote, recommended_for, tags, notes, sort_order)
+       VALUES (0, ?, '', ?, ?, ?, ?, ?, ?, ?, 0, '', ?, ?, ?, ?, ?, ?, ?, 0)`,
       [
         title,
         author,
         translator,
         category,
+        publicationYear,
+        editionNumber,
+        pagesCount,
+        publisher,
         coverUrl,
         shortDescription,
         description,
@@ -3608,7 +3726,17 @@ class MySQLDatabaseManager {
       'SELECT * FROM library_books WHERE id = ? LIMIT 1',
       [result.insertId]
     );
-    return created[0] as LibraryBookRow;
+    const row = created[0] as LibraryBookRow;
+    return {
+      ...row,
+      edition_number: row.edition_number ?? '',
+      publisher: row.publisher ?? '',
+      description: row.description ?? '',
+      memorable_quote: row.memorable_quote ?? '',
+      recommended_for: row.recommended_for ?? '',
+      tags: row.tags ?? '',
+      notes: row.notes ?? '',
+    };
   }
 
   public async deleteAdminLibraryBook(id: number): Promise<void> {
@@ -4420,11 +4548,13 @@ class MySQLDatabaseManager {
     aboutClub?: Partial<AboutClubRow>;
     aboutManager?: Partial<AboutManagerRow>;
     contactInfo?: Partial<ContactInfoRow>;
+    footerSettings?: Partial<FooterSettingsRow>;
   }): Promise<{
     heroSettings: HeroSettingsRow;
     aboutClub: AboutClubRow;
     aboutManager: AboutManagerRow;
     contactInfo: ContactInfoRow;
+    footerSettings: FooterSettingsRow;
   }> {
     if (input.heroSettings) {
       const current = await this.getHeroSettings();
@@ -4605,11 +4735,78 @@ class MySQLDatabaseManager {
       }
     }
 
-    const [heroSettings, aboutClub, aboutManager, contactInfo] = await Promise.all([
+    if (input.footerSettings) {
+      const current = await this.getFooterSettings();
+      const merged: FooterSettingsRow = {
+        ...current,
+        ...input.footerSettings,
+        links: Array.isArray(input.footerSettings.links)
+          ? input.footerSettings.links
+              .map((l) => ({
+                label: String(l?.label || '').trim(),
+                href: String(l?.href || '').trim() || '#',
+              }))
+              .filter((l) => Boolean(l.label))
+          : current.links,
+      };
+      const linksJson = JSON.stringify(merged.links || []);
+      const [rows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT id FROM footer_settings ORDER BY id ASC LIMIT 1'
+      );
+      if (rows.length > 0) {
+        await this.pool.execute(
+          `UPDATE footer_settings
+           SET title = ?, description = ?, phone = ?, email = ?, address = ?,
+               links_json = ?, instagram_url = ?, telegram_url = ?, twitter_url = ?,
+               youtube_url = ?, linkedin_url = ?, copyright_text = ?, tagline_text = ?
+           WHERE id = ?`,
+          [
+            String(merged.title || '').trim(),
+            String(merged.description || '').trim(),
+            String(merged.phone || '').trim(),
+            String(merged.email || '').trim(),
+            String(merged.address || '').trim(),
+            linksJson,
+            String(merged.instagram_url || '').trim(),
+            String(merged.telegram_url || '').trim(),
+            String(merged.twitter_url || '').trim(),
+            String(merged.youtube_url || '').trim(),
+            String(merged.linkedin_url || '').trim(),
+            String(merged.copyright_text || '').trim(),
+            String(merged.tagline_text || '').trim(),
+            rows[0].id,
+          ]
+        );
+      } else {
+        await this.pool.execute(
+          `INSERT INTO footer_settings
+            (title, description, phone, email, address, links_json, instagram_url, telegram_url, twitter_url, youtube_url, linkedin_url, copyright_text, tagline_text)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            String(merged.title || '').trim(),
+            String(merged.description || '').trim(),
+            String(merged.phone || '').trim(),
+            String(merged.email || '').trim(),
+            String(merged.address || '').trim(),
+            linksJson,
+            String(merged.instagram_url || '').trim(),
+            String(merged.telegram_url || '').trim(),
+            String(merged.twitter_url || '').trim(),
+            String(merged.youtube_url || '').trim(),
+            String(merged.linkedin_url || '').trim(),
+            String(merged.copyright_text || '').trim(),
+            String(merged.tagline_text || '').trim(),
+          ]
+        );
+      }
+    }
+
+    const [heroSettings, aboutClub, aboutManager, contactInfo, footerSettings] = await Promise.all([
       this.getHeroSettings(),
       this.getAboutClub(),
       this.getAboutManager(),
       this.getContactInfo(),
+      this.getFooterSettings(),
     ]);
 
     return {
@@ -4617,6 +4814,7 @@ class MySQLDatabaseManager {
       aboutClub,
       aboutManager,
       contactInfo,
+      footerSettings,
     };
   }
 }

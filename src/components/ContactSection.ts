@@ -1,16 +1,54 @@
 import $ from 'jquery';
 import { ApiService } from '../services/api.ts';
-import type { ContactInfoData } from '../types/models.ts';
+import type { ContactInfoData, FooterSettingsData } from '../types/models.ts';
 import { toPersianDigits } from '../utils/persianNumbers.ts';
 
 export interface ContactSectionProps {
   contactInfo: ContactInfoData;
+  footerSettings?: FooterSettingsData;
 }
+
+const DEFAULT_FOOTER_SETTINGS: FooterSettingsData = {
+  id: 1,
+  title: 'باشگاه کتابخوانی بوک‌میت',
+  description: 'محفلی صمیمی برای خوانش آهسته، نقد ادبی و هم‌اندیشی پیرامون ماندگارترین آثار داستانی و فلسفی جهان.',
+  phone: '۰۲۱-۸۸۹۴۳۲۱۰',
+  email: 'hello@bookmeet.ir',
+  address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات بوک‌میت',
+  links: [
+    { label: 'درباره باشگاه', href: '#about-club' },
+    { label: 'کتابخانه', href: '#library' },
+    { label: 'نشست‌ها', href: '#events' },
+    { label: 'کلاس‌ها و دوره‌ها', href: '#courses' },
+    { label: 'وبلاگ', href: '#blog' },
+    { label: 'تماس با ما', href: '#contact' },
+  ],
+  instagram_url: '',
+  telegram_url: '',
+  twitter_url: '',
+  youtube_url: '',
+  linkedin_url: '',
+  copyright_text: 'تمامی حقوق مادی و معنوی برای باشگاه کتابخوانی بوک‌میت محفوظ است · ۱۴۰۵',
+  tagline_text: 'حلقه‌های مطالعاتی و نقد ادبیات داستانی',
+};
 
 export function createContactSectionComponent(
   props: ContactSectionProps
 ): JQuery<HTMLElement> {
   const { contactInfo } = props;
+  const footer: FooterSettingsData = {
+    ...DEFAULT_FOOTER_SETTINGS,
+    ...(props.footerSettings || {}),
+    links: Array.isArray(props.footerSettings?.links)
+      ? props.footerSettings!.links
+      : DEFAULT_FOOTER_SETTINGS.links,
+  };
+
+  const footerLinks = (footer.links || []).filter((l) => String(l?.label || '').trim());
+  const hasFooterContact =
+    Boolean(String(footer.phone || '').trim()) ||
+    Boolean(String(footer.email || '').trim()) ||
+    Boolean(String(footer.address || '').trim());
 
   const $section = $(`
     <section
@@ -125,9 +163,9 @@ export function createContactSectionComponent(
           </div>
         </div>
 
-        <!-- Refined Proportional Footer with Brand Headline & Organized Social Media Icons -->
+        <!-- Refined Proportional Footer Configured via Admin Footer Settings -->
         <footer class="mt-16 pt-8 border-t border-[#d8ccb6]">
-          <div class="bg-[#f6f1e4]/75 border border-[#ded3be] rounded-2xl px-6 py-5 sm:px-7 sm:py-6">
+          <div class="bg-[#f6f1e4]/75 border border-[#ded3be] rounded-2xl px-6 py-5 sm:px-7 sm:py-6 space-y-5">
             <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-5 border-b border-[#e5dccb]">
               <!-- Compact Prominent Brand Title & Subtitle -->
               <div class="space-y-1.5 max-w-lg">
@@ -138,15 +176,19 @@ export function createContactSectionComponent(
                     class="h-10 w-auto object-contain select-none shrink-0"
                   />
                   <h3 class="text-base sm:text-[18px] font-bold text-[#2c1b0e] tracking-tight">
-                    باشگاه کتابخوانی بوک‌میت
+                    ${toPersianDigits(footer.title || 'باشگاه کتابخوانی بوک‌میت')}
                   </h3>
                 </div>
-                <p
-                  class="text-[12px] text-[#5c4a3a] leading-[1.9] text-justify"
-                  style="text-align: justify; text-justify: inter-word;"
-                >
-                  محفلی صمیمی برای خوانش آهسته، نقد ادبی و هم‌اندیشی پیرامون ماندگارترین آثار داستانی و فلسفی جهان.
-                </p>
+                ${
+                  footer.description
+                    ? `<p
+                        class="text-[12px] text-[#5c4a3a] leading-[1.9] text-justify"
+                        style="text-align: justify; text-justify: inter-word;"
+                      >
+                        ${toPersianDigits(footer.description)}
+                      </p>`
+                    : ''
+                }
               </div>
 
               <!-- Organized Social Media Icon Row -->
@@ -157,7 +199,9 @@ export function createContactSectionComponent(
                 <div class="flex items-center gap-2" role="list" aria-label="شبکه‌های اجتماعی باشگاه بوک‌میت">
                   <!-- Instagram -->
                   <a
-                    href="#instagram"
+                    href="${footer.instagram_url || '#instagram'}"
+                    ${footer.instagram_url ? 'target="_blank" rel="noopener noreferrer"' : ''}
+                    data-has-url="${footer.instagram_url ? '1' : '0'}"
                     aria-label="اینستاگرام بوک‌میت"
                     title="اینستاگرام"
                     class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
@@ -171,7 +215,9 @@ export function createContactSectionComponent(
 
                   <!-- Telegram -->
                   <a
-                    href="#telegram"
+                    href="${footer.telegram_url || '#telegram'}"
+                    ${footer.telegram_url ? 'target="_blank" rel="noopener noreferrer"' : ''}
+                    data-has-url="${footer.telegram_url ? '1' : '0'}"
                     aria-label="تلگرام بوک‌میت"
                     title="تلگرام"
                     class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
@@ -184,7 +230,9 @@ export function createContactSectionComponent(
 
                   <!-- X / Twitter -->
                   <a
-                    href="#x"
+                    href="${footer.twitter_url || '#x'}"
+                    ${footer.twitter_url ? 'target="_blank" rel="noopener noreferrer"' : ''}
+                    data-has-url="${footer.twitter_url ? '1' : '0'}"
                     aria-label="ایکس (توییتر) بوک‌میت"
                     title="ایکس (توییتر)"
                     class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
@@ -197,7 +245,9 @@ export function createContactSectionComponent(
 
                   <!-- YouTube -->
                   <a
-                    href="#youtube"
+                    href="${footer.youtube_url || '#youtube'}"
+                    ${footer.youtube_url ? 'target="_blank" rel="noopener noreferrer"' : ''}
+                    data-has-url="${footer.youtube_url ? '1' : '0'}"
                     aria-label="یوتیوب بوک‌میت"
                     title="یوتیوب"
                     class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
@@ -210,7 +260,9 @@ export function createContactSectionComponent(
 
                   <!-- LinkedIn -->
                   <a
-                    href="#linkedin"
+                    href="${footer.linkedin_url || '#linkedin'}"
+                    ${footer.linkedin_url ? 'target="_blank" rel="noopener noreferrer"' : ''}
+                    data-has-url="${footer.linkedin_url ? '1' : '0'}"
                     aria-label="لینکدین بوک‌میت"
                     title="لینکدین"
                     class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
@@ -225,12 +277,68 @@ export function createContactSectionComponent(
               </div>
             </div>
 
-            <div class="pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-[#75604d]">
+            ${
+              footerLinks.length > 0 || hasFooterContact
+                ? `
+              <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#e5dccb] text-[12px] text-[#5c4a3a]">
+                ${
+                  footerLinks.length > 0
+                    ? `
+                  <nav aria-label="لینک‌های فوتر" class="flex flex-wrap items-center gap-x-5 gap-y-2">
+                    ${footerLinks
+                      .map(
+                        (link) => `
+                      <a
+                        href="${link.href || '#'}"
+                        class="font-semibold text-[#382315] hover:text-[#7a4b2a] transition-colors"
+                      >
+                        ${toPersianDigits(link.label)}
+                      </a>
+                    `
+                      )
+                      .join('')}
+                  </nav>
+                `
+                    : '<div></div>'
+                }
+
+                ${
+                  hasFooterContact
+                    ? `
+                  <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11.5px] text-[#5c4a3a]">
+                    ${
+                      footer.phone
+                        ? `<span>تلفن: <strong class="font-semibold text-[#2c1b0e]">${toPersianDigits(footer.phone)}</strong></span>`
+                        : ''
+                    }
+                    ${
+                      footer.email
+                        ? `<span>ایمیل: <strong class="font-semibold text-[#2c1b0e]">${footer.email}</strong></span>`
+                        : ''
+                    }
+                    ${
+                      footer.address
+                        ? `<span>نشانی: <strong class="font-semibold text-[#2c1b0e]">${toPersianDigits(footer.address)}</strong></span>`
+                        : ''
+                    }
+                  </div>
+                `
+                    : ''
+                }
+              </div>
+            `
+                : ''
+            }
+
+            <div class="pt-1 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-[#75604d]">
               <div>
-                تمامی حقوق مادی و معنوی برای <strong class="font-semibold text-[#382315]">باشگاه کتابخوانی بوک‌میت</strong> محفوظ است · ۱۴۰۵
+                ${toPersianDigits(
+                  footer.copyright_text ||
+                    'تمامی حقوق مادی و معنوی برای باشگاه کتابخوانی بوک‌میت محفوظ است · ۱۴۰۵'
+                )}
               </div>
               <div>
-                حلقه‌های مطالعاتی و نقد ادبیات داستانی
+                ${toPersianDigits(footer.tagline_text || 'حلقه‌های مطالعاتی و نقد ادبیات داستانی')}
               </div>
             </div>
           </div>
@@ -239,8 +347,11 @@ export function createContactSectionComponent(
     </section>
   `);
 
-  $section.find('.js-social-icon').on('click', (e) => {
-    e.preventDefault();
+  $section.find('.js-social-icon').on('click', function (e) {
+    const hasUrl = String($(this).attr('data-has-url')) === '1';
+    if (!hasUrl) {
+      e.preventDefault();
+    }
   });
 
   const $form = $section.find('.js-contact-form');
