@@ -150,6 +150,16 @@ export interface ContactMessageInput {
   message: string;
 }
 
+export interface ContactMessageItem {
+  id: number;
+  full_name: string;
+  email: string;
+  subject: string;
+  message: string;
+  is_read: number;
+  created_at: string;
+}
+
 export interface ClubMember {
   id: number;
   first_name: string;
@@ -389,6 +399,7 @@ export interface AdminPanelPayload {
   footerSettings?: FooterSettingsData;
   libraryBooks: LibraryBook[];
   libraryCategories?: LibraryCategory[];
+  contactMessages?: ContactMessageItem[];
 }
 
 export interface ClubRegisterInput {

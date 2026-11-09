@@ -146,6 +146,7 @@ export interface ContactMessageRow {
   email: string;
   subject: string;
   message: string;
+  is_read: number;
   created_at: string;
 }
 
@@ -378,7 +379,7 @@ const DEFAULT_NAVIGATION_LINKS: NavigationLinkRow[] = [
 
 const EMPTY_HERO_SETTINGS: HeroSettingsRow = {
   id: 1,
-  headline: 'به باشگاه کتابخوانی بوک میت خوش آمدید',
+  headline: 'به باشگاه کتابخوانی کتابوشکا خوش آمدید',
   subtitle_line_1:
     'بعضی جهان‌ها تنها زمانی جان می‌گیرند که از خواندن دست بکشید و به تماشا بنشینید.',
   subtitle_line_2:
@@ -391,14 +392,14 @@ const EMPTY_HERO_SETTINGS: HeroSettingsRow = {
 
 const EMPTY_ABOUT_CLUB: AboutClubRow = {
   id: 1,
-  section_kicker: '۰۱ · درباره باشگاه کتابخوانی بوک‌میت',
+  section_kicker: '۰۱ · درباره باشگاه کتابخوانی کتابوشکا',
   title: 'جایی برای زیستن در جهانِ کتاب‌هایی که فراموش نمی‌شوند',
   paragraph_1:
-    'باشگاه کتابخوانی بوک‌میت با هدف شکل‌دادن به فضایی صمیمی، عمیق و اندیشه‌ورز برای علاقه‌مندان به ادبیات داستانی و آثار ماندگار جهان راه‌اندازی شده است.',
+    'باشگاه کتابخوانی کتابوشکا با هدف شکل‌دادن به فضایی صمیمی، عمیق و اندیشه‌ورز برای علاقه‌مندان به ادبیات داستانی و آثار ماندگار جهان راه‌اندازی شده است.',
   paragraph_2:
-    'در نشست‌های دوره‌ای و حلقه‌های مطالعاتی بوک‌میت، اعضا گرد هم می‌آیند تا ضمن واکاوی ساختار، شخصیت‌پردازی و درون‌مایه‌های فلسفی آثار برگزیده، تجربه‌های زیسته خود را به اشتراک بگذارند.',
+    'در نشست‌های دوره‌ای و حلقه‌های مطالعاتی کتابوشکا، اعضا گرد هم می‌آیند تا ضمن واکاوی ساختار، شخصیت‌پردازی و درون‌مایه‌های فلسفی آثار برگزیده، تجربه‌های زیسته خود را به اشتراک بگذارند.',
   image_url: '/assets/about-club.png',
-  image_caption: 'نشست‌های هم‌خوانی و بررسی نسخه‌های ماندگار ادبی در باشگاه بوک‌میت',
+  image_caption: 'نشست‌های هم‌خوانی و بررسی نسخه‌های ماندگار ادبی در باشگاه کتابوشکا',
   stat_1_value: '۰',
   stat_1_label: 'نشست نقد و هم‌خوانی',
   stat_2_value: '۰',
@@ -411,11 +412,11 @@ const EMPTY_ABOUT_MANAGER: AboutManagerRow = {
   id: 1,
   section_kicker: '۰۲ · معرفی مدیر و بنیان‌گذار باشگاه',
   full_name: 'سهراب رستگار',
-  role_title: 'پژوهشگر ادبیات تطبیقی، منتقد ادبی و بنیان‌گذار باشگاه کتابخوانی بوک‌میت',
+  role_title: 'پژوهشگر ادبیات تطبیقی، منتقد ادبی و بنیان‌گذار باشگاه کتابخوانی کتابوشکا',
   bio_paragraph_1:
     'سهراب رستگار در حوزه نقد ادبی، روایت‌شناسی و برگزاری کارگاه‌های تخصصی خوانش خلاق فعالیت می‌کند.',
   bio_paragraph_2:
-    'دغدغه اصلی او در بوک‌میت، احیای فرهنگ خواندنِ دقیق و آهسته و ایجاد پیوندی پایدار میان دوستداران کتاب است.',
+    'دغدغه اصلی او در کتابوشکا، احیای فرهنگ خواندنِ دقیق و آهسته و ایجاد پیوندی پایدار میان دوستداران کتاب است.',
   quote_text:
     '«کتاب‌ها زمانی به راستی آغاز می‌شوند که آخرین صفحه‌شان را می‌بندیم و درباره آنچه در ما دگرگون کرده‌اند با یکدیگر سخن می‌گوییم.»',
   image_url: '/assets/manager-portrait.png',
@@ -425,23 +426,23 @@ const EMPTY_ABOUT_MANAGER: AboutManagerRow = {
 const EMPTY_CONTACT_INFO: ContactInfoRow = {
   id: 1,
   section_kicker: '۰۵ · ارتباط با ما و عضویت در حلقه‌های مطالعاتی',
-  title: 'صدای شما، آغازگر گفت‌وگوهای تازه در باشگاه بوک‌میت است',
+  title: 'صدای شما، آغازگر گفت‌وگوهای تازه در باشگاه کتابوشکا است',
   description:
-    'اگر درباره شیوه برگزاری نشست‌های هفتگی، پیشنهاد کتاب برای دوره‌های آینده یا عضویت در حلقه‌های مطالعاتی بوک‌میت پرسشی دارید، پیام خود را برای ما ارسال کنید.',
-  address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات بوک‌میت',
+    'اگر درباره شیوه برگزاری نشست‌های هفتگی، پیشنهاد کتاب برای دوره‌های آینده یا عضویت در حلقه‌های مطالعاتی کتابوشکا پرسشی دارید، پیام خود را برای ما ارسال کنید.',
+  address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات کتابوشکا',
   meeting_hours: 'نشست‌های حضوری: چهارشنبه‌ها ساعت ۱۸ تا ۲۰ · نشست‌های برخط: جمعه‌ها ساعت ۱۹',
-  email: 'hello@bookmeet.ir',
+  email: 'hello@ketboshka.ir',
   phone: '۰۲۱-۸۸۹۴۳۲۱۰',
-  telegram_handle: '@BookmeetClub',
+  telegram_handle: '@KetboshkaClub',
 };
 
 const EMPTY_FOOTER_SETTINGS: FooterSettingsRow = {
   id: 1,
-  title: 'باشگاه کتابخوانی بوک‌میت',
+  title: 'باشگاه کتابخوانی کتابوشکا',
   description: 'حلقه‌ای صمیمی برای خواندن عمیق، گفت‌وگوی انتقادی و تجربه زیستن در جهان ادبیات.',
   phone: '۰۲۱-۸۸۹۴۳۲۱۰',
-  email: 'hello@bookmeet.ir',
-  address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات بوک‌میت',
+  email: 'hello@ketboshka.ir',
+  address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات کتابوشکا',
   links: [
     { label: 'درباره باشگاه', href: '#about-club' },
     { label: 'کتابخانه', href: '/library' },
@@ -455,7 +456,7 @@ const EMPTY_FOOTER_SETTINGS: FooterSettingsRow = {
   twitter_url: '',
   youtube_url: '',
   linkedin_url: '',
-  copyright_text: '© ۱۴۰۵ باشگاه کتابخوانی بوک‌میت · تمامی حقوق برای اعضا و نویسندگان محفوظ است.',
+  copyright_text: '© ۱۴۰۵ باشگاه کتابخوانی کتابوشکا · تمامی حقوق برای اعضا و نویسندگان محفوظ است.',
   tagline_text: 'طراحی با الهام از چاپخانه‌های کلاسیک و زیبایی‌شناسی مینیمالیستی نوردیک',
 };
 
@@ -701,7 +702,7 @@ class MySQLDatabaseManager {
 
       `CREATE TABLE IF NOT EXISTS footer_settings (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        title VARCHAR(200) NOT NULL DEFAULT 'باشگاه کتابخوانی بوک‌میت',
+        title VARCHAR(200) NOT NULL DEFAULT 'باشگاه کتابخوانی کتابوشکا',
         description TEXT NOT NULL,
         phone VARCHAR(80) NOT NULL DEFAULT '',
         email VARCHAR(150) NOT NULL DEFAULT '',
@@ -723,6 +724,7 @@ class MySQLDatabaseManager {
         email VARCHAR(150) NOT NULL,
         subject VARCHAR(200) NOT NULL,
         message TEXT NOT NULL,
+        is_read TINYINT(1) NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
@@ -1045,6 +1047,18 @@ class MySQLDatabaseManager {
       }
     }
 
+    // 6b. Ensure contact_messages has is_read column
+    const [contactReadCol] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'contact_messages' AND COLUMN_NAME = 'is_read'`,
+      [dbName]
+    );
+    if (contactReadCol.length === 0) {
+      await this.pool.execute(
+        'ALTER TABLE contact_messages ADD COLUMN is_read TINYINT(1) NOT NULL DEFAULT 0 AFTER message'
+      );
+    }
+
     // 7. Backfill exact Jalali joined_date from created_at on club_members where placeholder was stored
     const [membersToBackfill] = await this.pool.execute<RowDataPacket[]>(
       "SELECT id, created_at, joined_date FROM club_members WHERE joined_date = '' OR joined_date = '۱۴۰۵' OR joined_date = 'آبان ۱۴۰۵'"
@@ -1058,6 +1072,60 @@ class MySQLDatabaseManager {
         ]);
       }
     }
+
+    // 8. Migrate stored branding strings from Bookmeet/بوک‌میت to Ketboshka/کتابوشکا
+    await this.pool.execute(`
+      UPDATE hero_settings
+      SET headline = REPLACE(REPLACE(headline, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          subtitle_line_1 = REPLACE(REPLACE(subtitle_line_1, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          subtitle_line_2 = REPLACE(REPLACE(subtitle_line_2, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا')
+      WHERE headline LIKE '%بوک%' OR subtitle_line_1 LIKE '%بوک%' OR subtitle_line_2 LIKE '%بوک%'
+    `);
+
+    await this.pool.execute(`
+      UPDATE about_club
+      SET section_kicker = REPLACE(REPLACE(section_kicker, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          title = REPLACE(REPLACE(title, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          paragraph_1 = REPLACE(REPLACE(paragraph_1, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          paragraph_2 = REPLACE(REPLACE(paragraph_2, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          image_caption = REPLACE(REPLACE(image_caption, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا')
+      WHERE section_kicker LIKE '%بوک%' OR title LIKE '%بوک%' OR paragraph_1 LIKE '%بوک%' OR paragraph_2 LIKE '%بوک%' OR image_caption LIKE '%بوک%'
+    `);
+
+    await this.pool.execute(`
+      UPDATE about_manager
+      SET role_title = REPLACE(REPLACE(role_title, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          bio_paragraph_1 = REPLACE(REPLACE(bio_paragraph_1, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          bio_paragraph_2 = REPLACE(REPLACE(bio_paragraph_2, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا')
+      WHERE role_title LIKE '%بوک%' OR bio_paragraph_1 LIKE '%بوک%' OR bio_paragraph_2 LIKE '%بوک%'
+    `);
+
+    await this.pool.execute(`
+      UPDATE contact_info
+      SET title = REPLACE(REPLACE(title, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          description = REPLACE(REPLACE(description, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          address = REPLACE(REPLACE(address, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          email = REPLACE(REPLACE(email, 'bookmeet', 'ketboshka'), 'Bookmeet', 'Ketboshka'),
+          telegram_handle = REPLACE(REPLACE(telegram_handle, 'Bookmeet', 'Ketboshka'), 'bookmeet', 'ketboshka')
+      WHERE title LIKE '%بوک%' OR description LIKE '%بوک%' OR address LIKE '%بوک%' OR email LIKE '%bookmeet%' OR telegram_handle LIKE '%Bookmeet%' OR telegram_handle LIKE '%bookmeet%'
+    `);
+
+    await this.pool.execute(`
+      UPDATE footer_settings
+      SET title = REPLACE(REPLACE(title, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          description = REPLACE(REPLACE(description, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          address = REPLACE(REPLACE(address, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          email = REPLACE(REPLACE(email, 'bookmeet', 'ketboshka'), 'Bookmeet', 'Ketboshka'),
+          copyright_text = REPLACE(REPLACE(REPLACE(REPLACE(copyright_text, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'), 'Bookmeet', 'Ketboshka'), 'bookmeet', 'ketboshka')
+      WHERE title LIKE '%بوک%' OR description LIKE '%بوک%' OR address LIKE '%بوک%' OR email LIKE '%bookmeet%' OR copyright_text LIKE '%بوک%' OR copyright_text LIKE '%Bookmeet%'
+    `);
+
+    await this.pool.execute(`
+      UPDATE club_members
+      SET bio = REPLACE(REPLACE(bio, 'بوک‌میت', 'کتابوشکا'), 'بوک میت', 'کتابوشکا'),
+          email = REPLACE(REPLACE(email, 'bookmeet', 'ketboshka'), 'Bookmeet', 'Ketboshka')
+      WHERE bio LIKE '%بوک%' OR email LIKE '%bookmeet%'
+    `);
   }
 
   public async ensureInitialized(): Promise<void> {
@@ -1105,19 +1173,19 @@ class MySQLDatabaseManager {
     const username = normalizeIdentifierDigits(
       String(process.env.ADMIN_USERNAME || 'admin').trim()
     );
-    const email = String(process.env.ADMIN_EMAIL || 'admin@bookmeet.ir').trim();
+    const email = String(process.env.ADMIN_EMAIL || 'admin@ketboshka.ir').trim();
     const passwordHash = await bcrypt.hash(rawPassword, 12);
 
     await this.pool.execute(
       `INSERT INTO club_members
         (first_name, last_name, phone, role, status, education, email, avatar_url, bio, membership_code, joined_date, password_hash)
-       VALUES (?, ?, ?, 'admin', 'فعال', 'دکتری', ?, '/assets/manager-portrait.png', 'مدیر باشگاه کتابخوانی بوک‌میت', 'BM-ADMIN-۰۰۱', '۱۴۰۵', ?)`,
+       VALUES (?, ?, ?, 'admin', 'فعال', 'C2', ?, '/assets/manager-portrait.png', 'مدیر باشگاه کتابخوانی کتابوشکا', 'BM-ADMIN-۰۰۱', '۱۴۰۵', ?)`,
       [firstName, lastName, username, email, passwordHash]
     );
   }
 
   /**
-   * Used by `npm run init-admin` CLI script to securely initialize the single administrator.
+   * Used by \`npm run init-admin\` CLI script to securely initialize the single administrator.
    */
   public async initializeSingleAdminAccount(input: {
     firstName: string;
@@ -1155,7 +1223,7 @@ class MySQLDatabaseManager {
     const [result] = await this.pool.execute<ResultSetHeader>(
       `INSERT INTO club_members
         (first_name, last_name, phone, role, status, education, email, avatar_url, bio, membership_code, joined_date, password_hash)
-       VALUES (?, ?, ?, 'admin', 'فعال', 'دکتری', ?, '/assets/manager-portrait.png', 'مدیر باشگاه کتابخوانی بوک‌میت', 'BM-ADMIN-۰۰۱', '۱۴۰۵', ?)`,
+       VALUES (?, ?, ?, 'admin', 'فعال', 'C2', ?, '/assets/manager-portrait.png', 'مدیر باشگاه کتابخوانی کتابوشکا', 'BM-ADMIN-۰۰۱', '۱۴۰۵', ?)`,
       [
         input.firstName.trim(),
         input.lastName.trim(),
@@ -1345,6 +1413,42 @@ class MySQLDatabaseManager {
     };
   }
 
+  private formatContactMessageRow(row: RowDataPacket): ContactMessageRow {
+    const rawCreated = row.created_at;
+    let formattedDate = '';
+    if (rawCreated) {
+      const parsed = rawCreated instanceof Date ? rawCreated : new Date(String(rawCreated));
+      if (!Number.isNaN(parsed.getTime())) {
+        try {
+          const datePart = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          }).format(parsed);
+          const timePart = new Intl.DateTimeFormat('fa-IR', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          }).format(parsed);
+          formattedDate = `${datePart} · ساعت ${timePart}`;
+        } catch {
+          formattedDate = formatPersianRegistrationDate(parsed, String(rawCreated));
+        }
+      } else {
+        formattedDate = String(rawCreated);
+      }
+    }
+    return {
+      id: Number(row.id),
+      full_name: String(row.full_name || ''),
+      email: String(row.email || ''),
+      subject: String(row.subject || ''),
+      message: String(row.message || ''),
+      is_read: Number(row.is_read) === 1 ? 1 : 0,
+      created_at: formattedDate || 'هم‌اکنون',
+    };
+  }
+
   public async createContactMessage(input: {
     full_name: string;
     email: string;
@@ -1352,17 +1456,58 @@ class MySQLDatabaseManager {
     message: string;
   }): Promise<ContactMessageRow> {
     const [result] = await this.pool.execute<ResultSetHeader>(
-      'INSERT INTO contact_messages (full_name, email, subject, message) VALUES (?, ?, ?, ?)',
+      'INSERT INTO contact_messages (full_name, email, subject, message, is_read) VALUES (?, ?, ?, ?, 0)',
       [input.full_name, input.email, input.subject, input.message]
     );
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM contact_messages WHERE id = ? LIMIT 1',
+      [result.insertId]
+    );
+    if (rows.length > 0) {
+      return this.formatContactMessageRow(rows[0]);
+    }
     return {
       id: result.insertId,
       full_name: input.full_name,
       email: input.email,
       subject: input.subject,
       message: input.message,
-      created_at: new Date().toISOString(),
+      is_read: 0,
+      created_at: formatPersianRegistrationDate(new Date()),
     };
+  }
+
+  public async getContactMessages(): Promise<ContactMessageRow[]> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM contact_messages ORDER BY id DESC'
+    );
+    return rows.map((r) => this.formatContactMessageRow(r));
+  }
+
+  public async updateContactMessageReadStatus(
+    id: number,
+    isRead: boolean
+  ): Promise<ContactMessageRow> {
+    const [existing] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM contact_messages WHERE id = ? LIMIT 1',
+      [Number(id)]
+    );
+    if (existing.length === 0) {
+      throw new Error('پیام مورد نظر یافت نشد.');
+    }
+    await this.pool.execute(
+      'UPDATE contact_messages SET is_read = ? WHERE id = ?',
+      [isRead ? 1 : 0, Number(id)]
+    );
+    const [updated] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM contact_messages WHERE id = ? LIMIT 1',
+      [Number(id)]
+    );
+    return this.formatContactMessageRow(updated[0]);
+  }
+
+  public async deleteContactMessage(id: number): Promise<void> {
+    await this.pool.execute('DELETE FROM contact_messages WHERE id = ?', [Number(id)]);
   }
 
   // ==================== REGISTRATION & LOGIN ====================
@@ -1382,6 +1527,12 @@ class MySQLDatabaseManager {
     const lowerPhone = normalizedPhone.toLowerCase();
     if (lowerPhone === 'admin' || lowerPhone === 'مدیر' || lowerPhone === 'root') {
       throw new Error('استفاده از این شناسه برای ثبت‌نام کاربران مجاز نیست.');
+    }
+
+    const allowedRussianLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+    const normalizedLevel = String(input.education || '').trim().toUpperCase();
+    if (!allowedRussianLevels.includes(normalizedLevel)) {
+      throw new Error('لطفاً سطح روسی معتبر (A1 تا C2) را انتخاب نمایید.');
     }
 
     if (!input.password_plain || input.password_plain.length < 4) {
@@ -1406,12 +1557,12 @@ class MySQLDatabaseManager {
     const [result] = await this.pool.execute<ResultSetHeader>(
       `INSERT INTO club_members
         (first_name, last_name, phone, role, status, education, email, avatar_url, bio, membership_code, joined_date, password_hash)
-       VALUES (?, ?, ?, 'member', 'فعال', ?, '', '', 'عضو باشگاه کتابخوانی بوک‌میت', ?, ?, ?)`,
+       VALUES (?, ?, ?, 'member', 'فعال', ?, '', '', 'عضو باشگاه کتابخوانی کتابوشکا', ?, ?, ?)`,
       [
         input.first_name.trim(),
         input.last_name.trim(),
         persianPhone,
-        input.education.trim(),
+        normalizedLevel,
         tempCode,
         joinedDate,
         passwordHash,
@@ -1856,7 +2007,7 @@ class MySQLDatabaseManager {
             weekday_name: parsed.weekday_name,
             time_range: String(sub.session_time || session.session_time || '۱۸:۰۰ تا ۲۰:۰۰'),
             host_name: String(
-              session.translator || session.mentor_name || session.book_author || 'باشگاه بوک‌میت'
+              session.translator || session.mentor_name || session.book_author || 'باشگاه کتابوشکا'
             ),
             location_label:
               enrollmentStatus === 'فعال'
@@ -1909,7 +2060,7 @@ class MySQLDatabaseManager {
           weekday_name: parsed.weekday_name,
           time_range: String(session.session_time || '۱۸:۰۰ تا ۲۰:۰۰'),
           host_name: String(
-            session.translator || session.mentor_name || session.book_author || 'باشگاه بوک‌میت'
+            session.translator || session.mentor_name || session.book_author || 'باشگاه کتابوشکا'
           ),
           location_label:
             enrollmentStatus === 'فعال'
@@ -3257,6 +3408,7 @@ class MySQLDatabaseManager {
     footerSettings: FooterSettingsRow;
     libraryBooks: LibraryBookRow[];
     libraryCategories: LibraryCategoryRow[];
+    contactMessages: ContactMessageRow[];
   }> {
     const [
       rawSessions,
@@ -3274,6 +3426,7 @@ class MySQLDatabaseManager {
       footerSettings,
       libraryBooks,
       libraryCategories,
+      contactMessages,
     ] = await Promise.all([
       this.pool.execute<RowDataPacket[]>(
         'SELECT * FROM member_sessions ORDER BY sort_order ASC, id DESC'
@@ -3306,6 +3459,7 @@ class MySQLDatabaseManager {
       this.getFooterSettings(),
       this.getLibraryBooks(),
       this.getLibraryCategories(),
+      this.getContactMessages(),
     ]);
 
     const sessions = await this.mapSessionRowsWithEnrollments(rawSessions[0]);
@@ -3330,6 +3484,7 @@ class MySQLDatabaseManager {
       footerSettings,
       libraryBooks,
       libraryCategories,
+      contactMessages,
     };
   }
 
@@ -4071,9 +4226,9 @@ class MySQLDatabaseManager {
         String(input.last_name || 'جدید').trim(),
         persianPhone,
         input.status || 'فعال',
-        String(input.education || 'کارشناسی').trim(),
+        String(input.education || 'B1').trim(),
         String(input.email || '').trim(),
-        String(input.bio || 'عضو باشگاه کتابخوانی بوک‌میت').trim(),
+        String(input.bio || 'عضو باشگاه کتابخوانی کتابوشکا').trim(),
         String(input.membership_code || 'BM-۱۴۰۵-۱۰۰').trim(),
         exactJoinedDate,
         passwordHash,

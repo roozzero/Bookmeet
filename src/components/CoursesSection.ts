@@ -153,7 +153,7 @@ export function createCoursesSection(
             <div class="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-[#F8F1E5] border border-[#DECAB0] mb-4">
               <span class="w-2 h-2 rounded-full bg-[#7A4B2A]"></span>
               <span class="text-[12px] sm:text-[13px] font-semibold text-[#5E3D24]">
-                دپارتمان زبان و ادبیات روسی باشگاه بوک‌میت
+                دپارتمان زبان و ادبیات روسی باشگاه کتابوشکا
               </span>
             </div>
             <h2 class="font-display text-[28px] sm:text-[36px] lg:text-[42px] font-bold leading-[1.3] text-[#1E150F] text-justify">
@@ -162,7 +162,7 @@ export function createCoursesSection(
           </div>
 
           <p class="text-[14px] sm:text-[15px] leading-[1.9] text-[#554233] max-w-md text-justify">
-            برای خواندن آثار داستایوفسکی، تولستوی، چخوف و بولگاکف به زبان مادریِ نویسندگانشان، دوره‌های آموزش زبان روسی بوک‌میت از سطح پایه تا خوانش تخصصی متون ادبی برگزار می‌شوند.
+            برای خواندن آثار داستایوفسکی، تولستوی، چخوف و بولگاکف به زبان مادریِ نویسندگانشان، دوره‌های آموزش زبان روسی کتابوشکا از سطح پایه تا خوانش تخصصی متون ادبی برگزار می‌شوند.
           </p>
         </div>
 

@@ -13,6 +13,7 @@ import type {
   ClubRegisterInput,
   ContactInfoData,
   ContactMessageInput,
+  ContactMessageItem,
   FeaturedBook,
   FooterSettingsData,
   GalleryImage,
@@ -1017,6 +1018,52 @@ export const ApiService = {
                 errorThrown ||
                 textStatus ||
                 'خطا در حذف دسته‌بندی'
+            )
+          ),
+      });
+    });
+  },
+
+  updateAdminContactMessageRead(payload: {
+    id: number;
+    is_read: boolean;
+  }): Promise<{ success: boolean; contactMessage: ContactMessageItem }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/admin/contact-messages/${payload.id}/read`,
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify({ is_read: payload.is_read }),
+        dataType: 'json',
+        success: (data: { success: boolean; contactMessage: ContactMessageItem }) =>
+          resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(
+              jqXHR.responseJSON?.error ||
+                errorThrown ||
+                textStatus ||
+                'خطا در تغییر وضعیت مطالعه پیام'
+            )
+          ),
+      });
+    });
+  },
+
+  deleteAdminContactMessage(id: number): Promise<{ success: boolean }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/admin/contact-messages/${id}`,
+        method: 'DELETE',
+        dataType: 'json',
+        success: (data: { success: boolean }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(
+              jqXHR.responseJSON?.error ||
+                errorThrown ||
+                textStatus ||
+                'خطا در حذف پیام دریافتی'
             )
           ),
       });

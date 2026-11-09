@@ -7,7 +7,7 @@ async function runInitAdmin(): Promise<void> {
   const firstName = nameParts[0] || 'مدیر';
   const lastName = nameParts.slice(1).join(' ') || 'باشگاه';
   const username = String(process.env.ADMIN_USERNAME || 'admin').trim();
-  const email = String(process.env.ADMIN_EMAIL || 'admin@bookmeet.ir').trim();
+  const email = String(process.env.ADMIN_EMAIL || 'admin@ketboshka.ir').trim();
   const passwordPlain = String(process.env.ADMIN_PASSWORD || '').trim();
 
   if (

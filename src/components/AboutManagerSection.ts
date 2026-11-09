@@ -36,7 +36,7 @@ export function createAboutManagerSectionComponent(
                   ${toPersianDigits(aboutManager.full_name)}
                 </div>
                 <div class="text-[11.5px] text-[#e2d8c5] mt-0.5">
-                  مدیر و بنیان‌گذار باشگاه کتابخوانی بوک‌میت
+                  مدیر و بنیان‌گذار باشگاه کتابخوانی کتابوشکا
                 </div>
               </div>
             </div>

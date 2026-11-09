@@ -40,7 +40,7 @@ export function createBlogPostPageComponent(
           </button>
 
           <div class="text-xs text-[#6f5a48]">
-            <span>وبلاگ باشگاه کتابخوانی بوک‌میت</span>
+            <span>وبلاگ باشگاه کتابخوانی کتابوشکا</span>
             <span class="mx-1.5">·</span>
             <span>شماره یادداشت ${toPersianDigits(post.id)}</span>
           </div>
@@ -146,7 +146,7 @@ export function createBlogPostPageComponent(
           relatedPosts.length > 0
             ? `<div class="mt-14 space-y-6">
                 <h2 class="text-xl font-bold text-[#382315]">
-                  سایر یادداشت‌های وبلاگ بوک‌میت
+                  سایر یادداشت‌های وبلاگ کتابوشکا
                 </h2>
                 <div class="js-related-posts grid grid-cols-1 md:grid-cols-2 gap-6"></div>
               </div>`

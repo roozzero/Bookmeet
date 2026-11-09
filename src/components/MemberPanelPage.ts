@@ -285,6 +285,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
   };
 
   let activeTab: PanelTabKey = props.initialTab || 'dashboard';
+  let isMobileSidebarOpen = false;
   let selectedSessionId: number | null = null;
   let selectedClassId: number | null = null;
   let selectedTicketId: number | null = null;
@@ -374,8 +375,8 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
 
   const $wrapper = $(`
     <section
-      aria-label="پنل کاربری اعضای باشگاه کتابخوانی بوک‌میت"
-      class="w-full max-w-[1440px] mx-auto px-5 sm:px-10 md:px-16 lg:px-20 pt-6 pb-20"
+      aria-label="پنل کاربری اعضای باشگاه کتابخوانی کتابوشکا"
+      class="w-full max-w-[1440px] mx-auto px-4 sm:px-10 md:px-16 lg:px-20 pt-6 pb-20 overflow-x-hidden"
     ></section>
   `);
 
@@ -573,10 +574,10 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               </span>
               <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <span dir="ltr" class="text-[12.5px] font-mono text-[#3F2E21] bg-[#FAF5EC] px-3 py-2 rounded-lg border border-[#E2D2BC] select-all truncate">
-                  ${subItem.meeting_link || 'https://meet.bookmeet.ir/live-session'}
+                  ${subItem.meeting_link || 'https://meet.ketboshka.ir/live-session'}
                 </span>
                 <a
-                  href="${subItem.meeting_link || 'https://meet.bookmeet.ir/live-session'}"
+                  href="${subItem.meeting_link || 'https://meet.ketboshka.ir/live-session'}"
                   target="_blank"
                   rel="noopener noreferrer"
                   class="px-4 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold text-center transition-colors shrink-0"
@@ -1494,7 +1495,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
             کلاس‌های من
           </h2>
           <p class="text-[13.5px] text-[#6B5444] mt-1 text-justify">
-            دوره‌ها و کلاس‌های تخصصی ثبت‌نام شده شما در باشگاه کتابخوانی بوک‌میت. با کلیک بر روی هر کارت می‌توانید وارد صفحه کلاس شده و کارت‌های جلسات تعریف شده و برگزار شده را مشاهده کنید.
+            دوره‌ها و کلاس‌های تخصصی ثبت‌نام شده شما در باشگاه کتابخوانی کتابوشکا. با کلیک بر روی هر کارت می‌توانید وارد صفحه کلاس شده و کارت‌های جلسات تعریف شده و برگزار شده را مشاهده کنید.
           </p>
         </div>
 
@@ -1968,7 +1969,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">
-              اطلاعیه‌های باشگاه کتابخوانی بوک‌میت
+              اطلاعیه‌های باشگاه کتابخوانی کتابوشکا
             </h2>
             <p class="text-[13.5px] text-[#6B5444] mt-1 text-justify">
               آخرین اخبار، فراخوان‌های رأی‌گیری کتاب ماه، منابع آموزشی بارگذاری‌شده و اطلاعیه‌های دبیرخانه باشگاه را در این بخش دنبال کنید.
@@ -2169,7 +2170,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                         }">
                           <span class="font-bold flex items-center gap-1.5">
                             <span class="w-2 h-2 rounded-full ${isAdmin ? 'bg-[#235332]' : 'bg-[#7A4B2A]'}"></span>
-                            <span>${isAdmin ? 'پاسخ دبیرخانه / مدیر باشگاه بوک‌میت' : 'پیام شما'}</span>
+                            <span>${isAdmin ? 'پاسخ دبیرخانه / مدیر باشگاه کتابوشکا' : 'پیام شما'}</span>
                           </span>
                           <span>${toPersianDigits(msg.created_at || ticket.created_at)}</span>
                         </div>
@@ -2521,12 +2522,13 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               />
             </div>
             <div>
-              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">مقطع تحصیلی</label>
+              <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">سطح روسی</label>
               <select
                 name="education"
                 class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
               >
-                ${['دیپلم', 'کاردانی', 'کارشناسی', 'کارشناسی ارشد', 'دکتری', 'حوزوی / پژوهشی آزاد']
+                <option value="" ${!['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].includes(state.member.education) ? 'selected' : ''}>سطح روسی خود را انتخاب کنید</option>
+                ${['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
                   .map(
                     (lvl) =>
                       `<option value="${lvl}" ${state.member.education === lvl ? 'selected' : ''}>${lvl}</option>`
@@ -2842,72 +2844,89 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     ];
 
     const sidebarAvatar = state.member.avatar_url || '';
+    const activeNavItem = navItems.find((item) => item.key === activeTab) || navItems[0];
 
     $wrapper.html(`
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-7 items-start">
         <!-- Sidebar Navigation -->
-        <aside class="lg:col-span-3 p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] shadow-[0_12px_32px_rgba(61,46,34,0.05)] lg:sticky lg:top-24">
-          <div class="pb-4 mb-4 border-b border-[#E6D8C5] flex items-center gap-3.5">
-            <div class="w-12 h-12 rounded-2xl bg-[#7A4B2A] text-[#FAF5EC] font-display text-[18px] font-bold flex items-center justify-center overflow-hidden border border-[#DEC8AC] shrink-0">
-              ${
-                sidebarAvatar
-                  ? `<img src="${sidebarAvatar}" alt="${state.member.first_name}" class="w-full h-full object-cover" />`
-                  : state.member.first_name.charAt(0)
-              }
+        <aside class="lg:col-span-3 p-4 sm:p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] shadow-[0_12px_32px_rgba(61,46,34,0.05)] lg:sticky lg:top-24">
+          <div class="flex items-center justify-between gap-3 lg:pb-4 lg:mb-4 lg:border-b lg:border-[#E6D8C5]">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#7A4B2A] text-[#FAF5EC] font-display text-[18px] font-bold flex items-center justify-center overflow-hidden border border-[#DEC8AC] shrink-0">
+                ${
+                  sidebarAvatar
+                    ? `<img src="${sidebarAvatar}" alt="${state.member.first_name}" class="w-full h-full object-cover" />`
+                    : state.member.first_name.charAt(0)
+                }
+              </div>
+              <div class="min-w-0">
+                <h3 class="font-bold text-[14.5px] sm:text-[15px] text-[#231912] truncate">
+                  ${state.member.first_name} ${state.member.last_name}
+                </h3>
+                <span class="text-[12px] text-[#6B5444] block">
+                  ${toPersianDigits(state.member.phone)}
+                </span>
+              </div>
             </div>
-            <div class="min-w-0">
-              <h3 class="font-bold text-[15px] text-[#231912] truncate">
-                ${state.member.first_name} ${state.member.last_name}
-              </h3>
-              <span class="text-[12px] text-[#6B5444] block">
-                ${toPersianDigits(state.member.phone)}
-              </span>
-            </div>
+
+            <button
+              type="button"
+              aria-expanded="${isMobileSidebarOpen ? 'true' : 'false'}"
+              aria-label="باز و بسته کردن منوی پنل کاربری"
+              class="js-toggle-member-mobile-nav lg:hidden inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#EFE3D2] hover:bg-[#E4D3BC] text-[#3F2E21] text-[12.5px] font-semibold transition-colors cursor-pointer shrink-0"
+            >
+              <span>${activeNavItem.label}</span>
+              <svg class="w-4 h-4 transition-transform ${isMobileSidebarOpen ? 'rotate-180' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
           </div>
 
-          <nav class="space-y-1.5" aria-label="منوی پنل کاربری">
-            ${navItems
-              .map((item) => {
-                const isActive = activeTab === item.key;
-                return `
-                  <button
-                    type="button"
-                    data-tab="${item.key}"
-                    class="js-panel-tab-btn w-full px-4 py-3 rounded-xl text-right text-[13.5px] font-semibold flex items-center justify-between transition-all cursor-pointer ${
-                      isActive
-                        ? 'bg-[#5A3A22] text-[#FAF5EC] shadow-sm'
-                        : 'text-[#3F2E21] hover:bg-[#EFE3D2]'
-                    }"
-                  >
-                    <span>${item.label}</span>
-                    ${
-                      item.badge
-                        ? `<span class="text-[11px] px-2 py-0.5 rounded-md ${
-                            isActive
-                              ? 'bg-[#FAF5EC]/20 text-[#FAF5EC]'
-                              : 'bg-[#E8DAC7] text-[#5C4432]'
-                          }">${item.badge}</span>`
-                        : ''
-                    }
-                  </button>
-                `;
-              })
-              .join('')}
-          </nav>
+          <div class="${isMobileSidebarOpen ? 'block pt-4 mt-4 border-t border-[#E6D8C5]' : 'hidden'} lg:block">
+            <nav class="space-y-1.5" aria-label="منوی پنل کاربری">
+              ${navItems
+                .map((item) => {
+                  const isActive = activeTab === item.key;
+                  return `
+                    <button
+                      type="button"
+                      data-tab="${item.key}"
+                      class="js-panel-tab-btn w-full px-4 py-3 rounded-xl text-right text-[13.5px] font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-[#5A3A22] text-[#FAF5EC] shadow-sm'
+                          : 'text-[#3F2E21] hover:bg-[#EFE3D2]'
+                      }"
+                    >
+                      <span>${item.label}</span>
+                      ${
+                        item.badge
+                          ? `<span class="text-[11px] px-2 py-0.5 rounded-md ${
+                              isActive
+                                ? 'bg-[#FAF5EC]/20 text-[#FAF5EC]'
+                                : 'bg-[#E8DAC7] text-[#5C4432]'
+                            }">${item.badge}</span>`
+                          : ''
+                      }
+                    </button>
+                  `;
+                })
+                .join('')}
+            </nav>
 
-          <div class="pt-4 mt-4 border-t border-[#E6D8C5] space-y-2">
-            <button
-              type="button"
-              class="js-back-to-home w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#5B4636] hover:bg-[#EFE3D2] text-right transition-colors cursor-pointer"
-            >
-              ← بازگشت به صفحه اصلی سایت
-            </button>
-            <button
-              type="button"
-              class="js-logout-panel w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#9E3329] hover:bg-[#FBEAE8] text-right transition-colors cursor-pointer"
-            >
-              خروج از حساب کاربری
-            </button>
+            <div class="pt-4 mt-4 border-t border-[#E6D8C5] space-y-2">
+              <button
+                type="button"
+                class="js-back-to-home w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#5B4636] hover:bg-[#EFE3D2] text-right transition-colors cursor-pointer"
+              >
+                ← بازگشت به صفحه اصلی سایت
+              </button>
+              <button
+                type="button"
+                class="js-logout-panel w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#9E3329] hover:bg-[#FBEAE8] text-right transition-colors cursor-pointer"
+              >
+                خروج از حساب کاربری
+              </button>
+            </div>
           </div>
         </aside>
 
@@ -2941,10 +2960,16 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
   }
 
   // Event Delegations
+  $wrapper.on('click', '.js-toggle-member-mobile-nav', () => {
+    isMobileSidebarOpen = !isMobileSidebarOpen;
+    render();
+  });
+
   $wrapper.on('click', '.js-panel-tab-btn', function () {
     const nextTab = $(this).data('tab') as PanelTabKey;
     if (nextTab) {
       activeTab = nextTab;
+      isMobileSidebarOpen = false;
       selectedSessionId = null;
       selectedClassId = null;
       selectedTicketId = null;
@@ -2963,6 +2988,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     const nextTab = $(this).data('switch-tab') as PanelTabKey;
     if (nextTab) {
       activeTab = nextTab;
+      isMobileSidebarOpen = false;
       selectedSessionId = null;
       selectedClassId = null;
       selectedTicketId = null;
@@ -3590,7 +3616,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
 
     const first_name = String($form.find('[name="first_name"]').val() || '').trim();
     const last_name = String($form.find('[name="last_name"]').val() || '').trim();
-    const education = String($form.find('[name="education"]').val() || 'کارشناسی ارشد').trim();
+    const education = String($form.find('[name="education"]').val() || 'B1').trim();
     const email = String($form.find('[name="email"]').val() || '').trim();
     const bio = String($form.find('[name="bio"]').val() || '').trim();
 

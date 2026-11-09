@@ -7,14 +7,7 @@ export interface ClubAuthModalOptions {
   onAuthSuccess?: (member: ClubMember) => void;
 }
 
-const EDUCATION_OPTIONS = [
-  'دیپلم',
-  'کاردانی',
-  'کارشناسی',
-  'کارشناسی ارشد',
-  'دکتری',
-  'سایر',
-];
+const RUSSIAN_LEVEL_OPTIONS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
 export function createClubAuthModalComponent(
   options: ClubAuthModalOptions = {}
@@ -27,11 +20,11 @@ export function createClubAuthModalComponent(
           <div class="flex items-center gap-2">
             <img
               src="/assets/Bookmate Persian Logo with Colorful Books.png"
-              alt="لوگوی باشگاه کتابخوانی بوک‌میت"
+              alt="لوگوی باشگاه کتابخوانی کتابوشکا"
               class="h-7 w-auto object-contain select-none"
             />
             <h2 class="js-auth-modal-title text-sm font-bold text-[#38281b]">
-              ورود به باشگاه بوک‌میت
+              ورود به باشگاه کتابوشکا
             </h2>
           </div>
           <button
@@ -80,10 +73,10 @@ export function createClubAuthModalComponent(
 
           <div class="js-login-error hidden text-xs text-red-800 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-justify"></div>
           <div class="js-login-feedback hidden text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-justify">
-            ورود شما به باشگاه کتابخوانی بوک‌میت با موفقیت انجام شد. خوش آمدید!
+            ورود شما به باشگاه کتابخوانی کتابوشکا با موفقیت انجام شد. خوش آمدید!
           </div>
 
-          <div class="pt-2.5 flex items-center justify-between gap-2 border-t border-[#e8dfd0]">
+          <div class="pt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-[#e8dfd0]">
             <button
               type="button"
               class="js-switch-to-register bg-transparent hover:bg-transparent text-xs font-semibold text-[#7a5436] hover:text-[#2c1d11] underline underline-offset-4 cursor-pointer"
@@ -110,7 +103,7 @@ export function createClubAuthModalComponent(
         <!-- VIEW 2: REGISTRATION FORM -->
         <form class="js-register-form hidden space-y-2.5" autocomplete="on">
           <!-- Row 1: First Name & Last Name -->
-          <div class="grid grid-cols-2 gap-2.5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
               <label class="block text-xs font-semibold text-[#4f3f31] mb-1">
                 نام <span class="text-[#a16237]">*</span>
@@ -137,8 +130,8 @@ export function createClubAuthModalComponent(
             </div>
           </div>
 
-          <!-- Row 2: Phone Number & Custom Styled Education Dropdown -->
-          <div class="grid grid-cols-2 gap-2.5">
+          <!-- Row 2: Phone Number & Custom Styled Russian Level Dropdown -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
               <label class="block text-xs font-semibold text-[#4f3f31] mb-1">
                 شماره تلفن <span class="text-[#a16237]">*</span>
@@ -152,17 +145,17 @@ export function createClubAuthModalComponent(
               />
             </div>
 
-            <!-- Custom Modern Education Dropdown -->
+            <!-- Custom Modern Russian Level Dropdown -->
             <div class="js-education-dropdown relative">
               <label class="block text-xs font-semibold text-[#4f3f31] mb-1">
-                تحصیلات <span class="text-[#a16237]">*</span>
+                سطح روسی <span class="text-[#a16237]">*</span>
               </label>
               <input type="hidden" name="education" value="" />
               <button
                 type="button"
                 class="js-education-trigger w-full px-2.5 py-1.5 text-xs sm:text-sm bg-white hover:bg-[#fdfbf7] border border-[#d5c8b2] focus:border-[#6e492d] rounded-xl text-[#2c1f14] flex items-center justify-between gap-1.5 transition-all cursor-pointer"
               >
-                <span class="js-education-label text-[#8a7968] truncate">انتخاب مقطع...</span>
+                <span class="js-education-label text-[#8a7968] truncate">سطح روسی خود را انتخاب کنید</span>
                 <svg
                   class="js-education-chevron w-3.5 h-3.5 text-[#7a6451] shrink-0 transition-transform duration-200"
                   viewBox="0 0 20 20"
@@ -178,14 +171,14 @@ export function createClubAuthModalComponent(
 
               <!-- Dropdown Menu List -->
               <div class="js-education-menu hidden absolute right-0 left-0 top-full mt-1 z-30 bg-[#faf6ec] border border-[#cfc0a9] rounded-xl shadow-[0_14px_30px_-8px_rgba(45,29,16,0.22)] py-1 overflow-hidden">
-                ${EDUCATION_OPTIONS.map(
+                ${RUSSIAN_LEVEL_OPTIONS.map(
                   (opt) => `
                   <button
                     type="button"
                     data-value="${opt}"
                     class="js-education-option w-full text-right px-3 py-1.5 text-xs font-medium text-[#3d2c1e] hover:bg-[#ece2cf] hover:text-[#23180f] flex items-center justify-between transition-colors cursor-pointer"
                   >
-                    <span>${opt}</span>
+                    <span dir="ltr">${opt}</span>
                     <span class="js-education-check opacity-0 text-[#6e492d] text-[11px]">✓</span>
                   </button>
                 `
@@ -195,7 +188,7 @@ export function createClubAuthModalComponent(
           </div>
 
           <!-- Row 3: Password & Confirm Password -->
-          <div class="grid grid-cols-2 gap-2.5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
               <label class="block text-xs font-semibold text-[#4f3f31] mb-1">
                 رمز عبور <span class="text-[#a16237]">*</span>
@@ -226,10 +219,10 @@ export function createClubAuthModalComponent(
 
           <div class="js-register-error hidden text-xs text-red-800 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-justify"></div>
           <div class="js-register-feedback hidden text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-justify">
-            ثبت‌نام شما در باشگاه کتابخوانی بوک‌میت با موفقیت انجام شد!
+            ثبت‌نام شما در باشگاه کتابخوانی کتابوشکا با موفقیت انجام شد!
           </div>
 
-          <div class="pt-2.5 flex items-center justify-between gap-2 border-t border-[#e8dfd0]">
+          <div class="pt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-[#e8dfd0]">
             <button
               type="button"
               class="js-switch-to-login bg-transparent hover:bg-transparent text-xs font-semibold text-[#7a5436] hover:text-[#2c1d11] underline underline-offset-4 cursor-pointer"
@@ -365,12 +358,12 @@ export function createClubAuthModalComponent(
     }
 
     if (view === 'login') {
-      $modalTitle.text('ورود به باشگاه بوک‌میت');
+      $modalTitle.text('ورود به باشگاه کتابوشکا');
       $registerForm.addClass('hidden');
       $forgotForm.addClass('hidden');
       $loginForm.removeClass('hidden');
     } else {
-      $modalTitle.text('ثبت‌نام در باشگاه بوک‌میت');
+      $modalTitle.text('ثبت‌نام در باشگاه کتابوشکا');
       $loginForm.addClass('hidden');
       $forgotForm.addClass('hidden');
       $registerForm.removeClass('hidden');
@@ -445,7 +438,7 @@ export function createClubAuthModalComponent(
                 `${res.member.first_name} ${res.member.last_name} عزیز، ورود شما به پنل مدیریت باشگاه با موفقیت انجام شد.`
               )
             : toPersianDigits(
-                `${res.member.first_name} ${res.member.last_name} عزیز، ورود شما به باشگاه کتابخوانی بوک‌میت با موفقیت انجام شد.`
+                `${res.member.first_name} ${res.member.last_name} عزیز، ورود شما به باشگاه کتابخوانی کتابوشکا با موفقیت انجام شد.`
               );
         $loginForm
           .find('.js-login-feedback')
@@ -495,7 +488,7 @@ export function createClubAuthModalComponent(
     if (!education) {
       $registerForm
         .find('.js-register-error')
-        .text('لطفاً مقطع تحصیلی خود را انتخاب نمایید.')
+        .text('لطفاً سطح روسی خود را انتخاب نمایید.')
         .removeClass('hidden');
       return;
     }
@@ -521,7 +514,7 @@ export function createClubAuthModalComponent(
     })
       .then((res) => {
         const successMsg = toPersianDigits(
-          `${res.member.first_name} ${res.member.last_name} عزیز، عضویت شما در باشگاه بوک‌میت با موفقیت ثبت شد. در حال ورود به پنل کاربری...`
+          `${res.member.first_name} ${res.member.last_name} عزیز، عضویت شما در باشگاه کتابوشکا با موفقیت ثبت شد. در حال ورود به پنل کاربری...`
         );
         $registerForm
           .find('.js-register-feedback')
@@ -532,7 +525,7 @@ export function createClubAuthModalComponent(
           ($registerForm[0] as HTMLFormElement).reset();
           $eduInput.val('');
           $eduLabel
-            .text('انتخاب مقطع...')
+            .text('سطح روسی خود را انتخاب کنید')
             .addClass('text-[#8a7968]')
             .removeClass('text-[#2c1f14] font-medium');
           $eduDropdown.find('.js-education-check').addClass('opacity-0');

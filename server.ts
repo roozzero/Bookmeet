@@ -351,11 +351,20 @@ async function startServer() {
         return;
       }
 
+      const allowedRussianLevels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+      const cleanLevel = String(education || '').trim().toUpperCase();
+      if (!allowedRussianLevels.includes(cleanLevel)) {
+        res
+          .status(400)
+          .json({ error: 'لطفاً سطح روسی خود را انتخاب نمایید.' });
+        return;
+      }
+
       const { member, token } = await mysqlDb.registerClubMember({
         first_name: String(first_name).trim(),
         last_name: String(last_name).trim(),
         phone: String(phone).trim(),
-        education: String(education).trim(),
+        education: cleanLevel,
         password_plain: String(password),
       });
 
@@ -1017,6 +1026,43 @@ async function startServer() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'خطا در حذف دسته‌بندی کتابخانه';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.get('/api/admin/contact-messages', requireAdmin, async (_req, res) => {
+    try {
+      const contactMessages = await mysqlDb.getContactMessages();
+      res.json({ success: true, contactMessages });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در دریافت پیام‌های دریافتی';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  app.put('/api/admin/contact-messages/:id/read', requireAdmin, async (req, res) => {
+    try {
+      const isRead = Boolean(req.body?.is_read);
+      const contactMessage = await mysqlDb.updateContactMessageReadStatus(
+        Number(req.params.id),
+        isRead
+      );
+      res.json({ success: true, contactMessage });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در تغییر وضعیت مطالعه پیام';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.delete('/api/admin/contact-messages/:id', requireAdmin, async (req, res) => {
+    try {
+      await mysqlDb.deleteContactMessage(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در حذف پیام دریافتی';
       res.status(400).json({ error: message });
     }
   });

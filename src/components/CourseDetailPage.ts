@@ -288,7 +288,7 @@ export function createCourseDetailPage(
                 نظرات و دیدگاه‌های مخاطبان دوره (${toPersianDigits(course.comments.length)})
               </h2>
               <p class="text-[13.5px] text-[#6B5444] mt-1">
-                تجربه دانش‌پذیران دوره‌های پیشین آموزش زبان روسی در باشگاه کتابخوانی بوک‌میت
+                تجربه دانش‌پذیران دوره‌های پیشین آموزش زبان روسی در باشگاه کتابخوانی کتابوشکا
               </p>
             </div>
           </div>
@@ -373,8 +373,9 @@ export function createCourseDetailPage(
                 <input
                   type="text"
                   name="author_name"
+                  value=""
                   required
-                  placeholder="نام شما..."
+                  placeholder="نام و نام خانوادگی خود را وارد کنید"
                   class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
                 />
               </div>

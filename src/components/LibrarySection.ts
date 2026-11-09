@@ -332,7 +332,7 @@ export function createLibrarySection(
                   <span class="text-[12.5px] font-semibold text-[#7A4B2A]">برنامه نشست‌های حضوری و آنلاین</span>
                 </div>
                 <h3 class="font-display text-[22px] sm:text-[28px] font-bold text-[#1E150F] text-justify">
-                  رویدادهای پیش رو در باشگاه بوک‌میت
+                  رویدادهای پیش رو در باشگاه کتابوشکا
                 </h3>
               </div>
               <p class="text-[13.5px] text-[#5E493A] text-justify">
@@ -444,7 +444,7 @@ export function createLibrarySection(
             <div>
               <div class="inline-flex items-center gap-2 mb-2">
                 <span class="w-2 h-2 rounded-full bg-[#7A4B2A]"></span>
-                <span class="text-[12.5px] font-semibold text-[#7A4B2A]">کتابخانه باشگاه بوک‌میت</span>
+                <span class="text-[12.5px] font-semibold text-[#7A4B2A]">کتابخانه باشگاه کتابوشکا</span>
               </div>
               <h2 class="font-display text-[26px] sm:text-[34px] font-bold leading-[1.3] text-[#1E150F] text-justify">
                 قفسه کتاب‌های باشگاه
@@ -660,10 +660,6 @@ export function createLibraryBookDetailPageComponent(props: {
       String(c.target_title || '').trim() === String(book.title || '').trim()
   );
 
-  const defaultAuthorName = currentMember
-    ? `${currentMember.first_name || ''} ${currentMember.last_name || ''}`.trim()
-    : '';
-
   const specItems: Array<{ label: string; value: string }> = [
     { label: 'نام نویسنده', value: book.author ? toPersianDigits(book.author) : '—' },
     { label: 'مترجم', value: book.translator ? toPersianDigits(book.translator) : '—' },
@@ -856,7 +852,26 @@ export function createLibraryBookDetailPageComponent(props: {
             : ''
         }
 
-        <!-- 7. User Comments Section -->
+        <!-- 7. Tags Below Notes and Remarks -->
+        ${
+          tagsList.length > 0
+            ? `
+          <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-7 space-y-3">
+            <h2 class="font-display text-[17px] font-bold text-[#1E150F]">برچسب‌های کتاب</h2>
+            <div class="flex flex-wrap gap-2">
+              ${tagsList
+                .map(
+                  (tag) =>
+                    `<span class="px-3.5 py-1.5 rounded-xl bg-[#EFE3D2] border border-[#D8C4AA] text-[#4E3B2D] text-[12.5px] font-semibold">#${toPersianDigits(tag)}</span>`
+                )
+                .join('')}
+            </div>
+          </div>
+        `
+            : ''
+        }
+
+        <!-- 8. User Comments Section -->
         <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-8 space-y-6">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E6D8C4] pb-4">
             <div>
@@ -932,9 +947,9 @@ export function createLibraryBookDetailPageComponent(props: {
                   <input
                     type="text"
                     name="author_name"
-                    value="${defaultAuthorName}"
+                    value=""
                     required
-                    placeholder="نام خود را وارد کنید"
+                    placeholder="نام و نام خانوادگی خود را وارد کنید"
                     class="w-full px-3.5 py-2.5 rounded-xl bg-[#FDFBF7] border border-[#D8C7B0] text-[13.5px] text-[#221811] focus:outline-none focus:border-[#5A3A22]"
                   />
                 </div>
@@ -974,25 +989,6 @@ export function createLibraryBookDetailPageComponent(props: {
             </form>
           </div>
         </div>
-
-        <!-- 8. Tags at the Very Bottom -->
-        ${
-          tagsList.length > 0
-            ? `
-          <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-7 space-y-3">
-            <h2 class="font-display text-[17px] font-bold text-[#1E150F]">برچسب‌های کتاب</h2>
-            <div class="flex flex-wrap gap-2">
-              ${tagsList
-                .map(
-                  (tag) =>
-                    `<span class="px-3.5 py-1.5 rounded-xl bg-[#EFE3D2] border border-[#D8C4AA] text-[#4E3B2D] text-[12.5px] font-semibold">#${toPersianDigits(tag)}</span>`
-                )
-                .join('')}
-            </div>
-          </div>
-        `
-            : ''
-        }
       </div>
     </section>
   `);

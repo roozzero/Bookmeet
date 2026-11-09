@@ -57,7 +57,7 @@ export function createBookshelfComponent(props: BookshelfProps): JQuery<HTMLElem
       <div class="relative w-full">
         <img
           src="${imageSrc}"
-          alt="قفسه کتاب‌های باشگاه کتابخوانی بوک میت"
+          alt="قفسه کتاب‌های باشگاه کتابخوانی کتابوشکا"
           width="860"
           height="367"
           loading="eager"

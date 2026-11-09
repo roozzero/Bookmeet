@@ -16,7 +16,7 @@ export function createBlogSectionComponent(
     <section
       id="blog"
       dir="rtl"
-      aria-label="وبلاگ باشگاه کتابخوانی بوک‌میت"
+      aria-label="وبلاگ باشگاه کتابخوانی کتابوشکا"
       class="w-full py-20 md:py-28 px-6 md:px-14 border-t border-[#dfd6c3]/80 relative overflow-hidden bg-[#ebe4d1]/45"
     >
       <div class="max-w-6xl mx-auto">
@@ -28,12 +28,12 @@ export function createBlogSectionComponent(
               <span>۰۴ · وبلاگ و جستارهای ادبی باشگاه</span>
             </div>
             <h2 class="text-2xl sm:text-3xl md:text-[36px] font-bold text-[#382315] leading-[1.35] tracking-tight">
-              یادداشت‌ها، نقدها و تجربه‌های خوانش در بوک‌میت
+              یادداشت‌ها، نقدها و تجربه‌های خوانش در کتابوشکا
             </h2>
           </div>
 
           <p class="text-sm text-[#594636] max-w-md leading-[1.95] text-justify" style="text-align: justify; text-justify: inter-word;">
-            در وبلاگ بوک‌میت، خلاصه مباحث مطرح‌شده در نشست‌های هفتگی، جستارهای تحلیلی اعضا و راهنماهای خوانش خلاق ادبیات داستانی منتشر می‌شود.
+            در وبلاگ کتابوشکا، خلاصه مباحث مطرح‌شده در نشست‌های هفتگی، جستارهای تحلیلی اعضا و راهنماهای خوانش خلاق ادبیات داستانی منتشر می‌شود.
           </p>
         </div>
 

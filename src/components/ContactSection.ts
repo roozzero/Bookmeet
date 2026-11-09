@@ -10,11 +10,11 @@ export interface ContactSectionProps {
 
 const DEFAULT_FOOTER_SETTINGS: FooterSettingsData = {
   id: 1,
-  title: 'باشگاه کتابخوانی بوک‌میت',
+  title: 'باشگاه کتابخوانی کتابوشکا',
   description: 'محفلی صمیمی برای خوانش آهسته، نقد ادبی و هم‌اندیشی پیرامون ماندگارترین آثار داستانی و فلسفی جهان.',
   phone: '۰۲۱-۸۸۹۴۳۲۱۰',
-  email: 'hello@bookmeet.ir',
-  address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات بوک‌میت',
+  email: 'hello@ketboshka.ir',
+  address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات کتابوشکا',
   links: [
     { label: 'درباره باشگاه', href: '#about-club' },
     { label: 'کتابخانه', href: '#library' },
@@ -28,7 +28,7 @@ const DEFAULT_FOOTER_SETTINGS: FooterSettingsData = {
   twitter_url: '',
   youtube_url: '',
   linkedin_url: '',
-  copyright_text: 'تمامی حقوق مادی و معنوی برای باشگاه کتابخوانی بوک‌میت محفوظ است · ۱۴۰۵',
+  copyright_text: 'تمامی حقوق مادی و معنوی برای باشگاه کتابخوانی کتابوشکا محفوظ است · ۱۴۰۵',
   tagline_text: 'حلقه‌های مطالعاتی و نقد ادبیات داستانی',
 };
 
@@ -54,8 +54,8 @@ export function createContactSectionComponent(
     <section
       id="contact"
       dir="rtl"
-      aria-label="ارتباط با باشگاه کتابخوانی بوک‌میت"
-      class="w-full pt-20 pb-14 md:pt-28 md:pb-16 px-6 md:px-14 border-t border-[#dfd6c3]/80 relative overflow-hidden"
+      aria-label="ارتباط با باشگاه کتابخوانی کتابوشکا"
+      class="w-full pt-20 pb-14 md:pt-28 md:pb-16 px-4 sm:px-6 md:px-14 border-t border-[#dfd6c3]/80 relative overflow-hidden"
     >
       <div class="max-w-6xl mx-auto">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
@@ -80,9 +80,9 @@ export function createContactSectionComponent(
 
           <!-- Left Column: Interactive Contact Form (Saved to MySQL) -->
           <div class="lg:col-span-7">
-            <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-[26px] p-6 sm:p-8 md:p-10 shadow-[0_20px_50px_-22px_rgba(45,29,16,0.16)]">
+            <div class="bg-[#f8f4ea] border border-[#dcd0bb] rounded-[26px] p-5 sm:p-8 md:p-10 shadow-[0_20px_50px_-22px_rgba(45,29,16,0.16)]">
               <h3 class="text-lg md:text-xl font-bold text-[#382315] mb-2">
-                ارسال پیام به دبیرخانه باشگاه
+                ارسال پیام
               </h3>
               <p
                 class="text-xs md:text-sm text-[#5e4a3a] leading-[1.95] mb-6 text-justify"
@@ -172,11 +172,11 @@ export function createContactSectionComponent(
                 <div class="inline-flex items-center gap-3">
                   <img
                     src="/assets/Bookmate%20Persian%20Logo%20with%20Colorful%20Books.png"
-                    alt="لوگوی باشگاه کتابخوانی بوک‌میت"
+                    alt="لوگوی باشگاه کتابخوانی کتابوشکا"
                     class="h-10 w-auto object-contain select-none shrink-0"
                   />
                   <h3 class="text-base sm:text-[18px] font-bold text-[#2c1b0e] tracking-tight">
-                    ${toPersianDigits(footer.title || 'باشگاه کتابخوانی بوک‌میت')}
+                    ${toPersianDigits(footer.title || 'باشگاه کتابخوانی کتابوشکا')}
                   </h3>
                 </div>
                 ${
@@ -196,13 +196,13 @@ export function createContactSectionComponent(
                 <span class="text-[11px] font-medium text-[#6e5947]">
                   همراه ما در شبکه‌های اجتماعی باشید
                 </span>
-                <div class="flex items-center gap-2" role="list" aria-label="شبکه‌های اجتماعی باشگاه بوک‌میت">
+                <div class="flex items-center gap-2" role="list" aria-label="شبکه‌های اجتماعی باشگاه کتابوشکا">
                   <!-- Instagram -->
                   <a
                     href="${footer.instagram_url || '#instagram'}"
                     ${footer.instagram_url ? 'target="_blank" rel="noopener noreferrer"' : ''}
                     data-has-url="${footer.instagram_url ? '1' : '0'}"
-                    aria-label="اینستاگرام بوک‌میت"
+                    aria-label="اینستاگرام کتابوشکا"
                     title="اینستاگرام"
                     class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
                   >
@@ -218,7 +218,7 @@ export function createContactSectionComponent(
                     href="${footer.telegram_url || '#telegram'}"
                     ${footer.telegram_url ? 'target="_blank" rel="noopener noreferrer"' : ''}
                     data-has-url="${footer.telegram_url ? '1' : '0'}"
-                    aria-label="تلگرام بوک‌میت"
+                    aria-label="تلگرام کتابوشکا"
                     title="تلگرام"
                     class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
                   >
@@ -233,7 +233,7 @@ export function createContactSectionComponent(
                     href="${footer.twitter_url || '#x'}"
                     ${footer.twitter_url ? 'target="_blank" rel="noopener noreferrer"' : ''}
                     data-has-url="${footer.twitter_url ? '1' : '0'}"
-                    aria-label="ایکس (توییتر) بوک‌میت"
+                    aria-label="ایکس (توییتر) کتابوشکا"
                     title="ایکس (توییتر)"
                     class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
                   >
@@ -248,7 +248,7 @@ export function createContactSectionComponent(
                     href="${footer.youtube_url || '#youtube'}"
                     ${footer.youtube_url ? 'target="_blank" rel="noopener noreferrer"' : ''}
                     data-has-url="${footer.youtube_url ? '1' : '0'}"
-                    aria-label="یوتیوب بوک‌میت"
+                    aria-label="یوتیوب کتابوشکا"
                     title="یوتیوب"
                     class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
                   >
@@ -263,7 +263,7 @@ export function createContactSectionComponent(
                     href="${footer.linkedin_url || '#linkedin'}"
                     ${footer.linkedin_url ? 'target="_blank" rel="noopener noreferrer"' : ''}
                     data-has-url="${footer.linkedin_url ? '1' : '0'}"
-                    aria-label="لینکدین بوک‌میت"
+                    aria-label="لینکدین کتابوشکا"
                     title="لینکدین"
                     class="js-social-icon w-8.5 h-8.5 rounded-lg bg-[#faf6ec] border border-[#cfc1aa] text-[#382315] hover:bg-[#382315] hover:text-[#f8f4ea] hover:border-[#382315] hover:-translate-y-0.5 flex items-center justify-center transition-all duration-200"
                   >
@@ -334,7 +334,7 @@ export function createContactSectionComponent(
               <div>
                 ${toPersianDigits(
                   footer.copyright_text ||
-                    'تمامی حقوق مادی و معنوی برای باشگاه کتابخوانی بوک‌میت محفوظ است · ۱۴۰۵'
+                    'تمامی حقوق مادی و معنوی برای باشگاه کتابخوانی کتابوشکا محفوظ است · ۱۴۰۵'
                 )}
               </div>
               <div>

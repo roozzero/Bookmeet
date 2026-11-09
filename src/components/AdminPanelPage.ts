@@ -8,6 +8,7 @@ import type {
   ClubAnnouncement,
   ClubMember,
   ContactInfoData,
+  ContactMessageItem,
   CourseSyllabusItem,
   EnrollmentRecord,
   FooterLinkItem,
@@ -41,6 +42,7 @@ export type AdminTabKey =
   | 'classes'
   | 'users'
   | 'tickets'
+  | 'contact_messages'
   | 'announcements'
   | 'profile'
   | 'blog'
@@ -314,12 +316,12 @@ function renderTicketAttachmentsHtml(
 export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuery {
   const defaultFooterSettings: FooterSettingsData = {
     id: 1,
-    title: 'باشگاه کتابخوانی بوک‌میت',
+    title: 'باشگاه کتابخوانی کتابوشکا',
     description:
       'محفلی صمیمی برای خوانش آهسته، نقد ادبی و هم‌اندیشی پیرامون ماندگارترین آثار داستانی و فلسفی جهان.',
     phone: '۰۲۱-۸۸۹۴۳۲۱۰',
-    email: 'hello@bookmeet.ir',
-    address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات بوک‌میت',
+    email: 'hello@ketboshka.ir',
+    address: 'تهران، خیابان کریم‌خان زند، خیابان ایرانشهر، خانه فرهنگ و ادبیات کتابوشکا',
     links: [
       { label: 'درباره باشگاه', href: '#about-club' },
       { label: 'کتابخانه', href: '#library' },
@@ -333,7 +335,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     twitter_url: '',
     youtube_url: '',
     linkedin_url: '',
-    copyright_text: 'تمامی حقوق مادی و معنوی برای باشگاه کتابخوانی بوک‌میت محفوظ است · ۱۴۰۵',
+    copyright_text: 'تمامی حقوق مادی و معنوی برای باشگاه کتابخوانی کتابوشکا محفوظ است · ۱۴۰۵',
     tagline_text: 'حلقه‌های مطالعاتی و نقد ادبیات داستانی',
   };
 
@@ -343,6 +345,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     classes: [...(props.initialData.classes || [])],
     users: [...(props.initialData.users || [])],
     tickets: [...(props.initialData.tickets || [])],
+    contactMessages: [...(props.initialData.contactMessages || [])],
     announcements: [...(props.initialData.announcements || [])],
     blogPosts: [...(props.initialData.blogPosts || [])],
     comments: [...(props.initialData.comments || [])],
@@ -368,6 +371,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   };
 
   let activeTab: AdminTabKey = props.initialTab || 'dashboard';
+  let isAdminMobileSidebarOpen = false;
 
   // Gallery state
   let gallerySearch = '';
@@ -464,6 +468,11 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   // Tickets management state
   let ticketFilter: 'all' | 'در انتظار بررسی' | 'پاسخ داده‌شده' | 'بسته‌شده' = 'all';
   let selectedAdminTicketId: number | null = null;
+
+  // Contact messages (پیام‌های دریافتی) management state
+  let contactMessageFilter: 'all' | 'unread' | 'read' = 'all';
+  let contactMessageSearch = '';
+  let viewingContactMessage: ContactMessageItem | null = null;
 
   // Announcements management state
   let editingAnnouncement: Partial<ClubAnnouncement> | null = null;
@@ -566,8 +575,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
 
   const $wrapper = $(`
     <section
-      aria-label="پنل مدیریت باشگاه کتابخوانی بوک‌میت"
-      class="w-full max-w-[1440px] mx-auto px-5 sm:px-10 md:px-16 lg:px-20 pt-6 pb-20"
+      aria-label="پنل مدیریت باشگاه کتابخوانی کتابوشکا"
+      class="w-full max-w-[1440px] mx-auto px-4 sm:px-10 md:px-16 lg:px-20 pt-6 pb-20 overflow-x-hidden"
     ></section>
   `);
 
@@ -1542,6 +1551,92 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 class="js-admin-close-view-lib-book px-4 py-2 rounded-xl border border-[#C5B198] text-[#4E3B2D] hover:bg-[#EFE3D2] text-[12.5px] font-semibold cursor-pointer"
               >
                 بستن
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (viewingContactMessage) {
+      const msg = viewingContactMessage;
+      const isRead = Number(msg.is_read || 0) === 1;
+      html += `
+        <div class="js-admin-view-contact-msg-backdrop fixed inset-0 z-50 bg-[#1B120C]/65 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div class="w-full max-w-[640px] max-h-[88vh] rounded-2xl bg-[#FAF5EC] border-2 border-[#DEC8AC] shadow-[0_24px_60px_rgba(27,18,12,0.35)] flex flex-col overflow-hidden">
+            <div class="px-6 py-4 bg-[#F2E6D5] border-b border-[#E5D7C5] flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="px-2.5 py-0.5 rounded-md text-[11px] font-bold ${
+                    isRead
+                      ? 'bg-[#E4F2E7] text-[#235332]'
+                      : 'bg-[#FFF3CD] text-[#7A5A10]'
+                  }">
+                    ${isRead ? '✓ خوانده‌شده' : '● پیام جدید (خوانده‌نشده)'}
+                  </span>
+                  <span class="text-[11.5px] text-[#6B5444]">
+                    تاریخ ارسال: ${toPersianDigits(msg.created_at || '—')}
+                  </span>
+                </div>
+                <h3 class="font-display text-[17.5px] font-bold text-[#231912] mt-1.5">
+                  ${toPersianDigits(msg.subject || 'بدون موضوع')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                class="js-admin-close-contact-msg-modal px-3 py-1.5 rounded-xl text-[#4E3B2D] hover:bg-[#EFE3D2] text-[13px] font-semibold cursor-pointer shrink-0"
+              >
+                بستن ✕
+              </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto space-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[12.5px]">
+                <div>
+                  <span class="block text-[#7A6452] text-[11px]">نام و نام خانوادگی فرستنده:</span>
+                  <strong class="text-[#231912] font-bold mt-0.5 block">${toPersianDigits(msg.full_name || '—')}</strong>
+                </div>
+                <div>
+                  <span class="block text-[#7A6452] text-[11px]">پست الکترونیک (ایمیل):</span>
+                  <strong dir="ltr" class="text-[#231912] font-bold mt-0.5 block text-right sm:text-left break-all">${msg.email || '—'}</strong>
+                </div>
+              </div>
+
+              <div class="p-5 rounded-xl bg-[#FDFBF7] border border-[#E6D7C3] space-y-2">
+                <span class="block text-[12px] font-bold text-[#6E4526]">متن کامل پیام:</span>
+                <p class="text-[14px] text-[#231912] leading-[2] whitespace-pre-line text-justify">
+                  ${toPersianDigits(msg.message || '')}
+                </p>
+              </div>
+            </div>
+
+            <div class="px-6 py-3.5 border-t border-[#E5D7C5] flex flex-wrap items-center justify-between gap-2.5">
+              <div class="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  data-contact-msg-id="${msg.id}"
+                  data-next-read="${isRead ? '0' : '1'}"
+                  class="js-admin-toggle-contact-msg-read px-3.5 py-2 rounded-xl border text-[12px] font-semibold cursor-pointer transition-colors ${
+                    isRead
+                      ? 'bg-[#FFF6E0] border-[#E3C178] text-[#6E4B0C] hover:bg-[#F7E7C4]'
+                      : 'bg-[#E4F2E7] border-[#BBD9C2] text-[#235332] hover:bg-[#D2E9D7]'
+                  }"
+                >
+                  ${isRead ? 'علامت به عنوان خوانده‌نشده' : '✓ علامت به عنوان خوانده‌شده'}
+                </button>
+                <button
+                  type="button"
+                  data-delete-contact-msg="${msg.id}"
+                  class="js-admin-delete-contact-msg px-3.5 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold cursor-pointer transition-colors"
+                >
+                  حذف پیام
+                </button>
+              </div>
+              <button
+                type="button"
+                class="js-admin-close-contact-msg-modal px-4 py-2 rounded-xl border border-[#C5B198] text-[#4E3B2D] hover:bg-[#EFE3D2] text-[12.5px] font-semibold cursor-pointer"
+              >
+                بستن پنجره
               </button>
             </div>
           </div>
@@ -2756,7 +2851,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 name="meeting_link"
                 dir="ltr"
                 value="${subBeingEdited?.meeting_link || ''}"
-                placeholder="https://meet.bookmeet.ir/live"
+                placeholder="https://meet.ketboshka.ir/live"
                 class="w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px] text-left"
               />
             </div>
@@ -3293,9 +3388,10 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 <input type="text" name="phone" required value="${toPersianDigits(editingUser.phone || '')}" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px]" />
               </div>
               <div>
-                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">مقطع تحصیلی</label>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">سطح روسی</label>
                 <select name="education" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px]">
-                  ${['دیپلم', 'کاردانی', 'کارشناسی', 'کارشناسی ارشد', 'دکتری']
+                  <option value="" ${!['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].includes(editingUser?.education || '') ? 'selected' : ''}>سطح روسی خود را انتخاب کنید</option>
+                  ${['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
                     .map(
                       (lvl) =>
                         `<option value="${lvl}" ${editingUser?.education === lvl ? 'selected' : ''}>${lvl}</option>`
@@ -3334,7 +3430,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           <input
             type="text"
             value="${toPersianDigits(userSearch)}"
-            placeholder="جستجو در جدول کاربران بر اساس نام، شماره تلفن، ایمیل یا تحصیلات..."
+            placeholder="جستجو در جدول کاربران بر اساس نام، شماره تلفن، ایمیل یا سطح روسی..."
             class="js-admin-user-search flex-1 px-4 py-2 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
           />
           <div class="flex items-center gap-2 shrink-0">
@@ -3376,7 +3472,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   <th class="py-3.5 px-4">کد عضویت</th>
                   <th class="py-3.5 px-4">شماره همراه</th>
                   <th class="py-3.5 px-4">پست الکترونیک (ایمیل)</th>
-                  <th class="py-3.5 px-4">تحصیلات</th>
+                  <th class="py-3.5 px-4">سطح روسی</th>
                   <th class="py-3.5 px-4">تاریخ عضویت</th>
                   <th class="py-3.5 px-4 text-center">عملیات</th>
                 </tr>
@@ -4001,7 +4097,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         <div>
           <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">پروفایل مدیر باشگاه</h2>
           <p class="text-[13.5px] text-[#6B5444] mt-1">
-            ویرایش مشخصات فردی، تصویر پروفایل و رمز عبور ویژه مدیریت باشگاه کتابخوانی بوک‌میت.
+            ویرایش مشخصات فردی، تصویر پروفایل و رمز عبور ویژه مدیریت باشگاه کتابخوانی کتابوشکا.
           </p>
         </div>
 
@@ -4043,7 +4139,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             </div>
             <div>
               <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">پست الکترونیک (ایمیل)</label>
-              <input type="text" name="email" dir="ltr" value="${state.admin.email || 'admin@bookmeet.ir'}" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px] text-left" />
+              <input type="text" name="email" dir="ltr" value="${state.admin.email || 'admin@ketboshka.ir'}" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13.5px] text-left" />
             </div>
             <div>
               <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">مقطع تحصیلی</label>
@@ -4893,7 +4989,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   type="text"
                   name="footer_title"
                   value="${toPersianDigits(fs.title || '')}"
-                  placeholder="مثلاً: باشگاه کتابخوانی بوک‌میت"
+                  placeholder="مثلاً: باشگاه کتابخوانی کتابوشکا"
                   class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px]"
                 />
               </div>
@@ -4926,7 +5022,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   dir="ltr"
                   name="footer_email"
                   value="${fs.email || ''}"
-                  placeholder="hello@bookmeet.ir"
+                  placeholder="hello@ketboshka.ir"
                   class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-left"
                 />
               </div>
@@ -5058,7 +5154,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   type="text"
                   name="footer_copyright"
                   value="${toPersianDigits(fs.copyright_text || '')}"
-                  placeholder="© ۱۴۰۵ باشگاه کتابخوانی بوک‌میت · تمامی حقوق محفوظ است."
+                  placeholder="© ۱۴۰۵ باشگاه کتابخوانی کتابوشکا · تمامی حقوق محفوظ است."
                   class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px]"
                 />
               </div>
@@ -5099,6 +5195,185 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     `;
   }
 
+  function renderContactMessagesTab(): string {
+    const allMessages = state.contactMessages || [];
+    const unreadCount = allMessages.filter((m) => Number(m.is_read || 0) === 0).length;
+    const readCount = allMessages.filter((m) => Number(m.is_read || 0) === 1).length;
+
+    const q = contactMessageSearch.trim().toLowerCase();
+    const filteredMessages = allMessages.filter((m) => {
+      const isRead = Number(m.is_read || 0) === 1;
+      if (contactMessageFilter === 'unread' && isRead) return false;
+      if (contactMessageFilter === 'read' && !isRead) return false;
+      if (!q) return true;
+      const haystack = `${m.full_name} ${m.email} ${m.subject} ${m.message}`.toLowerCase();
+      return haystack.includes(q);
+    });
+
+    return `
+      <div class="space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">
+              پیام‌های دریافتی
+            </h2>
+            <p class="text-[13.5px] text-[#6B5444] mt-1 text-justify">
+              مدیریت و مشاهده پیام‌های ارسال‌شده توسط مخاطبان از طریق فرم «ارسال پیام» در صفحه اصلی وب‌سایت.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-auto">
+            <span class="px-3.5 py-1.5 rounded-xl bg-[#FFF3CD] border border-[#E5C77B] text-[#7A5A10] text-[12px] font-bold">
+              ${toPersianDigits(unreadCount)} پیام جدید (خوانده‌نشده)
+            </span>
+            <span class="px-3.5 py-1.5 rounded-xl bg-[#EFE3D2] text-[#4E3B2D] text-[12px] font-semibold">
+              کل پیام‌ها: ${toPersianDigits(allMessages.length)}
+            </span>
+          </div>
+        </div>
+
+        <!-- Search and Read/Unread Filter Bar -->
+        <div class="p-4 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <input
+            type="text"
+            value="${toPersianDigits(contactMessageSearch)}"
+            placeholder="جستجو در نام فرستنده، ایمیل، موضوع یا متن پیام..."
+            class="js-admin-contact-msg-search flex-1 px-4 py-2 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+          />
+          <div class="flex flex-wrap items-center gap-2 shrink-0">
+            ${(
+              [
+                { key: 'all', label: `همه (${toPersianDigits(allMessages.length)})` },
+                { key: 'unread', label: `خوانده‌نشده (${toPersianDigits(unreadCount)})` },
+                { key: 'read', label: `خوانده‌شده (${toPersianDigits(readCount)})` },
+              ] as const
+            )
+              .map(
+                (f) => `
+              <button
+                type="button"
+                data-contact-msg-filter="${f.key}"
+                class="js-admin-contact-msg-filter px-3.5 py-2 rounded-xl text-[12px] font-semibold cursor-pointer transition-colors ${
+                  contactMessageFilter === f.key
+                    ? 'bg-[#5A3A22] text-[#FAF5EC]'
+                    : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#EFE3D2]'
+                }"
+              >
+                ${f.label}
+              </button>
+            `
+              )
+              .join('')}
+          </div>
+        </div>
+
+        <!-- Messages List -->
+        ${
+          filteredMessages.length > 0
+            ? `
+          <div class="space-y-4">
+            ${filteredMessages
+              .map((msg) => {
+                const isRead = Number(msg.is_read || 0) === 1;
+                return `
+                  <article class="p-5 sm:p-6 rounded-2xl border transition-all ${
+                    isRead
+                      ? 'bg-[#FAF5EC] border-[#E5D7C5]'
+                      : 'bg-[#FDF9F1] border-2 border-[#8B5A36] shadow-[0_10px_26px_rgba(122,75,42,0.08)]'
+                  } space-y-4">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div class="space-y-1 min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="px-2.5 py-0.5 rounded-md text-[11px] font-bold ${
+                            isRead
+                              ? 'bg-[#E4F2E7] text-[#235332]'
+                              : 'bg-[#FFF3CD] text-[#7A5A10]'
+                          }">
+                            ${isRead ? '✓ خوانده‌شده' : '● پیام جدید (خوانده‌نشده)'}
+                          </span>
+                          <span class="text-[12px] text-[#6B5444]">
+                            تاریخ ارسال: <strong class="text-[#231912]">${toPersianDigits(msg.created_at || '—')}</strong>
+                          </span>
+                        </div>
+                        <h3 class="font-display text-[17px] sm:text-[18px] font-bold text-[#231912] pt-1">
+                          ${toPersianDigits(msg.subject || 'بدون موضوع')}
+                        </h3>
+                      </div>
+
+                      <div class="flex flex-wrap items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          data-open-contact-msg="${msg.id}"
+                          class="js-admin-open-contact-msg px-3.5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold cursor-pointer transition-colors"
+                        >
+                          مشاهده کامل پیام
+                        </button>
+                        <button
+                          type="button"
+                          data-contact-msg-id="${msg.id}"
+                          data-next-read="${isRead ? '0' : '1'}"
+                          class="js-admin-toggle-contact-msg-read px-3.5 py-2 rounded-xl border text-[12px] font-semibold cursor-pointer transition-colors ${
+                            isRead
+                              ? 'bg-[#F4E9DA]/80 border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#EFE3D2]'
+                              : 'bg-[#E4F2E7] border-[#BBD9C2] text-[#235332] hover:bg-[#D2E9D7]'
+                          }"
+                        >
+                          ${isRead ? 'علامت خوانده‌نشده' : '✓ علامت خوانده‌شده'}
+                        </button>
+                        <button
+                          type="button"
+                          data-delete-contact-msg="${msg.id}"
+                          class="js-admin-delete-contact-msg px-3.5 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold cursor-pointer transition-colors"
+                        >
+                          حذف
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 px-4 py-3 rounded-xl bg-[#F4E9DA]/55 border border-[#E5D7C5] text-[12.5px]">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <span class="text-[#7A6452] shrink-0">نام فرستنده:</span>
+                        <strong class="text-[#231912] font-bold truncate">${toPersianDigits(msg.full_name || '—')}</strong>
+                      </div>
+                      <div class="flex items-center gap-2 min-w-0">
+                        <span class="text-[#7A6452] shrink-0">ایمیل فرستنده:</span>
+                        <strong dir="ltr" class="text-[#231912] font-bold truncate">${msg.email || '—'}</strong>
+                      </div>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-[#FDFBF7] border border-[#E6D7C3]">
+                      <p class="text-[13.5px] text-[#3F2E21] leading-[1.95] whitespace-pre-line text-justify">
+                        ${toPersianDigits(msg.message || '')}
+                      </p>
+                    </div>
+                  </article>
+                `;
+              })
+              .join('')}
+          </div>
+        `
+            : `
+          <div class="p-10 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] text-center space-y-2">
+            <div class="font-display text-[17px] font-bold text-[#231912]">
+              ${
+                allMessages.length === 0
+                  ? 'هنوز هیچ پیامی از طریق فرم «ارسال پیام» دریافت نشده است'
+                  : 'پیامی مطابق با فیلتر یا عبارت جستجوی شما یافت نشد'
+              }
+            </div>
+            <p class="text-[13px] text-[#6B5444] max-w-md mx-auto">
+              ${
+                allMessages.length === 0
+                  ? 'به محض اینکه کاربران از طریق بخش «ارسال پیام» در صفحه اصلی وب‌سایت پیامی ارسال کنند، در این فهرست نمایش داده خواهد شد.'
+                  : 'می‌توانید فیلتر وضعیت پیام‌ها را روی «همه» قرار دهید یا عبارت جستجو را تغییر دهید.'
+              }
+            </p>
+          </div>
+        `
+        }
+      </div>
+    `;
+  }
+
   function getActiveTabContent(): string {
     switch (activeTab) {
       case 'dashboard':
@@ -5115,6 +5390,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         return renderUsersTab();
       case 'tickets':
         return renderTicketsTab();
+      case 'contact_messages':
+        return renderContactMessagesTab();
       case 'announcements':
         return renderAnnouncementsTab();
       case 'profile':
@@ -5131,6 +5408,10 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   }
 
   function render(): void {
+    const unreadContactCount = (state.contactMessages || []).filter(
+      (m) => Number(m.is_read || 0) === 0
+    ).length;
+
     const navItems: { key: AdminTabKey; label: string; badge?: string }[] = [
       { key: 'dashboard', label: 'داشبورد' },
       {
@@ -5178,73 +5459,99 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         label: 'تیکت ها',
         badge: toPersianDigits(state.tickets.length),
       },
+      {
+        key: 'contact_messages',
+        label: 'پیامهای دریافتی',
+        badge:
+          unreadContactCount > 0
+            ? toPersianDigits(unreadContactCount)
+            : toPersianDigits((state.contactMessages || []).length),
+      },
       { key: 'profile', label: 'پروفایل' },
       { key: 'home_settings', label: 'تنظیمات صفحه اصلی' },
     ];
 
+    const activeNavItem = navItems.find((item) => item.key === activeTab) || navItems[0];
+
     $wrapper.html(`
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-7 items-start">
         <!-- Sidebar Navigation -->
-        <aside class="lg:col-span-3 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] p-5 lg:sticky lg:top-24">
-          <div class="flex items-center gap-3.5 pb-4 mb-4 border-b border-[#E6D8C5]">
-            <div class="w-12 h-12 rounded-2xl bg-[#5A3A22] text-[#FAF5EC] font-display text-[19px] font-bold flex items-center justify-center shrink-0 overflow-hidden">
-              ${
-                state.admin.avatar_url
-                  ? `<img src="${state.admin.avatar_url}" alt="${state.admin.first_name}" class="w-full h-full object-cover" />`
-                  : state.admin.first_name.charAt(0)
-              }
-            </div>
-            <div class="min-w-0">
-              <div class="font-bold text-[15px] text-[#231912] truncate">
-                ${state.admin.first_name} ${state.admin.last_name}
+        <aside class="lg:col-span-3 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] p-4 sm:p-5 lg:sticky lg:top-24">
+          <div class="flex items-center justify-between gap-3 lg:pb-4 lg:mb-4 lg:border-b lg:border-[#E6D8C5]">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#5A3A22] text-[#FAF5EC] font-display text-[19px] font-bold flex items-center justify-center shrink-0 overflow-hidden">
+                ${
+                  state.admin.avatar_url
+                    ? `<img src="${state.admin.avatar_url}" alt="${state.admin.first_name}" class="w-full h-full object-cover" />`
+                    : state.admin.first_name.charAt(0)
+                }
               </div>
-              <div class="text-[11.5px] text-[#235332] font-semibold truncate">مدیر ارشد باشگاه بوک‌میت</div>
+              <div class="min-w-0">
+                <div class="font-bold text-[14.5px] sm:text-[15px] text-[#231912] truncate">
+                  ${state.admin.first_name} ${state.admin.last_name}
+                </div>
+                <div class="text-[11.5px] text-[#235332] font-semibold truncate">مدیر ارشد باشگاه کتابوشکا</div>
+              </div>
             </div>
+
+            <button
+              type="button"
+              aria-expanded="${isAdminMobileSidebarOpen ? 'true' : 'false'}"
+              aria-label="باز و بسته کردن منوی پنل مدیریت"
+              class="js-toggle-admin-mobile-nav lg:hidden inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#EFE3D2] hover:bg-[#E4D3BC] text-[#3F2E21] text-[12.5px] font-semibold transition-colors cursor-pointer shrink-0"
+            >
+              <span>${activeNavItem.label}</span>
+              <svg class="w-4 h-4 transition-transform ${isAdminMobileSidebarOpen ? 'rotate-180' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
           </div>
 
-          <nav class="space-y-1.5" aria-label="منوی پنل مدیریت">
-            ${navItems
-              .map((item) => {
-                const isActive = activeTab === item.key;
-                return `
-                  <button
-                    type="button"
-                    data-admin-tab="${item.key}"
-                    class="js-admin-tab-btn w-full px-4 py-2.5 rounded-xl text-right text-[13px] font-semibold flex items-center justify-between transition-all cursor-pointer ${
-                      isActive
-                        ? 'bg-[#5A3A22] text-[#FAF5EC] shadow-sm'
-                        : 'text-[#3F2E21] hover:bg-[#EFE3D2]'
-                    }"
-                  >
-                    <span>${item.label}</span>
-                    ${
-                      item.badge
-                        ? `<span class="text-[11px] px-2 py-0.5 rounded-md ${
-                            isActive
-                              ? 'bg-[#FAF5EC]/20 text-[#FAF5EC]'
-                              : 'bg-[#E8DAC7] text-[#5C4432]'
-                          }">${item.badge}</span>`
-                        : ''
-                    }
-                  </button>
-                `;
-              })
-              .join('')}
-          </nav>
+          <div class="${isAdminMobileSidebarOpen ? 'block pt-4 mt-4 border-t border-[#E6D8C5]' : 'hidden'} lg:block">
+            <nav class="space-y-1.5" aria-label="منوی پنل مدیریت">
+              ${navItems
+                .map((item) => {
+                  const isActive = activeTab === item.key;
+                  return `
+                    <button
+                      type="button"
+                      data-admin-tab="${item.key}"
+                      class="js-admin-tab-btn w-full px-4 py-2.5 rounded-xl text-right text-[13px] font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-[#5A3A22] text-[#FAF5EC] shadow-sm'
+                          : 'text-[#3F2E21] hover:bg-[#EFE3D2]'
+                      }"
+                    >
+                      <span>${item.label}</span>
+                      ${
+                        item.badge
+                          ? `<span class="text-[11px] px-2 py-0.5 rounded-md ${
+                              isActive
+                                ? 'bg-[#FAF5EC]/20 text-[#FAF5EC]'
+                                : 'bg-[#E8DAC7] text-[#5C4432]'
+                            }">${item.badge}</span>`
+                          : ''
+                      }
+                    </button>
+                  `;
+                })
+                .join('')}
+            </nav>
 
-          <div class="pt-4 mt-4 border-t border-[#E6D8C5] space-y-2">
-            <button
-              type="button"
-              class="js-admin-back-to-site w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#5B4636] hover:bg-[#EFE3D2] text-right transition-colors cursor-pointer"
-            >
-              ← مشاهده صفحه اصلی سایت
-            </button>
-            <button
-              type="button"
-              class="js-admin-logout w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#9E3329] hover:bg-[#FBEAE8] text-right transition-colors cursor-pointer"
-            >
-              خروج از پنل مدیریت
-            </button>
+            <div class="pt-4 mt-4 border-t border-[#E6D8C5] space-y-2">
+              <button
+                type="button"
+                class="js-admin-back-to-site w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#5B4636] hover:bg-[#EFE3D2] text-right transition-colors cursor-pointer"
+              >
+                ← مشاهده صفحه اصلی سایت
+              </button>
+              <button
+                type="button"
+                class="js-admin-logout w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#9E3329] hover:bg-[#FBEAE8] text-right transition-colors cursor-pointer"
+              >
+                خروج از پنل مدیریت
+              </button>
+            </div>
           </div>
         </aside>
 
@@ -5258,16 +5565,23 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   }
 
   // ==================== EVENT HANDLERS ====================
+  $wrapper.on('click', '.js-toggle-admin-mobile-nav', () => {
+    isAdminMobileSidebarOpen = !isAdminMobileSidebarOpen;
+    render();
+  });
+
   $wrapper.on('click', '.js-admin-tab-btn', function () {
     const tab = $(this).data('admin-tab') as AdminTabKey;
     if (tab) {
       activeTab = tab;
+      isAdminMobileSidebarOpen = false;
       editingSession = null;
       managingSubSessionsForSessionId = null;
       editingSubSession = null;
       editingClass = null;
       managingSubSessionsForClassId = null;
       selectedAdminTicketId = null;
+      viewingContactMessage = null;
       editingUser = null;
       editingAnnouncement = null;
       editingBlogPost = null;
@@ -5283,9 +5597,11 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     const tab = $(this).data('admin-switch') as AdminTabKey;
     if (tab) {
       activeTab = tab;
+      isAdminMobileSidebarOpen = false;
       managingSubSessionsForSessionId = null;
       managingSubSessionsForClassId = null;
       selectedAdminTicketId = null;
+      viewingContactMessage = null;
       editingSubSession = null;
       blogPageMode = 'list';
       notifyRoute();
@@ -6623,7 +6939,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       first_name: '',
       last_name: '',
       phone: '',
-      education: 'کارشناسی ارشد',
+      education: 'A1',
       email: '',
       membership_code: `BM-۱۴۰۵-${120 + state.users.length}`,
       bio: '',
@@ -6645,7 +6961,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       first_name: String($f.find('[name="first_name"]').val() || '').trim(),
       last_name: String($f.find('[name="last_name"]').val() || '').trim(),
       phone: toPersianDigits(String($f.find('[name="phone"]').val() || '').trim()),
-      education: String($f.find('[name="education"]').val() || 'کارشناسی ارشد').trim(),
+      education: String($f.find('[name="education"]').val() || 'A1').trim(),
       email: String($f.find('[name="email"]').val() || '').trim(),
       membership_code: String($f.find('[name="membership_code"]').val() || '').trim(),
       password: String($f.find('[name="password"]').val() || '').trim() || undefined,
@@ -6992,7 +7308,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     if (!$f.length) return;
     const first_name = String($f.find('[name="first_name"]').val() || 'سهراب').trim();
     const last_name = String($f.find('[name="last_name"]').val() || 'رستگار').trim();
-    const email = String($f.find('[name="email"]').val() || 'admin@bookmeet.ir').trim();
+    const email = String($f.find('[name="email"]').val() || 'admin@ketboshka.ir').trim();
     const education = String($f.find('[name="education"]').val() || 'دکتری').trim();
     const bio = String($f.find('[name="bio"]').val() || '').trim();
     const new_password = String($f.find('[name="new_password"]').val() || '').trim();
@@ -7690,6 +8006,111 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   $wrapper.on('submit', '.js-admin-home-settings-form', (e) => {
     e.preventDefault();
     handleSaveHomeSettings();
+  });
+
+  // --- Contact Messages (پیام‌های دریافتی) Handlers ---
+  $wrapper.on('input', '.js-admin-contact-msg-search', function () {
+    contactMessageSearch = String($(this).val() || '');
+    render();
+    const $input = $wrapper.find('.js-admin-contact-msg-search');
+    $input.trigger('focus');
+    const len = String($input.val() || '').length;
+    const el = $input.get(0) as HTMLInputElement | undefined;
+    if (el && el.setSelectionRange) {
+      el.setSelectionRange(len, len);
+    }
+  });
+
+  $wrapper.on('click', '.js-admin-contact-msg-filter', function () {
+    const nextFilter = $(this).data('contact-msg-filter') as 'all' | 'unread' | 'read';
+    if (nextFilter) {
+      contactMessageFilter = nextFilter;
+      render();
+    }
+  });
+
+  $wrapper.on('click', '.js-admin-open-contact-msg', function () {
+    const id = Number($(this).data('open-contact-msg'));
+    const found = (state.contactMessages || []).find((m) => Number(m.id) === id);
+    if (!found) return;
+    viewingContactMessage = found;
+    render();
+
+    if (Number(found.is_read || 0) === 0) {
+      ApiService.updateAdminContactMessageRead({ id, is_read: true })
+        .then((res) => {
+          state.contactMessages = (state.contactMessages || []).map((m) =>
+            Number(m.id) === id ? res.contactMessage : m
+          );
+          if (viewingContactMessage && Number(viewingContactMessage.id) === id) {
+            viewingContactMessage = res.contactMessage;
+          }
+          render();
+        })
+        .catch(() => {
+          // ignore silent error when marking read on open
+        });
+    }
+  });
+
+  $wrapper.on('click', '.js-admin-close-contact-msg-modal', () => {
+    viewingContactMessage = null;
+    render();
+  });
+
+  $wrapper.on('click', '.js-admin-view-contact-msg-backdrop', function (e) {
+    if ($(e.target).hasClass('js-admin-view-contact-msg-backdrop')) {
+      viewingContactMessage = null;
+      render();
+    }
+  });
+
+  $wrapper.on('click', '.js-admin-toggle-contact-msg-read', function () {
+    const id = Number($(this).data('contact-msg-id'));
+    const nextRead = String($(this).data('next-read')) === '1';
+    if (!id) return;
+
+    ApiService.updateAdminContactMessageRead({ id, is_read: nextRead })
+      .then((res) => {
+        state.contactMessages = (state.contactMessages || []).map((m) =>
+          Number(m.id) === id ? res.contactMessage : m
+        );
+        if (viewingContactMessage && Number(viewingContactMessage.id) === id) {
+          viewingContactMessage = res.contactMessage;
+        }
+        render();
+        showToast(
+          nextRead
+            ? 'پیام به عنوان خوانده‌شده علامت‌گذاری شد.'
+            : 'پیام به عنوان خوانده‌نشده علامت‌گذاری شد.'
+        );
+      })
+      .catch((err) => showToast(err.message || 'خطا در تغییر وضعیت پیام', true));
+  });
+
+  $wrapper.on('click', '.js-admin-delete-contact-msg', function () {
+    const id = Number($(this).data('delete-contact-msg'));
+    const target = (state.contactMessages || []).find((m) => Number(m.id) === id);
+    if (!target) return;
+
+    askDeleteConfirmation(
+      'حذف پیام دریافتی',
+      `آیا از حذف پیام «${toPersianDigits(target.subject || 'بدون موضوع')}» ارسالی توسط «${toPersianDigits(target.full_name)}» اطمینان دارید؟ این عملیات غیرقابل بازگشت است.`,
+      () => {
+        ApiService.deleteAdminContactMessage(id)
+          .then(() => {
+            state.contactMessages = (state.contactMessages || []).filter(
+              (m) => Number(m.id) !== id
+            );
+            if (viewingContactMessage && Number(viewingContactMessage.id) === id) {
+              viewingContactMessage = null;
+            }
+            render();
+            showToast('پیام دریافتی با موفقیت از دیتابیس حذف شد.');
+          })
+          .catch((err) => showToast(err.message || 'خطا در حذف پیام دریافتی', true));
+      }
+    );
   });
 
   render();
