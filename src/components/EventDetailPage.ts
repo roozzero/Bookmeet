@@ -162,7 +162,7 @@ export function createEventDetailPage(
               <div class="pt-5 border-t border-[#E6D7C3] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <span class="text-[12.5px] text-[#6B5444] block mb-0.5">نحوه ثبت‌نام در نشست:</span>
-                  <span class="text-[13.5px] font-bold text-[#235332]">پس از ثبت نام و تایید مدیر نشست های شما فعال می شود:</span>
+                  <span class="text-[13.5px] font-bold text-[#235332]">پس از ثبت نام و تایید مدیر نشست های شما فعال می شود</span>
                 </div>
                 <button
                   type="button"

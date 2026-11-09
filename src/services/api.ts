@@ -599,6 +599,23 @@ export const ApiService = {
     });
   },
 
+  closeAdminTicket(id: number): Promise<{ success: boolean; ticket: MemberTicket }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/admin/tickets/${id}/close`,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({}),
+        dataType: 'json',
+        success: (data: { success: boolean; ticket: MemberTicket }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
   saveAdminAnnouncement(
     payload: Partial<ClubAnnouncement> & { id?: number }
   ): Promise<{ success: boolean; announcement: ClubAnnouncement }> {

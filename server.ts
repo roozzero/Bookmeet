@@ -794,6 +794,17 @@ async function startServer() {
     }
   });
 
+  app.post('/api/admin/tickets/:id/close', requireAdmin, async (req, res) => {
+    try {
+      const updated = await mysqlDb.closeAdminTicket(Number(req.params.id));
+      res.json({ success: true, ticket: updated });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در بستن تیکت';
+      res.status(400).json({ error: message });
+    }
+  });
+
   app.delete('/api/admin/tickets/:id', requireAdmin, async (req, res) => {
     try {
       await mysqlDb.deleteAdminTicket(Number(req.params.id));

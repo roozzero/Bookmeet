@@ -13,7 +13,7 @@ import type {
   TicketAttachmentMeta,
   TicketAttachmentUploadInput,
 } from '../types/models.ts';
-import { toPersianDigits } from '../utils/persianNumbers.ts';
+import { formatPersianDateDisplay, toPersianDigits } from '../utils/persianNumbers.ts';
 
 export type PanelTabKey =
   | 'dashboard'
@@ -451,7 +451,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                 <div class="px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/90 border border-[#E5D6C3] flex items-center justify-between gap-2 whitespace-nowrap">
                   <span class="text-[11.5px] text-[#7D6452]">تاریخ:</span>
                   <strong class="text-[12.5px] font-bold text-[#231912]">
-                    ${toPersianDigits(subItem.session_date)}
+                    ${formatPersianDateDisplay(subItem.session_date)}
                   </strong>
                 </div>
                 <div class="px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/90 border border-[#E5D6C3] flex items-center justify-between gap-2 whitespace-nowrap">
@@ -546,7 +546,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               <div class="px-4 py-3 rounded-xl bg-[#F4E9DA]/85 border border-[#E5D6C3] flex items-center justify-between">
                 <span class="text-[12px] text-[#7D6452]">تاریخ برگزاری:</span>
                 <strong class="text-[13.5px] font-bold text-[#231912]">
-                  ${toPersianDigits(subItem.session_date)}
+                  ${formatPersianDateDisplay(subItem.session_date)}
                 </strong>
               </div>
               <div class="px-4 py-3 rounded-xl bg-[#F4E9DA]/85 border border-[#E5D6C3] flex items-center justify-between">
@@ -732,12 +732,16 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     const completedBooksCount = state.library.filter(
       (b) => b.reading_status === 'خوانده‌شده'
     ).length;
-    const upcomingSessionsCount = state.sessions.length;
+    const upcomingSessionsCount = state.sessions.filter(
+      (s) => s.status !== 'برگزارشده' && s.status !== 'برگزار شده'
+    ).length;
     const openTicketsCount = state.tickets.filter(
       (t) => t.status !== 'بسته‌شده'
     ).length;
 
-    const nextSession = state.sessions[0];
+    const nextSession = state.sessions.find(
+      (s) => s.status !== 'برگزارشده' && s.status !== 'برگزار شده'
+    );
     const currentReadingBook =
       state.library.find((b) => b.reading_status === 'در حال مطالعه') || state.library[0];
 
@@ -828,7 +832,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                     کتاب محور نشست: <strong>${toPersianDigits(nextSession.book_title)}</strong> · با حضور ${toPersianDigits(nextSession.mentor_name)}
                   </p>
                   <div class="pt-2 border-t border-[#E2D2BC]/70 flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#4E3B2D]">
-                    <span>زمان: ${toPersianDigits(nextSession.session_date)}</span>
+                    <span>زمان: ${formatPersianDateDisplay(nextSession.session_date)}</span>
                     <span>${toPersianDigits(nextSession.session_time)}</span>
                   </div>
                 </div>
@@ -916,10 +920,10 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       return haystack.includes(query);
     };
 
-    // Defined sessions first, then Held sessions
+    // Defined sessions first (supporting both 'تعریف شده' and 'جلسه آتی'), then Held sessions
     const definedList = (params.subSessions || []).filter(
       (item) =>
-        item.status === 'تعریف شده' &&
+        (item.status === 'تعریف شده' || item.status === 'جلسه آتی') &&
         (subSessionFilter === 'all' || subSessionFilter === 'تعریف شده') &&
         matchesSearch(item)
     );
@@ -953,7 +957,9 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                   ${toPersianDigits(sub.session_number)}
                 </span>
                 <span class="font-semibold bg-[#1E140E]/70 px-2.5 py-1 rounded-lg">
-                  ${toPersianDigits(sub.session_date)} · ساعت ${toPersianDigits(sub.session_time)}
+                  ${formatPersianDateDisplay(sub.session_date)}${
+                    sub.session_time ? ` · ساعت ${toPersianDigits(sub.session_time)}` : ''
+                  }
                 </span>
               </div>
             </div>
@@ -1025,7 +1031,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               <div class="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-[12.5px] text-[#5B4739]">
                 <span>اثر: <strong class="text-[#231912]">${toPersianDigits(params.bookTitle)}</strong></span>
                 <span>${params.mentorLabel}: <strong class="text-[#231912]">${toPersianDigits(params.mentorName)}</strong></span>
-                <span>برنامه: <strong class="text-[#231912]">${toPersianDigits(params.scheduleText)}</strong></span>
+                <span>برنامه: <strong class="text-[#231912]">${formatPersianDateDisplay(params.scheduleText)}</strong></span>
               </div>
             </div>
           </div>
@@ -1171,24 +1177,140 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       selectedSessionId = null;
     }
 
-    // Item 1:
-    // در منوی جلسات من عنوان هر کارت باید یک خط باشد و اگر بیشتر شد بصورت ... نمایش دهد و به خط بعدی منتقل نشود و همچنین جستجو و فیلتر را ایجاد کن
     const query = sessionsListSearchQuery.trim().toLowerCase();
-    const filteredSessions = state.sessions.filter((session) => {
-      if (sessionsListFilter !== 'all') {
-        if (sessionsListFilter === 'فعال') {
-          if (session.status !== 'فعال' && session.status !== 'ثبت‌نام‌شده') return false;
-        } else if (session.status !== sessionsListFilter) {
-          return false;
-        }
-      }
+    const matchesSessionQuery = (session: MemberSession): boolean => {
       if (!query) return true;
       const haystack =
         `${session.title} ${session.book_title} ${session.mentor_name} ${session.session_date}`.toLowerCase();
       return haystack.includes(query);
+    };
+
+    const isHeldSessionStatus = (status: string): boolean =>
+      status === 'برگزارشده' || status === 'برگزار شده';
+
+    const upcomingSessions = state.sessions.filter((session) => {
+      if (isHeldSessionStatus(session.status)) return false;
+      if (sessionsListFilter === 'برگزارشده') return false;
+      if (sessionsListFilter === 'فعال') {
+        if (session.status !== 'فعال' && session.status !== 'ثبت‌نام‌شده') return false;
+      } else if (sessionsListFilter === 'غیرفعال') {
+        if (session.status !== 'غیرفعال') return false;
+      }
+      return matchesSessionQuery(session);
+    });
+
+    const heldSessions = state.sessions.filter((session) => {
+      if (!isHeldSessionStatus(session.status)) return false;
+      if (sessionsListFilter !== 'all' && sessionsListFilter !== 'برگزارشده') return false;
+      return matchesSessionQuery(session);
     });
 
     const hasPendingSessions = state.sessions.some((s) => s.status === 'غیرفعال');
+
+    const renderSessionEnrollmentCard = (session: MemberSession): string => {
+      const totalCount = (session.sub_sessions || []).length;
+      const coverImg = session.cover_url || '/assets/book-current.png';
+      const isInactive = session.status === 'غیرفعال';
+      const isHeld = isHeldSessionStatus(session.status);
+
+      return `
+        <article
+          data-open-session-id="${session.id}"
+          class="js-open-session-card group rounded-2xl bg-[#FAF5EC] border ${
+            isInactive
+              ? 'border-[#DFBA6F]'
+              : isHeld
+              ? 'border-[#BBD9C2]'
+              : 'border-[#E5D7C5]'
+          } hover:border-[#8B5A36] hover:shadow-[0_16px_36px_rgba(61,46,34,0.1)] transition-all cursor-pointer overflow-hidden flex flex-col justify-between min-w-0"
+        >
+          <div class="min-w-0">
+            <!-- Card Image Header -->
+            <div class="relative h-44 w-full overflow-hidden bg-[#EFE3D2]">
+              <img
+                src="${coverImg}"
+                alt="${session.title}"
+                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+              <div class="absolute inset-0 bg-gradient-to-t from-[#1E140E]/70 via-transparent to-transparent"></div>
+              <div class="absolute bottom-3 right-4 left-4 flex items-center justify-between text-[#FAF5EC]">
+                <span class="px-2.5 py-1 rounded-lg text-[11px] font-semibold ${
+                  isInactive
+                    ? 'bg-[#8A5A10]/95 text-[#FFF8E7]'
+                    : isHeld
+                    ? 'bg-[#1D5430]/95 text-[#FAF5EC]'
+                    : 'bg-[#235332]/90'
+                } backdrop-blur-xs">
+                  ${
+                    isInactive
+                      ? 'غیرفعال (در انتظار تایید)'
+                      : isHeld
+                      ? 'برگزار شده'
+                      : toPersianDigits(session.status)
+                  }
+                </span>
+                <span class="text-[11.5px] font-semibold bg-[#1E140E]/65 px-2.5 py-1 rounded-lg">
+                  ${toPersianDigits(totalCount)} نشست در این دوره
+                </span>
+              </div>
+            </div>
+
+            <!-- Card Body with strictly single-line truncated title -->
+            <div class="p-5 space-y-3 min-w-0">
+              <h3
+                title="${toPersianDigits(session.title)}"
+                class="font-display text-[16.5px] font-bold text-[#231912] group-hover:text-[#7A4B2A] transition-colors truncate whitespace-nowrap overflow-hidden text-ellipsis block"
+              >
+                ${toPersianDigits(session.title)}
+              </h3>
+
+              <div class="pt-2 border-t border-[#E6D8C5] space-y-1.5 text-[12.5px] text-[#5B4739]">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-[#7A6352] shrink-0">اثر محور جلسه:</span>
+                  <strong class="text-[#231912] truncate">${toPersianDigits(session.book_title)}</strong>
+                </div>
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-[#7A6352] shrink-0">تسهیل‌گر دوره:</span>
+                  <strong class="text-[#231912] truncate">${toPersianDigits(session.mentor_name)}</strong>
+                </div>
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-[#7A6352] shrink-0">زمان برگزاری:</span>
+                  <strong class="text-[#231912] truncate">${formatPersianDateDisplay(session.session_date)}${
+                    session.session_time ? ` · ${toPersianDigits(session.session_time)}` : ''
+                  }</strong>
+                </div>
+              </div>
+
+              ${
+                isInactive
+                  ? `
+                <div class="p-3 rounded-xl bg-[#FFF6E0] border border-[#E3C178] text-[12px] text-[#6E4B0C] leading-[1.75]">
+                  <strong>وضعیت: غیرفعال</strong> — جهت تایید ثبت‌نام تیکت بزنید <span class="font-bold text-[#235332]">✓</span>
+                </div>
+              `
+                  : ''
+              }
+            </div>
+          </div>
+
+          <div class="px-5 pb-5">
+            <div class="w-full py-2.5 rounded-xl ${
+              isInactive
+                ? 'bg-[#EFE5D4] text-[#7A5A10] border border-[#DFBA6F]'
+                : isHeld
+                ? 'bg-[#E4F2E7] group-hover:bg-[#235332] text-[#235332] group-hover:text-[#FAF5EC]'
+                : 'bg-[#F3E7D6] group-hover:bg-[#5A3A22] text-[#3F2E21] group-hover:text-[#FAF5EC]'
+            } text-[12.5px] font-semibold text-center transition-colors">
+              ${
+                isInactive
+                  ? '🔒 در انتظار تایید مدیر (دسترسی پس از تایید فعال می‌شود)'
+                  : 'ورود به صفحه جلسه و مشاهده جزئیات ←'
+              }
+            </div>
+          </div>
+        </article>
+      `;
+    };
 
     return `
       <div class="space-y-6">
@@ -1213,7 +1335,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                 )}
               </div>
               <p class="text-[12.5px] text-[#5C4110] font-medium">
-                جهت تایید ثبت‌نام تیکت بزنید یا با شماره <strong dir="ltr" class="font-bold">۰۲۱-۸۸۹۴۳۲۱۰</strong> تماس بگیرید.
+                جهت تایید ثبت‌نام تیکت بزنید <strong class="font-bold text-[#235332]">✓</strong>
               </p>
             </div>
             <button
@@ -1244,6 +1366,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                 { key: 'all', label: 'همه جلسات' },
                 { key: 'فعال', label: 'فعال' },
                 { key: 'غیرفعال', label: 'غیرفعال' },
+                { key: 'برگزارشده', label: 'جلسات برگزار شده' },
               ] as const
             )
               .map(
@@ -1265,101 +1388,49 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          ${
-            filteredSessions.length > 0
-              ? filteredSessions
-                  .map((session) => {
-                    const totalCount = (session.sub_sessions || []).length;
-                    const coverImg = session.cover_url || '/assets/book-current.png';
-                    const isInactive = session.status === 'غیرفعال';
+        ${
+          sessionsListFilter !== 'برگزارشده'
+            ? `
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="font-display text-[17px] font-bold text-[#231912] flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#7A4B2A]"></span>
+                <span>جلسات فعال و پیشِ رو</span>
+              </h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              ${
+                upcomingSessions.length > 0
+                  ? upcomingSessions.map((s) => renderSessionEnrollmentCard(s)).join('')
+                  : `<div class="md:col-span-2 p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] text-center text-[13.5px] text-[#6B5444]">جلسه پیشِ رویی مطابق با فیلتر یا جستجوی شما یافت نشد.</div>`
+              }
+            </div>
+          </div>
+        `
+            : ''
+        }
 
-                    return `
-                <article
-                  data-open-session-id="${session.id}"
-                  class="js-open-session-card group rounded-2xl bg-[#FAF5EC] border ${
-                    isInactive ? 'border-[#DFBA6F]' : 'border-[#E5D7C5]'
-                  } hover:border-[#8B5A36] hover:shadow-[0_16px_36px_rgba(61,46,34,0.1)] transition-all cursor-pointer overflow-hidden flex flex-col justify-between min-w-0"
-                >
-                  <div class="min-w-0">
-                    <!-- Card Image Header -->
-                    <div class="relative h-44 w-full overflow-hidden bg-[#EFE3D2]">
-                      <img
-                        src="${coverImg}"
-                        alt="${session.title}"
-                        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      <div class="absolute inset-0 bg-gradient-to-t from-[#1E140E]/70 via-transparent to-transparent"></div>
-                      <div class="absolute bottom-3 right-4 left-4 flex items-center justify-between text-[#FAF5EC]">
-                        <span class="px-2.5 py-1 rounded-lg text-[11px] font-semibold ${
-                          isInactive
-                            ? 'bg-[#8A5A10]/95 text-[#FFF8E7]'
-                            : 'bg-[#235332]/90'
-                        } backdrop-blur-xs">
-                          ${isInactive ? 'غیرفعال (در انتظار تایید)' : toPersianDigits(session.status)}
-                        </span>
-                        <span class="text-[11.5px] font-semibold bg-[#1E140E]/65 px-2.5 py-1 rounded-lg">
-                          ${toPersianDigits(totalCount)} نشست در این دوره
-                        </span>
-                      </div>
-                    </div>
-
-                    <!-- Card Body with strictly single-line truncated title -->
-                    <div class="p-5 space-y-3 min-w-0">
-                      <h3
-                        title="${toPersianDigits(session.title)}"
-                        class="font-display text-[16.5px] font-bold text-[#231912] group-hover:text-[#7A4B2A] transition-colors truncate whitespace-nowrap overflow-hidden text-ellipsis block"
-                      >
-                        ${toPersianDigits(session.title)}
-                      </h3>
-
-                      <div class="pt-2 border-t border-[#E6D8C5] space-y-1.5 text-[12.5px] text-[#5B4739]">
-                        <div class="flex items-center justify-between gap-2">
-                          <span class="text-[#7A6352] shrink-0">اثر محور جلسه:</span>
-                          <strong class="text-[#231912] truncate">${toPersianDigits(session.book_title)}</strong>
-                        </div>
-                        <div class="flex items-center justify-between gap-2">
-                          <span class="text-[#7A6352] shrink-0">تسهیل‌گر دوره:</span>
-                          <strong class="text-[#231912] truncate">${toPersianDigits(session.mentor_name)}</strong>
-                        </div>
-                        <div class="flex items-center justify-between gap-2">
-                          <span class="text-[#7A6352] shrink-0">زمان برگزاری:</span>
-                          <strong class="text-[#231912] truncate">${toPersianDigits(session.session_date)} · ${toPersianDigits(session.session_time)}</strong>
-                        </div>
-                      </div>
-
-                      ${
-                        isInactive
-                          ? `
-                        <div class="p-3 rounded-xl bg-[#FFF6E0] border border-[#E3C178] text-[12px] text-[#6E4B0C] leading-[1.75]">
-                          <strong>وضعیت: غیرفعال</strong> — جهت تایید ثبت‌نام تیکت بزنید یا با شماره <span dir="ltr" class="font-bold">۰۲۱-۸۸۹۴۳۲۱۰</span> تماس بگیرید.
-                        </div>
-                      `
-                          : ''
-                      }
-                    </div>
-                  </div>
-
-                  <div class="px-5 pb-5">
-                    <div class="w-full py-2.5 rounded-xl ${
-                      isInactive
-                        ? 'bg-[#EFE5D4] text-[#7A5A10] border border-[#DFBA6F]'
-                        : 'bg-[#F3E7D6] group-hover:bg-[#5A3A22] text-[#3F2E21] group-hover:text-[#FAF5EC]'
-                    } text-[12.5px] font-semibold text-center transition-colors">
-                      ${
-                        isInactive
-                          ? '🔒 در انتظار تایید مدیر (دسترسی پس از تایید فعال می‌شود)'
-                          : 'ورود به صفحه جلسه و مشاهده جزئیات ←'
-                      }
-                    </div>
-                  </div>
-                </article>
-              `;
-                  })
-                  .join('')
-              : `<div class="md:col-span-2 p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] text-center text-[13.5px] text-[#6B5444]">جلسه‌ای مطابق با فیلتر یا جستجوی شما یافت نشد.</div>`
-          }
-        </div>
+        ${
+          sessionsListFilter === 'all' || sessionsListFilter === 'برگزارشده'
+            ? `
+          <div class="space-y-4 pt-2">
+            <div class="flex items-center justify-between">
+              <h3 class="font-display text-[17px] font-bold text-[#231912] flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#2E6F40]"></span>
+                <span>جلسات برگزار شده</span>
+              </h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              ${
+                heldSessions.length > 0
+                  ? heldSessions.map((s) => renderSessionEnrollmentCard(s)).join('')
+                  : `<div class="md:col-span-2 p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] text-center text-[13.5px] text-[#6B5444]">هنوز جلسه برگزارشده‌ای در این بخش ثبت نشده است.</div>`
+              }
+            </div>
+          </div>
+        `
+            : ''
+        }
       </div>
     `;
   }
@@ -1423,7 +1494,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                 )}
               </div>
               <p class="text-[12.5px] text-[#5C4110] font-medium">
-                جهت تایید ثبت‌نام تیکت بزنید یا با شماره <strong dir="ltr" class="font-bold">۰۲۱-۸۸۹۴۳۲۱۰</strong> تماس بگیرید.
+                جهت تایید ثبت‌نام تیکت بزنید <strong class="font-bold text-[#235332]">✓</strong>
               </p>
             </div>
             <button
@@ -1548,7 +1619,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                         isInactive
                           ? `
                         <div class="p-3 rounded-xl bg-[#FFF6E0] border border-[#E3C178] text-[12px] text-[#6E4B0C] leading-[1.75]">
-                          <strong>وضعیت: غیرفعال</strong> — جهت تایید ثبت‌نام تیکت بزنید یا با شماره <span dir="ltr" class="font-bold">۰۲۱-۸۸۹۴۳۲۱۰</span> تماس بگیرید.
+                          <strong>وضعیت: غیرفعال</strong> — جهت تایید ثبت‌نام تیکت بزنید <span class="font-bold text-[#235332]">✓</span>
                         </div>
                       `
                           : ''

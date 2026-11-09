@@ -186,7 +186,8 @@ export interface MemberSession {
   full_description?: string;
   location_type: string;
   meeting_link_or_room: string;
-  status: 'فعال' | 'غیرفعال' | 'ثبت‌نام‌شده' | 'برگزارشده' | 'ظرفیت باز';
+  status: 'فعال' | 'غیرفعال' | 'ثبت‌نام‌شده' | 'برگزارشده' | 'برگزار شده' | 'ظرفیت باز';
+  enrollment_status?: 'فعال' | 'غیرفعال';
   member_note: string;
   sub_sessions: SessionSubItem[];
   enrolled_members?: EnrollmentRecord[];

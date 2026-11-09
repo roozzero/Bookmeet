@@ -189,7 +189,8 @@ export interface MemberSessionRow {
   full_description?: string;
   location_type: string;
   meeting_link_or_room: string;
-  status: 'ثبت‌نام‌شده' | 'برگزارشده' | 'ظرفیت باز' | 'فعال' | 'غیرفعال';
+  status: 'ثبت‌نام‌شده' | 'برگزارشده' | 'برگزار شده' | 'ظرفیت باز' | 'فعال' | 'غیرفعال';
+  enrollment_status?: 'فعال' | 'غیرفعال';
   member_note: string;
   sub_sessions: SessionSubItemRow[];
   enrolled_members?: EnrollmentRecordRow[];
@@ -1139,27 +1140,27 @@ class MySQLDatabaseManager {
   }
 
   public async getLibraryBooks(): Promise<LibraryBookRow[]> {
-    const [rows, inactiveSessions] = await Promise.all([
+    const [rows, hiddenSessions] = await Promise.all([
       this.pool.execute<RowDataPacket[]>(
         'SELECT * FROM library_books ORDER BY sort_order ASC, id DESC'
       ),
       this.pool.execute<RowDataPacket[]>(
-        "SELECT book_title, title FROM member_sessions WHERE status = 'غیرفعال'"
+        "SELECT book_title, title FROM member_sessions WHERE status IN ('غیرفعال', 'برگزارشده', 'برگزار شده')"
       ),
     ]);
-    const inactiveTitles = new Set<string>();
-    for (const s of inactiveSessions[0]) {
-      if (s.book_title) inactiveTitles.add(String(s.book_title).trim());
-      if (s.title) inactiveTitles.add(String(s.title).trim());
+    const hiddenTitles = new Set<string>();
+    for (const s of hiddenSessions[0]) {
+      if (s.book_title) hiddenTitles.add(String(s.book_title).trim());
+      if (s.title) hiddenTitles.add(String(s.title).trim());
     }
     return (rows[0] as LibraryBookRow[]).filter(
-      (b) => !inactiveTitles.has(String(b.title || '').trim())
+      (b) => !hiddenTitles.has(String(b.title || '').trim())
     );
   }
 
   public async getPublicActiveSessions(): Promise<MemberSessionRow[]> {
     const [rows] = await this.pool.execute<RowDataPacket[]>(
-      "SELECT * FROM member_sessions WHERE status != 'غیرفعال' ORDER BY sort_order ASC, id DESC"
+      "SELECT * FROM member_sessions WHERE status NOT IN ('غیرفعال', 'برگزارشده', 'برگزار شده') ORDER BY sort_order ASC, id DESC"
     );
     return this.mapSessionRowsWithEnrollments(rows);
   }
@@ -1483,6 +1484,34 @@ class MySQLDatabaseManager {
     }
   }
 
+  private hasActualCalendarDate(rawInput: string): boolean {
+    const text = String(rawInput || '').trim();
+    if (!text) return false;
+    const ascii = normalizeIdentifierDigits(text);
+    // Gregorian ISO date (YYYY-MM-DD) or Jalali numeric date (1405/08/18 or 1405-08-18)
+    if (/\b(20\d{2}|13\d{2}|14\d{2})[/\-](\d{1,2})[/\-](\d{1,2})\b/.test(ascii)) {
+      return true;
+    }
+    const persianMonths = [
+      'فروردین',
+      'اردیبهشت',
+      'خرداد',
+      'تیر',
+      'مرداد',
+      'شهریور',
+      'مهر',
+      'آبان',
+      'آذر',
+      'دی',
+      'بهمن',
+      'اسفند',
+    ];
+    const hasMonth = persianMonths.some((m) => text.includes(m));
+    const withoutYear = ascii.replace(/\b(13\d{2}|14\d{2}|20\d{2})\b/g, ' ');
+    const hasDay = /\b([1-9]|[12]\d|3[01])\b/.test(withoutYear);
+    return hasMonth && hasDay;
+  }
+
   private parsePersianDateParts(rawInput: string, fallbackMonth?: string): {
     day_of_month: string;
     month_name: string;
@@ -1532,6 +1561,37 @@ class MySQLDatabaseManager {
     }
 
     const ascii = normalizeIdentifierDigits(text);
+
+    // Check Gregorian ISO YYYY-MM-DD or YYYY/MM/DD from <input type="date">
+    const isoMatch = ascii.match(/\b(20\d{2})[/\-](\d{1,2})[/\-](\d{1,2})\b/);
+    if (isoMatch) {
+      const gYear = parseInt(isoMatch[1], 10);
+      const gMonth = parseInt(isoMatch[2], 10);
+      const gDay = parseInt(isoMatch[3], 10);
+      const dateObj = new Date(gYear, gMonth - 1, gDay, 12, 0, 0);
+      if (!Number.isNaN(dateObj.getTime())) {
+        try {
+          const parts = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long',
+          }).formatToParts(dateObj);
+          const pDay = parts.find((p) => p.type === 'day')?.value || '۱';
+          const pMonth = parts.find((p) => p.type === 'month')?.value || 'آبان';
+          const pYear = parts.find((p) => p.type === 'year')?.value || '۱۴۰۵';
+          const pWeekday = parts.find((p) => p.type === 'weekday')?.value || foundWeekday;
+          return {
+            day_of_month: toPersianDigitsServer(pDay),
+            month_name: toPersianDigitsServer(`${pMonth} ${pYear}`),
+            weekday_name: pWeekday,
+          };
+        } catch {
+          // Fallback to manual parsing below
+        }
+      }
+    }
+
     // Check YYYY/MM/DD or YYYY-MM-DD Jalali format e.g. 1405/08/18
     const slashMatch = ascii.match(/(13\d{2}|14\d{2})[/\-](\d{1,2})[/\-](\d{1,2})/);
     if (slashMatch) {
@@ -1592,7 +1652,7 @@ class MySQLDatabaseManager {
       storedReservationsById.set(evId, list);
     }
 
-    // 1. Generate dynamic events from active reading sessions (member_sessions)
+    // 1. Generate dynamic events from active reading sessions (member_sessions) using actual dates
     const activeSessions = allSessions.filter((s) => s.status !== 'غیرفعال');
     for (const session of activeSessions) {
       const enrollment = (session.enrolled_members || []).find(
@@ -1608,13 +1668,15 @@ class MySQLDatabaseManager {
           : 'ثبت‌نام نشده';
 
       const subSessions = Array.isArray(session.sub_sessions) ? session.sub_sessions : [];
-      const subsWithDates = subSessions.filter((sub) => String(sub.session_date || '').trim() !== '');
+      const subsWithDates = subSessions.filter((sub) =>
+        this.hasActualCalendarDate(String(sub.session_date || ''))
+      );
 
       if (subsWithDates.length > 0) {
         subsWithDates.forEach((sub, idx) => {
           const eventId = 100000 + session.id * 100 + (Number(sub.id) || idx + 1);
           const parsed = this.parsePersianDateParts(
-            String(sub.session_date || session.session_date || ''),
+            String(sub.session_date || ''),
             defaultMonth
           );
           const reservedList = storedReservationsById.get(eventId) || [];
@@ -1622,7 +1684,10 @@ class MySQLDatabaseManager {
             enrollmentStatus === 'فعال' ||
             reservedList.includes(canonicalPhone) ||
             reservedList.includes(normalizedPhone);
-          const isHeld = sub.status === 'برگزار شده';
+          const isHeld =
+            sub.status === 'برگزار شده' ||
+            session.status === 'برگزارشده' ||
+            session.status === 'برگزار شده';
           const capacityLabel = isHeld
             ? 'برگزار شده'
             : enrollmentStatus === 'فعال'
@@ -1641,10 +1706,17 @@ class MySQLDatabaseManager {
             month_name: parsed.month_name,
             weekday_name: parsed.weekday_name,
             time_range: String(sub.session_time || session.session_time || '۱۸:۰۰ تا ۲۰:۰۰'),
-            host_name: String(session.translator || session.mentor_name || session.book_author || 'باشگاه بوک‌میت'),
+            host_name: String(
+              session.translator || session.mentor_name || session.book_author || 'باشگاه بوک‌میت'
+            ),
             location_label:
               enrollmentStatus === 'فعال'
-                ? String(sub.meeting_link || session.meeting_link_or_room || session.location_type || 'حضوری و آنلاین')
+                ? String(
+                    sub.meeting_link ||
+                      session.meeting_link_or_room ||
+                      session.location_type ||
+                      'حضوری و آنلاین'
+                  )
                 : String(session.location_type || 'حضوری و آنلاین (لینک پس از تایید مدیر)'),
             capacity_info: capacityLabel,
             description: String(
@@ -1662,7 +1734,7 @@ class MySQLDatabaseManager {
             enrollment_status: enrollmentStatus,
           });
         });
-      } else {
+      } else if (this.hasActualCalendarDate(String(session.session_date || ''))) {
         const eventId = 100000 + session.id * 100;
         const parsed = this.parsePersianDateParts(String(session.session_date || ''), defaultMonth);
         const reservedList = storedReservationsById.get(eventId) || [];
@@ -1670,7 +1742,7 @@ class MySQLDatabaseManager {
           enrollmentStatus === 'فعال' ||
           reservedList.includes(canonicalPhone) ||
           reservedList.includes(normalizedPhone);
-        const isHeld = session.status === 'برگزارشده';
+        const isHeld = session.status === 'برگزارشده' || session.status === 'برگزار شده';
         const capacityLabel = isHeld
           ? 'برگزار شده'
           : enrollmentStatus === 'فعال'
@@ -1687,7 +1759,9 @@ class MySQLDatabaseManager {
           month_name: parsed.month_name,
           weekday_name: parsed.weekday_name,
           time_range: String(session.session_time || '۱۸:۰۰ تا ۲۰:۰۰'),
-          host_name: String(session.translator || session.mentor_name || session.book_author || 'باشگاه بوک‌میت'),
+          host_name: String(
+            session.translator || session.mentor_name || session.book_author || 'باشگاه بوک‌میت'
+          ),
           location_label:
             enrollmentStatus === 'فعال'
               ? String(session.meeting_link_or_room || session.location_type || 'حضوری و آنلاین')
@@ -1707,7 +1781,7 @@ class MySQLDatabaseManager {
       }
     }
 
-    // 2. Generate dynamic events from active courses (member_classes)
+    // 2. Generate dynamic events from active courses (member_classes) using actual dates
     const activeClasses = allClasses.filter((c) => c.status !== 'غیرفعال');
     for (const cls of activeClasses) {
       const enrollment = (cls.enrolled_members || []).find(
@@ -1723,13 +1797,15 @@ class MySQLDatabaseManager {
           : 'ثبت‌نام نشده';
 
       const subSessions = Array.isArray(cls.sub_sessions) ? cls.sub_sessions : [];
-      const subsWithDates = subSessions.filter((sub) => String(sub.session_date || '').trim() !== '');
+      const subsWithDates = subSessions.filter((sub) =>
+        this.hasActualCalendarDate(String(sub.session_date || ''))
+      );
 
       if (subsWithDates.length > 0) {
         subsWithDates.forEach((sub, idx) => {
           const eventId = 200000 + cls.id * 100 + (Number(sub.id) || idx + 1);
           const parsed = this.parsePersianDateParts(
-            String(sub.session_date || cls.start_date || cls.schedule_summary || ''),
+            String(sub.session_date || ''),
             defaultMonth
           );
           const reservedList = storedReservationsById.get(eventId) || [];
@@ -1737,7 +1813,7 @@ class MySQLDatabaseManager {
             enrollmentStatus === 'فعال' ||
             reservedList.includes(canonicalPhone) ||
             reservedList.includes(normalizedPhone);
-          const isHeld = sub.status === 'برگزار شده';
+          const isHeld = sub.status === 'برگزار شده' || cls.status === 'برگزارشده';
           const capacityLabel = isHeld
             ? 'برگزار شده'
             : enrollmentStatus === 'فعال'
@@ -1777,98 +1853,81 @@ class MySQLDatabaseManager {
           });
         });
       } else {
-        // Create event from course start_date / schedule_summary
-        const eventId = 200000 + cls.id * 100;
-        const parsed = this.parsePersianDateParts(
-          String(cls.start_date || cls.schedule_summary || ''),
-          defaultMonth
-        );
-        const reservedList = storedReservationsById.get(eventId) || [];
-        const isReserved =
-          enrollmentStatus === 'فعال' ||
-          reservedList.includes(canonicalPhone) ||
-          reservedList.includes(normalizedPhone);
-        const isHeld = cls.status === 'برگزارشده';
-        const capacityLabel = isHeld
-          ? 'برگزار شده'
-          : enrollmentStatus === 'فعال'
-          ? 'ثبت‌نام تایید شده'
-          : enrollmentStatus === 'غیرفعال'
-          ? 'در انتظار تایید مدیر'
-          : String(cls.capacity_label || 'ظرفیت باز');
+        const startRaw = String(cls.start_date || '');
+        const scheduleRaw = String(cls.schedule_summary || '');
+        const effectiveStartSource = this.hasActualCalendarDate(startRaw)
+          ? startRaw
+          : this.hasActualCalendarDate(scheduleRaw)
+          ? scheduleRaw
+          : '';
 
-        events.push({
-          id: eventId,
-          title: cls.start_date ? `شروع دوره: ${cls.title}` : cls.title,
-          event_type: 'دوره آموزشی',
-          day_of_month: parsed.day_of_month,
-          month_name: parsed.month_name,
-          weekday_name: parsed.weekday_name,
-          time_range: String(cls.schedule_summary || cls.duration_label || 'طبق برنامه دوره'),
-          host_name: String(cls.instructor_name || 'مدرس دوره'),
-          location_label:
-            enrollmentStatus === 'فعال'
-              ? 'کلاس فعال در بخش کلاس‌های من'
-              : 'ثبت‌نام و تایید توسط مدیریت باشگاه',
-          capacity_info: capacityLabel,
-          description: String(cls.description || `دوره آموزشی «${cls.title}» (${cls.level_label})`),
-          is_reserved: isReserved ? 1 : 0,
-          sort_order: cls.sort_order || 1,
-          target_type: 'class',
-          target_id: cls.id,
-          enrollment_status: enrollmentStatus,
-        });
+        if (effectiveStartSource) {
+          const eventId = 200000 + cls.id * 100;
+          const parsed = this.parsePersianDateParts(effectiveStartSource, defaultMonth);
+          const reservedList = storedReservationsById.get(eventId) || [];
+          const isReserved =
+            enrollmentStatus === 'فعال' ||
+            reservedList.includes(canonicalPhone) ||
+            reservedList.includes(normalizedPhone);
+          const isHeld = cls.status === 'برگزارشده';
+          const capacityLabel = isHeld
+            ? 'برگزار شده'
+            : enrollmentStatus === 'فعال'
+            ? 'ثبت‌نام تایید شده'
+            : enrollmentStatus === 'غیرفعال'
+            ? 'در انتظار تایید مدیر'
+            : String(cls.capacity_label || 'ظرفیت باز');
 
-        if (cls.end_date && String(cls.end_date).trim() !== String(cls.start_date || '').trim()) {
-          const endEventId = 200000 + cls.id * 100 + 99;
-          const endParsed = this.parsePersianDateParts(String(cls.end_date), parsed.month_name);
           events.push({
-            id: endEventId,
-            title: `پایان دوره: ${cls.title}`,
+            id: eventId,
+            title: cls.start_date ? `شروع دوره: ${cls.title}` : cls.title,
             event_type: 'دوره آموزشی',
-            day_of_month: endParsed.day_of_month,
-            month_name: endParsed.month_name,
-            weekday_name: endParsed.weekday_name,
-            time_range: String(cls.schedule_summary || 'جلسه پایانی'),
+            day_of_month: parsed.day_of_month,
+            month_name: parsed.month_name,
+            weekday_name: parsed.weekday_name,
+            time_range: String(cls.schedule_summary || cls.duration_label || 'طبق برنامه دوره'),
             host_name: String(cls.instructor_name || 'مدرس دوره'),
-            location_label: 'ارزیابی پایانی دوره',
+            location_label:
+              enrollmentStatus === 'فعال'
+                ? 'کلاس فعال در بخش کلاس‌های من'
+                : 'ثبت‌نام و تایید توسط مدیریت باشگاه',
             capacity_info: capacityLabel,
-            description: String(cls.description || `اختتامیه دوره «${cls.title}»`),
+            description: String(cls.description || `دوره آموزشی «${cls.title}» (${cls.level_label})`),
             is_reserved: isReserved ? 1 : 0,
-            sort_order: (cls.sort_order || 1) + 1,
+            sort_order: cls.sort_order || 1,
             target_type: 'class',
             target_id: cls.id,
             enrollment_status: enrollmentStatus,
           });
+
+          if (
+            cls.end_date &&
+            String(cls.end_date).trim() !== String(cls.start_date || '').trim() &&
+            this.hasActualCalendarDate(String(cls.end_date))
+          ) {
+            const endEventId = 200000 + cls.id * 100 + 99;
+            const endParsed = this.parsePersianDateParts(String(cls.end_date), parsed.month_name);
+            events.push({
+              id: endEventId,
+              title: `پایان دوره: ${cls.title}`,
+              event_type: 'دوره آموزشی',
+              day_of_month: endParsed.day_of_month,
+              month_name: endParsed.month_name,
+              weekday_name: endParsed.weekday_name,
+              time_range: String(cls.schedule_summary || 'جلسه پایانی'),
+              host_name: String(cls.instructor_name || 'مدرس دوره'),
+              location_label: 'ارزیابی پایانی دوره',
+              capacity_info: capacityLabel,
+              description: String(cls.description || `اختتامیه دوره «${cls.title}»`),
+              is_reserved: isReserved ? 1 : 0,
+              sort_order: (cls.sort_order || 1) + 1,
+              target_type: 'class',
+              target_id: cls.id,
+              enrollment_status: enrollmentStatus,
+            });
+          }
         }
       }
-    }
-
-    // 3. Also include any custom events stored directly in club_calendar_events with id < 100000
-    for (const ev of rawCustomEvents) {
-      const evId = Number(ev.id);
-      if (evId >= 100000) continue;
-      const reservedList = safeJsonParse<string[]>(ev.reserved_by_phones_json, []);
-      const isReservedByMember =
-        reservedList.includes(canonicalPhone) ||
-        reservedList.includes(normalizedPhone) ||
-        Number(ev.is_reserved) === 1;
-      events.push({
-        id: evId,
-        title: String(ev.title),
-        event_type: String(ev.event_type),
-        day_of_month: String(ev.day_of_month),
-        month_name: String(ev.month_name),
-        weekday_name: String(ev.weekday_name),
-        time_range: String(ev.time_range),
-        host_name: String(ev.host_name),
-        location_label: String(ev.location_label),
-        capacity_info: String(ev.capacity_info),
-        description: String(ev.description),
-        is_reserved: isReservedByMember ? 1 : 0,
-        sort_order: Number(ev.sort_order || 0),
-        target_type: 'custom',
-      });
     }
 
     return events;
@@ -2215,12 +2274,14 @@ class MySQLDatabaseManager {
             e.member_phone === canonicalPhone ||
             normalizeIdentifierDigits(e.member_phone) === normalizedPhone
         );
-        const isApproved = rec ? rec.status === 'فعال' : s.status === 'فعال';
+        const isSessionHeld = s.status === 'برگزارشده' || s.status === 'برگزار شده';
+        const isApproved = rec ? rec.status === 'فعال' : s.status === 'فعال' || isSessionHeld;
         if (!isApproved) {
           // Strip protected session links and notes while pending admin approval
           return {
             ...s,
             status: 'غیرفعال' as const,
+            enrollment_status: 'غیرفعال' as const,
             meeting_link_or_room: '',
             member_note: '',
             sub_sessions: (s.sub_sessions || []).map((sub) => ({
@@ -2232,7 +2293,8 @@ class MySQLDatabaseManager {
         }
         return {
           ...s,
-          status: 'فعال' as const,
+          status: isSessionHeld ? ('برگزارشده' as const) : ('فعال' as const),
+          enrollment_status: 'فعال' as const,
         };
       });
 
@@ -2875,17 +2937,23 @@ class MySQLDatabaseManager {
     classItem?: MemberClassRow;
   }> {
     const resolvedName = String(input.member_name || 'عضو باشگاه').trim();
+    const normalizedPhone = normalizeIdentifierDigits(input.member_phone);
+    const canonicalPhone = toPersianDigitsServer(normalizedPhone);
 
     if (input.target_type === 'class') {
-      const [existingClasses] = input.target_id
+      let [existingClasses] = input.target_id
         ? await this.pool.execute<RowDataPacket[]>(
             'SELECT * FROM member_classes WHERE id = ? LIMIT 1',
             [Number(input.target_id)]
           )
-        : await this.pool.execute<RowDataPacket[]>(
-            'SELECT * FROM member_classes WHERE title = ? LIMIT 1',
-            [input.title.trim()]
-          );
+        : [[] as RowDataPacket[]];
+
+      if (existingClasses.length === 0 && input.title) {
+        [existingClasses] = await this.pool.execute<RowDataPacket[]>(
+          'SELECT * FROM member_classes WHERE title = ? LIMIT 1',
+          [input.title.trim()]
+        );
+      }
 
       if (existingClasses.length === 0) {
         throw new Error('کلاس یا دوره مورد نظر در سیستم یافت نشد.');
@@ -2904,7 +2972,7 @@ class MySQLDatabaseManager {
           (target_type, target_id, member_id, member_phone, member_name, status, attendance_status, registered_at)
          VALUES ('class', ?, ?, ?, ?, 'غیرفعال', 'ثبت‌نام‌شده', 'ثبت‌نام جدید')
          ON DUPLICATE KEY UPDATE status = 'غیرفعال', member_name = VALUES(member_name), registered_at = 'ثبت‌نام مجدد'`,
-        [classId, input.member_id || null, input.member_phone, resolvedName]
+        [classId, input.member_id || null, canonicalPhone, resolvedName]
       );
 
       const [classRows] = await this.pool.execute<RowDataPacket[]>(
@@ -2927,15 +2995,53 @@ class MySQLDatabaseManager {
     }
 
     // target_type === 'session'
-    const [existingSessions] = input.target_id
+    let [existingSessions] = input.target_id
       ? await this.pool.execute<RowDataPacket[]>(
           'SELECT * FROM member_sessions WHERE id = ? LIMIT 1',
           [Number(input.target_id)]
         )
-      : await this.pool.execute<RowDataPacket[]>(
-          'SELECT * FROM member_sessions WHERE title = ? OR (book_title = ? AND book_title != "") LIMIT 1',
-          [input.title.trim(), String(input.book_title || '').trim()]
+      : [[] as RowDataPacket[]];
+
+    if (existingSessions.length === 0) {
+      [existingSessions] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM member_sessions WHERE title = ? OR (book_title = ? AND book_title != "") LIMIT 1',
+        [String(input.title || '').trim(), String(input.book_title || '').trim()]
+      );
+    }
+
+    if (existingSessions.length === 0) {
+      // Check if this event originated from library_books and create a matching member_sessions record
+      const fallbackBookId =
+        input.target_id && Number(input.target_id) > 100 ? Number(input.target_id) - 100 : 0;
+      const [bookRows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM library_books WHERE id = ? OR title = ? OR title = ? LIMIT 1',
+        [fallbackBookId, String(input.book_title || '').trim(), String(input.title || '').trim()]
+      );
+      if (bookRows.length > 0) {
+        const b = bookRows[0];
+        const createdSession = await this.saveAdminSession({
+          title: String(input.title || `نشست کتاب «${b.title}»`),
+          book_title: String(b.title || input.book_title || input.title || ''),
+          book_author: String(b.author || input.book_author || ''),
+          translator: String(b.translator || input.mentor_or_instructor || ''),
+          category: String(b.category || ''),
+          publication_year: Number(b.publication_year || 1405),
+          pages_count: Number(b.pages_count || input.pages_count || 0),
+          publisher: String(input.publisher || ''),
+          mentor_name: String(b.translator || input.mentor_or_instructor || ''),
+          session_date: String(input.schedule_text || b.session_schedule || ''),
+          session_time: String(input.time_text || ''),
+          cover_url: String(b.cover_url || input.cover_url || '/assets/book-current.png'),
+          short_description: String(b.short_description || input.description || ''),
+          full_description: String(b.short_description || input.description || ''),
+          status: 'فعال',
+        });
+        [existingSessions] = await this.pool.execute<RowDataPacket[]>(
+          'SELECT * FROM member_sessions WHERE id = ? LIMIT 1',
+          [createdSession.id]
         );
+      }
+    }
 
     if (existingSessions.length === 0) {
       throw new Error('نشست یا دوره هم‌خوانی مورد نظر در سیستم یافت نشد.');
@@ -2954,7 +3060,7 @@ class MySQLDatabaseManager {
         (target_type, target_id, member_id, member_phone, member_name, status, attendance_status, registered_at)
        VALUES ('session', ?, ?, ?, ?, 'غیرفعال', 'ثبت‌نام‌شده', 'ثبت‌نام جدید')
        ON DUPLICATE KEY UPDATE status = 'غیرفعال', member_name = VALUES(member_name), registered_at = 'ثبت‌نام مجدد'`,
-      [sessionId, input.member_id || null, input.member_phone, resolvedName]
+      [sessionId, input.member_id || null, canonicalPhone, resolvedName]
     );
 
     const [sessionRows] = await this.pool.execute<RowDataPacket[]>(
@@ -2967,6 +3073,7 @@ class MySQLDatabaseManager {
       session: {
         ...mapped[0],
         status: 'غیرفعال',
+        enrollment_status: 'غیرفعال',
         meeting_link_or_room: '',
         member_note: '',
         sub_sessions: (mapped[0].sub_sessions || []).map((sub) => ({
@@ -3071,17 +3178,27 @@ class MySQLDatabaseManager {
     member_phone: string;
     status: 'فعال' | 'غیرفعال' | 'لغو شده';
   }): Promise<{ session?: MemberSessionRow; classItem?: MemberClassRow }> {
+    const normalizedPhone = normalizeIdentifierDigits(input.member_phone);
+    const canonicalPhone = toPersianDigitsServer(normalizedPhone);
+
     await this.pool.execute(
       `UPDATE session_enrollments
        SET status = ?
-       WHERE target_type = ? AND target_id = ? AND member_phone = ?`,
-      [input.status, input.target_type, Number(input.target_id), input.member_phone]
+       WHERE target_type = ? AND target_id = ? AND (member_phone = ? OR member_phone = ? OR member_phone = ?)`,
+      [
+        input.status,
+        input.target_type,
+        Number(input.target_id),
+        input.member_phone,
+        canonicalPhone,
+        normalizedPhone,
+      ]
     );
 
     if (input.target_type === 'session') {
       if (input.status === 'فعال') {
         await this.pool.execute(
-          "UPDATE member_sessions SET status = 'فعال' WHERE id = ?",
+          "UPDATE member_sessions SET status = 'فعال' WHERE id = ? AND status NOT IN ('برگزارشده', 'برگزار شده')",
           [Number(input.target_id)]
         );
       }
@@ -3098,7 +3215,7 @@ class MySQLDatabaseManager {
 
     if (input.status === 'فعال') {
       await this.pool.execute(
-        "UPDATE member_classes SET status = 'فعال' WHERE id = ?",
+        "UPDATE member_classes SET status = 'فعال' WHERE id = ? AND status NOT IN ('برگزارشده', 'برگزار شده')",
         [Number(input.target_id)]
       );
     }
@@ -3638,6 +3755,10 @@ class MySQLDatabaseManager {
     }
 
     const ticket = rows[0];
+    if (String(ticket.status) === 'بسته‌شده') {
+      throw new Error('این تیکت بسته شده است و امکان ارسال پاسخ جدید در آن وجود ندارد.');
+    }
+
     const trimmedReply = String(input.admin_reply || '').trim();
     const validatedAttachments = this.validateAndSanitizeAttachments(input.attachments);
     const nowLabel = this.formatNowPersianDateTime();
@@ -3699,6 +3820,27 @@ class MySQLDatabaseManager {
     const [updatedRows] = await this.pool.execute<RowDataPacket[]>(
       'SELECT * FROM member_tickets WHERE id = ? LIMIT 1',
       [Number(input.id)]
+    );
+    const hydrated = await this.hydrateTicketRows(updatedRows);
+    return hydrated[0];
+  }
+
+  public async closeAdminTicket(id: number): Promise<MemberTicketRow> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_tickets WHERE id = ? LIMIT 1',
+      [Number(id)]
+    );
+    if (rows.length === 0) {
+      throw new Error('تیکت مورد نظر یافت نشد.');
+    }
+    const nowLabel = this.formatNowPersianDateTime();
+    await this.pool.execute(
+      'UPDATE member_tickets SET status = ?, updated_at = ? WHERE id = ?',
+      ['بسته‌شده', nowLabel, Number(id)]
+    );
+    const [updatedRows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM member_tickets WHERE id = ? LIMIT 1',
+      [Number(id)]
     );
     const hydrated = await this.hydrateTicketRows(updatedRows);
     return hydrated[0];

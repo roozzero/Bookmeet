@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import type { LibraryBook, MemberSession, UserComment } from '../types/models.ts';
-import { toPersianDigits } from '../utils/persianNumbers.ts';
+import { formatPersianDateDisplay, toPersianDigits } from '../utils/persianNumbers.ts';
 
 export interface EventSubSession {
   sessionNumber: string;
@@ -84,7 +84,7 @@ export function mapSessionToEventCard(
     (sub, idx) => ({
       sessionNumber: String(sub.session_number || `جلسه ${toPersianDigits(idx + 1)}`),
       title: String(sub.title || ''),
-      date: String(sub.session_date || session.session_date || ''),
+      date: formatPersianDateDisplay(sub.session_date || session.session_date || ''),
       time: String(sub.session_time || session.session_time || ''),
       pagesRange: String(sub.pages_to_read || ''),
       status: sub.status === 'برگزار شده' ? 'برگزار شده' : 'نشست آتی',
@@ -103,7 +103,7 @@ export function mapSessionToEventCard(
     bookTranslator: translatorName,
     bookPublisher: session.publisher || '',
     pagesCount: Number(session.pages_count || 0),
-    dateText: session.session_date || '',
+    dateText: formatPersianDateDisplay(session.session_date || ''),
     timeText: session.session_time || '',
     hostName: translatorName,
     capacityText: session.status === 'فعال' ? 'ظرفیت باز' : session.status,
@@ -191,7 +191,7 @@ export function createLibrarySection(
   approvedComments: UserComment[] = []
 ): JQuery {
   const validActiveSessions = (activeSessions || []).filter(
-    (s) => s.status !== 'غیرفعال'
+    (s) => s.status !== 'غیرفعال' && s.status !== 'برگزارشده' && s.status !== 'برگزار شده'
   );
   const dynamicEvents: UpcomingEventCard[] = validActiveSessions.map((s) =>
     mapSessionToEventCard(s, approvedComments)
@@ -217,7 +217,10 @@ export function createLibrarySection(
         publication_year: Number(primarySession.publication_year || 0),
         pages_count: Number(primarySession.pages_count || 0),
         reading_progress_percent: 0,
-        session_schedule: [primarySession.session_date, primarySession.session_time]
+        session_schedule: [
+          formatPersianDateDisplay(primarySession.session_date),
+          primarySession.session_time,
+        ]
           .filter(Boolean)
           .join(' · '),
         cover_url: primarySession.cover_url || '/assets/book-current.png',

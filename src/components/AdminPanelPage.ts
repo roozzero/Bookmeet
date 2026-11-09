@@ -20,7 +20,13 @@ import type {
   TicketAttachmentUploadInput,
   UserComment,
 } from '../types/models.ts';
-import { toEnglishDigits, toPersianDigits } from '../utils/persianNumbers.ts';
+import {
+  extractIsoDateForInput,
+  extractTimeForInput,
+  formatPersianDateDisplay,
+  toEnglishDigits,
+  toPersianDigits,
+} from '../utils/persianNumbers.ts';
 import { normalizeArticleHtml, sanitizeRichHtml } from '../utils/sanitizeHtml.ts';
 
 export type AdminTabKey =
@@ -97,6 +103,16 @@ function resizeImageToDataUrl(file: File, maxDim = 480): Promise<string> {
 
 function normalizeCourseStatus(status?: string): 'فعال' | 'غیرفعال' {
   if (status === 'غیرفعال' || status === 'برگزارشده') {
+    return 'غیرفعال';
+  }
+  return 'فعال';
+}
+
+function normalizeSessionStatus(status?: string): 'فعال' | 'غیرفعال' | 'برگزار شده' {
+  if (status === 'برگزارشده' || status === 'برگزار شده') {
+    return 'برگزار شده';
+  }
+  if (status === 'غیرفعال') {
     return 'غیرفعال';
   }
   return 'فعال';
@@ -371,7 +387,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
 
   // Sessions management state
   let sessionSearch = '';
-  let sessionStatusFilter: 'all' | 'فعال' | 'غیرفعال' = 'all';
+  let sessionStatusFilter: 'all' | 'فعال' | 'غیرفعال' | 'برگزار شده' = 'all';
   let editingSession: Partial<MemberSession> | null = null;
   let managingSubSessionsForSessionId: number | null = null;
   let editingSubSession: SessionSubItem | null = null;
@@ -392,6 +408,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
 
   // Tickets management state
   let ticketFilter: 'all' | 'در انتظار بررسی' | 'پاسخ داده‌شده' | 'بسته‌شده' = 'all';
+  let selectedAdminTicketId: number | null = null;
 
   // Announcements management state
   let editingAnnouncement: Partial<ClubAnnouncement> | null = null;
@@ -411,11 +428,12 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   // Home settings banner
   let homeSettingsSavedBanner = '';
 
-  // Parse initialSubPath if provided (e.g. /admin/blog/create, /admin/sessions/1)
+  // Parse initialSubPath if provided (e.g. /admin/blog/create, /admin/sessions/1, /admin/tickets/3)
   function applySubPath(tab: AdminTabKey, subPath?: string): void {
     activeTab = tab;
     managingSubSessionsForSessionId = null;
     managingSubSessionsForClassId = null;
+    selectedAdminTicketId = null;
     editingSubSession = null;
     isAddingSubSession = false;
     blogPageMode = 'list';
@@ -431,6 +449,11 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       const cid = Number(parts[0]);
       if (!Number.isNaN(cid) && state.classes.some((c) => c.id === cid)) {
         managingSubSessionsForClassId = cid;
+      }
+    } else if (tab === 'tickets' && parts[0]) {
+      const tid = Number(parts[0]);
+      if (!Number.isNaN(tid) && state.tickets.some((t) => Number(t.id) === tid)) {
+        selectedAdminTicketId = tid;
       }
     } else if (tab === 'blog') {
       if (parts[0] === 'create') {
@@ -469,6 +492,10 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     }
     if (activeTab === 'classes' && managingSubSessionsForClassId !== null) {
       props.onRouteChange(`/admin/classes/${managingSubSessionsForClassId}`);
+      return;
+    }
+    if (activeTab === 'tickets' && selectedAdminTicketId !== null) {
+      props.onRouteChange(`/admin/tickets/${selectedAdminTicketId}`);
       return;
     }
     if (activeTab === 'blog' && blogPageMode === 'editor') {
@@ -1405,7 +1432,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
 
     const q = sessionSearch.trim().toLowerCase();
     const filtered = state.sessions.filter((s) => {
-      const normStatus = normalizeCourseStatus(s.status);
+      const normStatus = normalizeSessionStatus(s.status);
       if (sessionStatusFilter !== 'all' && normStatus !== sessionStatusFilter) {
         return false;
       }
@@ -1448,8 +1475,9 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <div>
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">وضعیت دوره *</label>
                 <select name="status" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]">
-                  <option value="فعال" ${normalizeCourseStatus(editingSession.status) === 'فعال' ? 'selected' : ''}>فعال</option>
-                  <option value="غیرفعال" ${normalizeCourseStatus(editingSession.status) === 'غیرفعال' ? 'selected' : ''}>غیرفعال</option>
+                  <option value="فعال" ${normalizeSessionStatus(editingSession.status) === 'فعال' ? 'selected' : ''}>فعال</option>
+                  <option value="غیرفعال" ${normalizeSessionStatus(editingSession.status) === 'غیرفعال' ? 'selected' : ''}>غیرفعال</option>
+                  <option value="برگزار شده" ${normalizeSessionStatus(editingSession.status) === 'برگزار شده' ? 'selected' : ''}>برگزار شده</option>
                 </select>
               </div>
               <div>
@@ -1481,12 +1509,34 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 <input type="text" name="publisher" required value="${toPersianDigits(editingSession.publisher || '')}" placeholder="مثلاً: نشر نیلوفر" class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
               </div>
               <div>
-                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">روز و تاریخ برگزاری *</label>
-                <input type="text" name="session_date" required value="${toPersianDigits(editingSession.session_date || '')}" placeholder="مثلاً: چهارشنبه‌ها · آذر ۱۴۰۵" class="js-persian-digits-input w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">تاریخ برگزاری جلسه *</label>
+                <input
+                  type="date"
+                  name="session_date"
+                  data-existing-date="${editingSession.session_date || ''}"
+                  value="${extractIsoDateForInput(editingSession.session_date)}"
+                  class="js-admin-date-picker w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]"
+                />
+                ${
+                  editingSession.session_date
+                    ? `<span class="js-admin-date-preview block text-[11px] text-[#6B5444] mt-1">تاریخ ثبت‌شده: ${formatPersianDateDisplay(editingSession.session_date)}</span>`
+                    : `<span class="js-admin-date-preview block text-[11px] text-[#6B5444] mt-1">تاریخ را از تقویم انتخاب کنید</span>`
+                }
               </div>
               <div>
-                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">ساعت برگزاری *</label>
-                <input type="text" name="session_time" required value="${toPersianDigits(editingSession.session_time || '')}" placeholder="مثلاً: ساعت ۱۸:۰۰ تا ۲۰:۰۰" class="js-persian-digits-input w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]" />
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">ساعت شروع جلسه *</label>
+                <input
+                  type="time"
+                  name="session_time"
+                  data-existing-time="${editingSession.session_time || ''}"
+                  value="${extractTimeForInput(editingSession.session_time)}"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]"
+                />
+                ${
+                  editingSession.session_time
+                    ? `<span class="block text-[11px] text-[#6B5444] mt-1">ساعت ثبت‌شده: ${toPersianDigits(editingSession.session_time)}</span>`
+                    : ''
+                }
               </div>
               <div class="sm:col-span-2 lg:col-span-3">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">تصویر کاور دوره (انتخاب از گالری تصاویر)</label>
@@ -1524,7 +1574,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             : ''
         }
 
-        <!-- Search and Equal-Sized Compact Active/Inactive Filter -->
+        <!-- Search and Status Filter -->
         <div class="p-4 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <input
             type="text"
@@ -1532,12 +1582,13 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             placeholder="جستجو در عنوان دوره، نام کتاب، نویسنده یا مترجم..."
             class="js-admin-session-search flex-1 px-4 py-2 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
           />
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="flex flex-wrap items-center gap-2 shrink-0">
             ${(
               [
                 { key: 'all', label: 'همه دوره‌ها' },
                 { key: 'فعال', label: 'فعال' },
                 { key: 'غیرفعال', label: 'غیرفعال' },
+                { key: 'برگزار شده', label: 'برگزار شده' },
               ] as const
             )
               .map(
@@ -1545,7 +1596,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <button
                 type="button"
                 data-session-filter="${f.key}"
-                class="js-admin-session-filter w-[104px] h-8 rounded-lg text-[12px] font-semibold inline-flex items-center justify-center cursor-pointer transition-colors ${
+                class="js-admin-session-filter px-3.5 h-8 rounded-lg text-[12px] font-semibold inline-flex items-center justify-center cursor-pointer transition-colors ${
                   sessionStatusFilter === f.key
                     ? 'bg-[#5A3A22] text-[#FAF5EC]'
                     : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D]'
@@ -1562,7 +1613,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
           ${filtered
             .map((s) => {
-              const normStatus = normalizeCourseStatus(s.status);
+              const normStatus = normalizeSessionStatus(s.status);
               return `
             <article class="rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] overflow-hidden flex flex-col justify-between">
               <div>
@@ -1571,7 +1622,11 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   <div class="absolute inset-0 bg-gradient-to-t from-[#1E140E]/75 via-transparent to-transparent"></div>
                   <div class="absolute bottom-3 right-4 left-4 flex items-center justify-between text-[#FAF5EC] text-[11.5px] font-semibold">
                     <span class="px-2.5 py-1 rounded-lg ${
-                      normStatus === 'فعال' ? 'bg-[#235332]/90' : 'bg-[#7A5A10]/90'
+                      normStatus === 'فعال'
+                        ? 'bg-[#235332]/90'
+                        : normStatus === 'برگزار شده'
+                        ? 'bg-[#1D5430]/95'
+                        : 'bg-[#7A5A10]/90'
                     }">${normStatus}</span>
                     <span class="px-2.5 py-1 rounded-lg bg-[#1E140E]/65">${toPersianDigits((s.sub_sessions || []).length)} زیرجلسه</span>
                   </div>
@@ -1586,7 +1641,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     <div>تعداد صفحات: <strong class="text-[#231912]">${s.pages_count ? `${toPersianDigits(s.pages_count)} صفحه` : '—'}</strong></div>
                     <div>سال انتشار: <strong class="text-[#231912]">${s.publication_year ? toPersianDigits(s.publication_year) : '—'}</strong></div>
                     <div>انتشارات: <strong class="text-[#231912]">${toPersianDigits(s.publisher || '—')}</strong></div>
-                    <div>زمان: <strong class="text-[#231912]">${toPersianDigits(s.session_date || '—')}</strong></div>
+                    <div>زمان: <strong class="text-[#231912]">${formatPersianDateDisplay(s.session_date || '—')}${s.session_time ? ` · ساعت ${toPersianDigits(s.session_time)}` : ''}</strong></div>
                   </div>
                   ${renderEnrolledMembersBlock({
                     targetType: 'session',
@@ -1604,7 +1659,24 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 >
                   صفحه جلسات دوره (${toPersianDigits((s.sub_sessions || []).length)})
                 </button>
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
+                  ${
+                    normStatus !== 'برگزار شده'
+                      ? `
+                    <button
+                      type="button"
+                      data-mark-held-session="${s.id}"
+                      class="js-admin-mark-session-held px-3 py-2 rounded-xl bg-[#E4F2E7] hover:bg-[#235332] text-[#235332] hover:text-[#FAF5EC] border border-[#BBD9C2] text-[12px] font-semibold cursor-pointer transition-colors"
+                    >
+                      برگزار شده
+                    </button>
+                  `
+                      : `
+                    <span class="px-3 py-2 rounded-xl bg-[#E4F2E7] text-[#235332] border border-[#BBD9C2] text-[11.5px] font-bold">
+                      ✓ برگزار شده
+                    </span>
+                  `
+                  }
                   <button
                     type="button"
                     data-edit-session="${s.id}"
@@ -1731,24 +1803,34 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </select>
             </div>
             <div>
-              <label class="block text-[11.5px] font-semibold text-[#4E3B2D] mb-1">تاریخ برگزاری</label>
+              <label class="block text-[11.5px] font-semibold text-[#4E3B2D] mb-1">تاریخ برگزاری *</label>
               <input
-                type="text"
+                type="date"
                 name="session_date"
-                value="${toPersianDigits(subBeingEdited?.session_date || '')}"
-                placeholder="مثلاً: ۳۰ آبان ۱۴۰۵"
-                class="js-persian-digits-input w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
+                data-existing-date="${subBeingEdited?.session_date || ''}"
+                value="${extractIsoDateForInput(subBeingEdited?.session_date)}"
+                class="js-admin-date-picker w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
               />
+              ${
+                subBeingEdited?.session_date
+                  ? `<span class="js-admin-date-preview block text-[11px] text-[#6B5444] mt-1">تاریخ ثبت‌شده: ${formatPersianDateDisplay(subBeingEdited.session_date)}</span>`
+                  : `<span class="js-admin-date-preview block text-[11px] text-[#6B5444] mt-1">تاریخ جلسه را انتخاب کنید</span>`
+              }
             </div>
             <div>
-              <label class="block text-[11.5px] font-semibold text-[#4E3B2D] mb-1">زمان برگزاری</label>
+              <label class="block text-[11.5px] font-semibold text-[#4E3B2D] mb-1">ساعت شروع جلسه *</label>
               <input
-                type="text"
+                type="time"
                 name="session_time"
-                value="${toPersianDigits(subBeingEdited?.session_time || '')}"
-                placeholder="مثلاً: ۱۸:۰۰ تا ۲۰:۰۰"
-                class="js-persian-digits-input w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
+                data-existing-time="${subBeingEdited?.session_time || ''}"
+                value="${extractTimeForInput(subBeingEdited?.session_time)}"
+                class="w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
               />
+              ${
+                subBeingEdited?.session_time
+                  ? `<span class="block text-[11px] text-[#6B5444] mt-1">ساعت ثبت‌شده: ${toPersianDigits(subBeingEdited.session_time)}</span>`
+                  : ''
+              }
             </div>
             <div>
               <label class="block text-[11.5px] font-semibold text-[#4E3B2D] mb-1">سر فصل جلسه</label>
@@ -1756,7 +1838,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 type="text"
                 name="pages_to_read"
                 value="${toPersianDigits(subBeingEdited?.pages_to_read || '')}"
-                placeholder="مثلاً: فصل اول و دوم (صفحات ۱ تا ۹۰)"
+                placeholder="سرفصل یا موضوع مورد مطالعه این جلسه را وارد کنید"
                 class="js-persian-digits-input w-full px-3 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[12.5px]"
               />
             </div>
@@ -1835,13 +1917,34 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     ${toPersianDigits(sub.session_number)} · ${displayStatus}
                   </span>
                   <span class="text-[11.5px] text-[#6B5444]">
-                    ${toPersianDigits(sub.session_date)} · ساعت ${toPersianDigits(sub.session_time)}
+                    ${formatPersianDateDisplay(sub.session_date)}${
+                      sub.session_time ? ` · ساعت ${toPersianDigits(sub.session_time)}` : ''
+                    }
                   </span>
                 </div>
                 <h4 class="font-display text-[15.5px] font-bold text-[#231912]">${toPersianDigits(sub.title)}</h4>
                 <p class="text-[12px] text-[#5B4739]">سر فصل جلسه: ${toPersianDigits(sub.pages_to_read || String(sub.pages_read || '—'))}</p>
               </div>
-              <div class="pt-2 border-t border-[#E6D8C5] flex justify-end gap-2">
+              <div class="pt-2 border-t border-[#E6D8C5] flex flex-wrap items-center justify-end gap-2">
+                ${
+                  displayStatus !== 'برگزار شده'
+                    ? `
+                  <button
+                    type="button"
+                    data-parent-type="${params.parentType}"
+                    data-parent-id="${params.parentId}"
+                    data-sub-id="${sub.id}"
+                    class="js-admin-mark-subsession-held px-3 py-1.5 rounded-lg bg-[#E4F2E7] hover:bg-[#235332] text-[#235332] hover:text-[#FAF5EC] border border-[#BBD9C2] text-[11.5px] font-semibold cursor-pointer transition-colors"
+                  >
+                    برگزار شده
+                  </button>
+                `
+                    : `
+                  <span class="px-2.5 py-1 rounded-lg bg-[#E4F2E7] text-[#235332] border border-[#BBD9C2] text-[11px] font-bold">
+                    ✓ برگزار شده
+                  </span>
+                `
+                }
                 <button
                   type="button"
                   data-parent-type="${params.parentType}"
@@ -2484,7 +2587,249 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   }
 
   // ==================== 5. TICKETS MANAGEMENT TAB ====================
+  function getAdminTicketMessagesList(ticket: MemberTicket) {
+    if (Array.isArray(ticket.messages) && ticket.messages.length > 0) {
+      return ticket.messages;
+    }
+    return [
+      {
+        id: `init-${ticket.id}`,
+        sender_role: 'member' as const,
+        sender_name: ticket.member_phone || 'کاربر باشگاه',
+        text: ticket.message || '',
+        created_at: ticket.created_at || 'ثبت‌شده',
+        attachments: (ticket.attachments || []).filter((a) => a.uploader_role === 'member'),
+      },
+      ...(Array.isArray(ticket.admin_replies) && ticket.admin_replies.length > 0
+        ? ticket.admin_replies.map((rep, idx) => ({
+            id: `adm-${ticket.id}-${idx}`,
+            sender_role: 'admin' as const,
+            sender_name: 'مدیر باشگاه',
+            text: rep.text,
+            created_at: rep.created_at || ticket.created_at || 'ثبت‌شده',
+            attachments: (rep as { attachments?: TicketAttachmentMeta[] }).attachments || [],
+          }))
+        : ticket.admin_reply
+        ? [
+            {
+              id: `adm-single-${ticket.id}`,
+              sender_role: 'admin' as const,
+              sender_name: 'مدیر باشگاه',
+              text: ticket.admin_reply,
+              created_at: ticket.updated_at || ticket.created_at || 'ثبت‌شده',
+              attachments: (ticket.attachments || []).filter((a) => a.uploader_role === 'admin'),
+            },
+          ]
+        : []),
+    ];
+  }
+
+  function getAdminTicketLatestReplyDate(ticket: MemberTicket): string {
+    const msgs = getAdminTicketMessagesList(ticket);
+    if (msgs.length > 1) {
+      const lastMsg = msgs[msgs.length - 1];
+      if (lastMsg?.created_at) return lastMsg.created_at;
+    }
+    if (ticket.updated_at && ticket.updated_at !== ticket.created_at) {
+      return ticket.updated_at;
+    }
+    return 'بدون پاسخ جدید';
+  }
+
+  function getTicketOwnerLabel(ticket: MemberTicket): string {
+    const rawPhone = String(ticket.member_phone || '').trim();
+    const normPhone = toEnglishDigits(rawPhone);
+    const matchedUser = state.users.find(
+      (u) => u.phone === rawPhone || toEnglishDigits(u.phone) === normPhone
+    );
+    if (matchedUser) {
+      return `${matchedUser.first_name} ${matchedUser.last_name} (${toPersianDigits(rawPhone)})`;
+    }
+    return toPersianDigits(rawPhone || 'کاربر باشگاه');
+  }
+
   function renderTicketsTab(): string {
+    // Dedicated Ticket Detail Page when a ticket card is opened
+    if (selectedAdminTicketId !== null) {
+      const ticket = state.tickets.find((t) => Number(t.id) === Number(selectedAdminTicketId));
+      if (ticket) {
+        const messagesList = getAdminTicketMessagesList(ticket);
+        const latestReplyDate = getAdminTicketLatestReplyDate(ticket);
+        const ownerLabel = getTicketOwnerLabel(ticket);
+        const isClosed = ticket.status === 'بسته‌شده';
+        const statusBadgeClass =
+          ticket.status === 'پاسخ داده‌شده'
+            ? 'bg-[#E4F2E7] text-[#235332] border-[#BBD9C2]'
+            : isClosed
+            ? 'bg-[#EAE0D2] text-[#5B4739] border-[#D5C3AE]'
+            : 'bg-[#FFF3CD] text-[#7A5A10] border-[#E5C77B]';
+
+        return `
+          <div data-admin-ticket-card="${ticket.id}" class="space-y-6">
+            <!-- Top Navigation & Actions Bar -->
+            <div class="p-5 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div class="space-y-2">
+                <button
+                  type="button"
+                  class="js-admin-back-to-tickets-list inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#7A4B2A] hover:text-[#231912] cursor-pointer"
+                >
+                  <span>→</span>
+                  <span>بازگشت به لیست تیکت‌ها</span>
+                </button>
+                <div class="flex items-center gap-2.5 flex-wrap">
+                  <span class="font-mono text-[12px] font-bold px-2.5 py-1 rounded-md bg-[#EFE3D2] text-[#4E3B2D]">
+                    #${toPersianDigits(ticket.ticket_code)}
+                  </span>
+                  <h2 class="font-display text-[19px] sm:text-[21px] font-bold text-[#231912]">
+                    ${toPersianDigits(ticket.subject)}
+                  </h2>
+                  <span class="px-2.5 py-0.5 rounded-md border text-[11.5px] font-semibold ${statusBadgeClass}">
+                    ${toPersianDigits(ticket.status)}
+                  </span>
+                </div>
+                <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12px] text-[#5B4739]">
+                  <span>صاحب تیکت: <strong class="text-[#231912]">${ownerLabel}</strong></span>
+                  <span>بخش: <strong class="text-[#231912]">${toPersianDigits(ticket.department)}</strong></span>
+                  <span>تاریخ ایجاد: <strong class="text-[#231912]">${toPersianDigits(ticket.created_at)}</strong></span>
+                  <span>آخرین پاسخ: <strong class="text-[#231912]">${toPersianDigits(latestReplyDate)}</strong></span>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2 shrink-0 self-start md:self-center">
+                ${
+                  !isClosed
+                    ? `
+                  <button
+                    type="button"
+                    data-close-ticket="${ticket.id}"
+                    class="js-admin-close-ticket-btn px-4 py-2 rounded-xl bg-[#7A5411] hover:bg-[#5E3F0A] text-[#FAF5EC] text-[12px] font-semibold transition-colors cursor-pointer"
+                  >
+                    بستن تیکت
+                  </button>
+                `
+                    : `
+                  <span class="px-3.5 py-2 rounded-xl bg-[#EAE0D2] border border-[#D5C3AE] text-[#5B4739] text-[12px] font-semibold">
+                    🔒 تیکت بسته شده
+                  </span>
+                `
+                }
+                <button
+                  type="button"
+                  data-delete-ticket="${ticket.id}"
+                  class="js-admin-delete-ticket px-3.5 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold cursor-pointer"
+                >
+                  حذف تیکت
+                </button>
+              </div>
+            </div>
+
+            <!-- Full Conversation Thread -->
+            <div class="p-5 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] space-y-4">
+              <div class="flex items-center justify-between pb-3 border-b border-[#E6D8C5]">
+                <h3 class="font-display text-[16.5px] font-bold text-[#231912]">
+                  تاریخچه کامل گفت‌وگو و فایل‌های پیوست (${toPersianDigits(messagesList.length)} پیام)
+                </h3>
+                <span class="text-[11.5px] text-[#7A6352]">اولویت: ${toPersianDigits(ticket.priority || 'عادی')}</span>
+              </div>
+
+              <div class="space-y-3">
+                ${messagesList
+                  .map((msg, msgIdx) => {
+                    const isAdmin = msg.sender_role === 'admin';
+                    const msgAttachments = Array.isArray(msg.attachments) ? msg.attachments : [];
+                    const legacyName =
+                      msgIdx === 0 && msgAttachments.length === 0 ? ticket.attachment_name : undefined;
+                    return `
+                      <div class="p-4 rounded-xl border ${
+                        isAdmin
+                          ? 'bg-[#EEF6F0] border-[#C5DFCC] text-[#1E3F29]'
+                          : 'bg-[#F4E9DA]/55 border-[#E8DAC6] text-[#3D2E22]'
+                      } space-y-2">
+                        <div class="flex items-center justify-between gap-2 text-[11.5px] ${
+                          isAdmin ? 'text-[#235332]' : 'text-[#6B5444]'
+                        }">
+                          <span class="font-bold">
+                            ${isAdmin ? 'پاسخ مدیر باشگاه / دبیرخانه' : `پیام کاربر (${ownerLabel})`}
+                          </span>
+                          <span>${toPersianDigits(msg.created_at || ticket.created_at)}</span>
+                        </div>
+                        ${
+                          msg.text
+                            ? `<p class="text-[13.5px] leading-[1.9] text-justify whitespace-pre-line">${toPersianDigits(msg.text)}</p>`
+                            : ''
+                        }
+                        ${renderTicketAttachmentsHtml(ticket.id, msgAttachments, legacyName)}
+                      </div>
+                    `;
+                  })
+                  .join('')}
+              </div>
+
+              <!-- Reply Form or Closed Notice -->
+              ${
+                isClosed
+                  ? `
+                <div class="p-4 rounded-xl bg-[#EAE0D2]/80 border border-[#D5C3AE] text-[13px] font-semibold text-[#5B4739] text-center">
+                  این تیکت بسته شده است و امکان ارسال پاسخ جدید برای آن وجود ندارد.
+                </div>
+              `
+                  : `
+                <div class="pt-4 border-t border-[#E6D8C5] space-y-3">
+                  <div>
+                    <label class="block text-[12.5px] font-semibold text-[#235332] mb-1.5">ثبت پاسخ جدید دبیرخانه / مدیر باشگاه:</label>
+                    <textarea
+                      rows="3"
+                      placeholder="متن پاسخ جدید خود را اینجا بنویسید..."
+                      class="js-admin-ticket-reply-input w-full px-3.5 py-2.5 rounded-xl bg-[#FDFBF7] border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                    ></textarea>
+                  </div>
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-[#F4E9DA]/50 border border-[#E2D2BE]">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <label class="text-[11.5px] font-semibold text-[#4E3B2D]">📎 پیوست فایل یا تصویر به پاسخ (اختیاری):</label>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*,.pdf,.doc,.docx,.txt,.zip"
+                        class="js-admin-ticket-reply-files text-[11.5px] text-[#4E3B2D] file:ml-2 file:px-3 file:py-1 file:rounded-lg file:border-0 file:bg-[#5A3A22] file:text-[#FAF5EC] file:text-[11px] file:font-semibold file:cursor-pointer"
+                      />
+                    </div>
+                    <span class="text-[10.5px] text-[#7A6352]">فرمت‌های مجاز: تصویر، PDF، Word، ZIP (حداکثر ۵ مگابایت)</span>
+                  </div>
+                  <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+                    <div class="flex items-center gap-2">
+                      <label class="text-[12px] font-semibold text-[#4E3B2D]">وضعیت پس از ثبت:</label>
+                      <select class="js-admin-ticket-status-select px-3 py-1.5 rounded-xl bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[12.5px] text-[#231912]">
+                        <option value="پاسخ داده‌شده" ${ticket.status === 'پاسخ داده‌شده' ? 'selected' : ''}>پاسخ داده‌شده</option>
+                        <option value="در انتظار بررسی" ${ticket.status === 'در انتظار بررسی' ? 'selected' : ''}>در انتظار بررسی</option>
+                      </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        data-close-ticket="${ticket.id}"
+                        class="js-admin-close-ticket-btn px-4 py-2 rounded-xl border border-[#C5B198] hover:bg-[#EFE2CE] text-[#4E3B2D] text-[12px] font-semibold cursor-pointer"
+                      >
+                        بستن تیکت
+                      </button>
+                      <button
+                        type="button"
+                        data-save-ticket="${ticket.id}"
+                        class="js-admin-save-ticket px-5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer"
+                      >
+                        ارسال پاسخ دبیرخانه
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `
+              }
+            </div>
+          </div>
+        `;
+      }
+      selectedAdminTicketId = null;
+    }
+
     const filteredTickets = state.tickets.filter((t) => {
       if (ticketFilter === 'all') return true;
       return t.status === ticketFilter;
@@ -2496,7 +2841,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           <div>
             <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">مدیریت تیکت‌ها و درخواست‌های اعضا</h2>
             <p class="text-[13.5px] text-[#6B5444] mt-1">
-              بررسی پیشنهادهای کتاب و پیام‌های پشتیبانی فنی اعضا و ثبت پاسخ جدید دبیرخانه.
+              کارت‌های خلاصه تیکت‌های ارسالی اعضا. برای مشاهده مکالمه کامل، ارسال پاسخ یا بستن تیکت روی دکمه «مشاهده جزئیات» کلیک کنید.
             </p>
           </div>
           <div class="flex flex-wrap items-center gap-2">
@@ -2527,163 +2872,89 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           </div>
         </div>
 
-        <div class="space-y-4">
-          ${filteredTickets
-            .map((ticket) => {
-              const messagesList =
-                Array.isArray(ticket.messages) && ticket.messages.length > 0
-                  ? ticket.messages
-                  : [
-                      {
-                        id: `init-${ticket.id}`,
-                        sender_role: 'member' as const,
-                        sender_name: ticket.member_phone || 'کاربر باشگاه',
-                        text: ticket.message || '',
-                        created_at: ticket.created_at || 'ثبت‌شده',
-                        attachments: (ticket.attachments || []).filter((a) => a.uploader_role === 'member'),
-                      },
-                      ...(Array.isArray(ticket.admin_replies) && ticket.admin_replies.length > 0
-                        ? ticket.admin_replies.map((rep, idx) => ({
-                            id: `adm-${ticket.id}-${idx}`,
-                            sender_role: 'admin' as const,
-                            sender_name: 'مدیر باشگاه',
-                            text: rep.text,
-                            created_at: rep.created_at || ticket.created_at || 'ثبت‌شده',
-                            attachments: (rep as { attachments?: TicketAttachmentMeta[] }).attachments || [],
-                          }))
-                        : ticket.admin_reply
-                        ? [
-                            {
-                              id: `adm-single-${ticket.id}`,
-                              sender_role: 'admin' as const,
-                              sender_name: 'مدیر باشگاه',
-                              text: ticket.admin_reply,
-                              created_at: ticket.updated_at || ticket.created_at || 'ثبت‌شده',
-                              attachments: (ticket.attachments || []).filter((a) => a.uploader_role === 'admin'),
-                            },
-                          ]
-                        : []),
-                    ];
+        ${
+          filteredTickets.length === 0
+            ? `
+          <div class="p-8 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] text-center text-[13.5px] text-[#6B5444]">
+            تیکتی در این وضعیت یافت نشد.
+          </div>
+        `
+            : `
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            ${filteredTickets
+              .map((ticket) => {
+                const messagesList = getAdminTicketMessagesList(ticket);
+                const latestReplyDate = getAdminTicketLatestReplyDate(ticket);
+                const ownerLabel = getTicketOwnerLabel(ticket);
+                const attachmentsCount =
+                  (ticket.attachments || []).length || (ticket.attachment_name ? 1 : 0);
+                const statusBadgeClass =
+                  ticket.status === 'پاسخ داده‌شده'
+                    ? 'bg-[#E4F2E7] text-[#235332] border-[#BBD9C2]'
+                    : ticket.status === 'بسته‌شده'
+                    ? 'bg-[#EAE0D2] text-[#5B4739] border-[#D5C3AE]'
+                    : 'bg-[#FFF3CD] text-[#7A5A10] border-[#E5C77B]';
 
-              const statusBadgeClass =
-                ticket.status === 'پاسخ داده‌شده'
-                  ? 'bg-[#E4F2E7] text-[#235332] border-[#BBD9C2]'
-                  : ticket.status === 'بسته‌شده'
-                  ? 'bg-[#EAE0D2] text-[#5B4739] border-[#D5C3AE]'
-                  : 'bg-[#FFF3CD] text-[#7A5A10] border-[#E5C77B]';
+                return `
+                  <article class="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] hover:border-[#8B5A36] transition-all flex flex-col justify-between gap-4 shadow-[0_6px_20px_rgba(61,46,34,0.04)]">
+                    <div class="space-y-3">
+                      <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <span class="font-mono text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-[#EFE3D2] text-[#4E3B2D]">
+                          #${toPersianDigits(ticket.ticket_code)}
+                        </span>
+                        <span class="px-2.5 py-0.5 rounded-md border text-[11.5px] font-semibold ${statusBadgeClass}">
+                          ${toPersianDigits(ticket.status)}
+                        </span>
+                      </div>
 
-              return `
-            <div data-admin-ticket-card="${ticket.id}" class="p-5 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] space-y-4">
-              <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="flex items-center gap-2.5 flex-wrap">
-                  <span class="font-mono text-[12px] font-bold px-2.5 py-1 rounded-md bg-[#EFE3D2] text-[#4E3B2D]">
-                    #${toPersianDigits(ticket.ticket_code)}
-                  </span>
-                  <h3 class="font-display text-[16.5px] font-bold text-[#231912]">${toPersianDigits(ticket.subject)}</h3>
-                  <span class="px-2.5 py-0.5 rounded-md border text-[11px] font-semibold ${statusBadgeClass}">
-                    ${toPersianDigits(ticket.status)}
-                  </span>
-                </div>
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="text-[11.5px] px-2.5 py-0.5 rounded-md bg-[#F3E9DA] text-[#6B5444]">
-                    بخش: ${toPersianDigits(ticket.department)}
-                  </span>
-                  <span class="text-[11.5px] px-2.5 py-0.5 rounded-md bg-[#EFE3D2] text-[#4E3B2D]">
-                    فرستنده: ${toPersianDigits(ticket.member_phone)}
-                  </span>
-                  <span class="text-[11px] text-[#7A6352]">
-                    ایجاد: ${toPersianDigits(ticket.created_at)}
-                  </span>
-                </div>
-              </div>
+                      <h3 class="font-display text-[16.5px] font-bold text-[#231912] leading-[1.6] truncate" title="${toPersianDigits(ticket.subject)}">
+                        ${toPersianDigits(ticket.subject)}
+                      </h3>
 
-              <!-- Full Conversation Thread -->
-              <div class="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
-                ${messagesList
-                  .map((msg, msgIdx) => {
-                    const isAdmin = msg.sender_role === 'admin';
-                    const msgAttachments = Array.isArray(msg.attachments) ? msg.attachments : [];
-                    const legacyName =
-                      msgIdx === 0 && msgAttachments.length === 0 ? ticket.attachment_name : undefined;
-                    return `
-                      <div class="p-3.5 rounded-xl border ${
-                        isAdmin
-                          ? 'bg-[#EEF6F0] border-[#C5DFCC] text-[#1E3F29]'
-                          : 'bg-[#F4E9DA]/55 border-[#E8DAC6] text-[#3D2E22]'
-                      } space-y-1.5">
-                        <div class="flex items-center justify-between gap-2 text-[11px] ${
-                          isAdmin ? 'text-[#235332]' : 'text-[#6B5444]'
-                        }">
-                          <span class="font-bold">
-                            ${isAdmin ? 'پاسخ مدیر باشگاه / دبیرخانه' : `پیام کاربر (${toPersianDigits(ticket.member_phone)})`}
-                          </span>
-                          <span>${toPersianDigits(msg.created_at || ticket.created_at)}</span>
+                      <div class="pt-2.5 border-t border-[#E6D8C5] space-y-1.5 text-[12px] text-[#5B4739]">
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-[#7A6352]">فرستنده (صاحب تیکت):</span>
+                          <strong class="text-[#231912] truncate">${ownerLabel}</strong>
                         </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-[#7A6352]">تاریخ ایجاد تیکت:</span>
+                          <strong class="text-[#231912]">${toPersianDigits(ticket.created_at)}</strong>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-[#7A6352]">تاریخ آخرین پاسخ:</span>
+                          <strong class="text-[#231912]">${toPersianDigits(latestReplyDate)}</strong>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-[#7A6352]">بخش مربوطه:</span>
+                          <strong class="text-[#231912]">${toPersianDigits(ticket.department)}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-[#E6D8C5] flex items-center justify-between gap-2">
+                      <div class="flex items-center gap-2 text-[11px] text-[#6B5444]">
+                        <span>💬 ${toPersianDigits(messagesList.length)} پیام</span>
                         ${
-                          msg.text
-                            ? `<p class="text-[13px] leading-[1.85] text-justify whitespace-pre-line">${toPersianDigits(msg.text)}</p>`
+                          attachmentsCount > 0
+                            ? `<span>· 📎 ${toPersianDigits(attachmentsCount)} پیوست</span>`
                             : ''
                         }
-                        ${renderTicketAttachmentsHtml(ticket.id, msgAttachments, legacyName)}
                       </div>
-                    `;
-                  })
-                  .join('')}
-              </div>
-
-              <div class="pt-3 border-t border-[#E6D8C5] space-y-3">
-                <div>
-                  <label class="block text-[12px] font-semibold text-[#235332] mb-1">ثبت پاسخ جدید دبیرخانه / مدیر باشگاه:</label>
-                  <textarea
-                    rows="2"
-                    placeholder="متن پاسخ جدید خود را اینجا بنویسید..."
-                    class="js-admin-ticket-reply-input w-full px-3.5 py-2.5 rounded-xl bg-[#FDFBF7] border border-[#DFCEB9] text-[13px] text-[#231912]"
-                  ></textarea>
-                </div>
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-[#F4E9DA]/50 border border-[#E2D2BE]">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <label class="text-[11.5px] font-semibold text-[#4E3B2D]">📎 پیوست فایل یا تصویر به پاسخ (اختیاری):</label>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*,.pdf,.doc,.docx,.txt,.zip"
-                      class="js-admin-ticket-reply-files text-[11.5px] text-[#4E3B2D] file:ml-2 file:px-3 file:py-1 file:rounded-lg file:border-0 file:bg-[#5A3A22] file:text-[#FAF5EC] file:text-[11px] file:font-semibold file:cursor-pointer"
-                    />
-                  </div>
-                  <span class="text-[10.5px] text-[#7A6352]">فرمت‌های مجاز: تصویر، PDF، Word، ZIP (حداکثر ۵ مگابایت)</span>
-                </div>
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <div class="flex items-center gap-2">
-                    <label class="text-[12px] font-semibold text-[#4E3B2D]">وضعیت تیکت:</label>
-                    <select class="js-admin-ticket-status-select px-3 py-1.5 rounded-xl bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[12.5px] text-[#231912]">
-                      <option value="پاسخ داده‌شده" ${ticket.status === 'پاسخ داده‌شده' ? 'selected' : ''}>پاسخ داده‌شده</option>
-                      <option value="در انتظار بررسی" ${ticket.status === 'در انتظار بررسی' ? 'selected' : ''}>در انتظار بررسی</option>
-                      <option value="بسته‌شده" ${ticket.status === 'بسته‌شده' ? 'selected' : ''}>بسته‌شده</option>
-                    </select>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <button
-                      type="button"
-                      data-delete-ticket="${ticket.id}"
-                      class="js-admin-delete-ticket px-3.5 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold cursor-pointer"
-                    >
-                      حذف تیکت
-                    </button>
-                    <button
-                      type="button"
-                      data-save-ticket="${ticket.id}"
-                      class="js-admin-save-ticket px-5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer"
-                    >
-                      ثبت پاسخ / ذخیره وضعیت
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          `;
-            })
-            .join('')}
-        </div>
+                      <button
+                        type="button"
+                        data-ticket-id="${ticket.id}"
+                        class="js-admin-open-ticket-detail px-4 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold transition-colors cursor-pointer"
+                      >
+                        مشاهده جزئیات ←
+                      </button>
+                    </div>
+                  </article>
+                `;
+              })
+              .join('')}
+          </div>
+        `
+        }
       </div>
     `;
   }
@@ -3180,10 +3451,15 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     <button
                       type="button"
                       data-editor-cmd="image"
-                      title="درج تصویر در متن مقاله"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#5A3A22] hover:bg-[#432A18] text-[12px] font-semibold text-[#FAF5EC] cursor-pointer"
+                      title="درج تصویر در متن"
+                      aria-label="درج تصویر در متن"
+                      class="js-blog-editor-tool h-8 w-8 inline-flex items-center justify-center rounded-lg bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] cursor-pointer"
                     >
-                      🖼️ درج تصویر در متن
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                      </svg>
                     </button>
                     <button
                       type="button"
@@ -3864,6 +4140,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       editingSubSession = null;
       editingClass = null;
       managingSubSessionsForClassId = null;
+      selectedAdminTicketId = null;
       editingUser = null;
       editingAnnouncement = null;
       editingBlogPost = null;
@@ -3881,6 +4158,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       activeTab = tab;
       managingSubSessionsForSessionId = null;
       managingSubSessionsForClassId = null;
+      selectedAdminTicketId = null;
       editingSubSession = null;
       blogPageMode = 'list';
       notifyRoute();
@@ -4086,8 +4364,85 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   });
 
   $wrapper.on('click', '.js-admin-session-filter', function () {
-    sessionStatusFilter = $(this).data('session-filter') as 'all' | 'فعال' | 'غیرفعال';
+    sessionStatusFilter = $(this).data('session-filter') as
+      | 'all'
+      | 'فعال'
+      | 'غیرفعال'
+      | 'برگزار شده';
     render();
+  });
+
+  $wrapper.on('change', '.js-admin-date-picker', function () {
+    const val = String($(this).val() || '').trim();
+    const $preview = $(this).siblings('.js-admin-date-preview');
+    if (val) {
+      $preview.text(`تاریخ انتخاب‌شده: ${formatPersianDateDisplay(val)}`);
+    }
+  });
+
+  $wrapper.on('click', '.js-admin-mark-session-held', function () {
+    const id = Number($(this).data('mark-held-session'));
+    const target = state.sessions.find((s) => s.id === id);
+    if (!target) return;
+    askDeleteConfirmation(
+      'تغییر وضعیت جلسه به «برگزار شده»',
+      `آیا از تغییر وضعیت «${target.title}» به «برگزار شده» اطمینان دارید؟ پس از تایید، این جلسه به بخش جلسات برگزار شده منتقل می‌شود.`,
+      () => {
+        ApiService.saveAdminSession({
+          ...target,
+          id: target.id,
+          status: 'برگزارشده',
+        })
+          .then((res) => {
+            state.sessions = state.sessions.map((s) => (s.id === id ? res.session : s));
+            props.onSiteDataUpdated({ sessions: state.sessions });
+            render();
+            showToast('وضعیت دوره هم‌خوانی به «برگزار شده» تغییر یافت.');
+          })
+          .catch((err) => showToast(err.message || 'خطا در تغییر وضعیت جلسه', true));
+      },
+      { confirmLabel: 'بله، برگزار شده ثبت شود', confirmTone: 'success' }
+    );
+  });
+
+  $wrapper.on('click', '.js-admin-mark-subsession-held', function () {
+    const parentType = String($(this).data('parent-type')) as 'session' | 'class';
+    const parentId = Number($(this).data('parent-id'));
+    const subId = Number($(this).data('sub-id'));
+
+    if (parentType === 'session') {
+      const target = state.sessions.find((s) => s.id === parentId);
+      if (!target) return;
+      const updatedSubs = (target.sub_sessions || []).map((sub) =>
+        sub.id === subId ? { ...sub, status: 'برگزار شده' as const } : sub
+      );
+      ApiService.saveAdminSession({ id: target.id, sub_sessions: updatedSubs })
+        .then((res) => {
+          state.sessions = state.sessions.map((s) =>
+            s.id === target.id ? res.session : s
+          );
+          props.onSiteDataUpdated({ sessions: state.sessions });
+          render();
+          showToast('وضعیت این کارت جلسه به «برگزار شده» تغییر یافت.');
+        })
+        .catch((err) => showToast(err.message || 'خطا در بروزرسانی وضعیت جلسه', true));
+    } else {
+      const target = state.classes.find((c) => c.id === parentId);
+      if (!target) return;
+      const updatedSubs = (target.sub_sessions || []).map((sub) =>
+        sub.id === subId ? { ...sub, status: 'برگزار شده' as const } : sub
+      );
+      ApiService.saveAdminClass({ id: target.id, sub_sessions: updatedSubs })
+        .then((res) => {
+          state.classes = state.classes.map((c) =>
+            c.id === target.id ? res.classItem : c
+          );
+          props.onSiteDataUpdated({ classes: state.classes });
+          render();
+          showToast('وضعیت این کارت جلسه به «برگزار شده» تغییر یافت.');
+        })
+        .catch((err) => showToast(err.message || 'خطا در بروزرسانی وضعیت جلسه', true));
+    }
   });
 
   $wrapper.on('click', '.js-admin-new-session-btn', () => {
@@ -4136,6 +4491,29 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     );
     const translatorName = String($f.find('[name="translator"]').val() || '').trim();
 
+    const $dateInput = $f.find('[name="session_date"]');
+    const pickedIsoDate = String($dateInput.val() || '').trim();
+    const fallbackExistingDate = String($dateInput.attr('data-existing-date') || '').trim();
+    const resolvedSessionDate = pickedIsoDate || fallbackExistingDate;
+
+    const $timeInput = $f.find('[name="session_time"]');
+    const pickedTime = String($timeInput.val() || '').trim();
+    const fallbackExistingTime = String($timeInput.attr('data-existing-time') || '').trim();
+    const resolvedSessionTime = pickedTime
+      ? toPersianDigits(pickedTime)
+      : toPersianDigits(fallbackExistingTime);
+
+    if (!resolvedSessionDate) {
+      showToast('لطفاً تاریخ برگزاری جلسه را انتخاب کنید.', true);
+      return;
+    }
+
+    const rawStatus = String($f.find('[name="status"]').val() || 'فعال');
+    const normalizedStatus: MemberSession['status'] =
+      rawStatus === 'برگزار شده' || rawStatus === 'برگزارشده'
+        ? 'برگزارشده'
+        : (rawStatus as MemberSession['status']);
+
     const payload: Partial<MemberSession> & { id?: number } = {
       id,
       title: String($f.find('[name="title"]').val() || '').trim(),
@@ -4147,11 +4525,11 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       publication_year: Number(rawPubYear) || 1405,
       pages_count: Number(rawPages) || 300,
       publisher: String($f.find('[name="publisher"]').val() || '').trim(),
-      session_date: toPersianDigits(String($f.find('[name="session_date"]').val() || '').trim()),
-      session_time: toPersianDigits(String($f.find('[name="session_time"]').val() || '').trim()),
+      session_date: resolvedSessionDate,
+      session_time: resolvedSessionTime,
       short_description: String($f.find('[name="short_description"]').val() || '').trim(),
       full_description: String($f.find('[name="full_description"]').val() || '').trim(),
-      status: String($f.find('[name="status"]').val() || 'فعال') as MemberSession['status'],
+      status: normalizedStatus,
       cover_url: String($f.find('[name="cover_url"]').val() || '/assets/book-current.png').trim(),
     };
     ApiService.saveAdminSession(payload)
@@ -4259,6 +4637,23 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     const parentId = Number($f.data('parent-id'));
     const existingSubId = Number($f.find('[name="sub_id"]').val() || 0) || undefined;
 
+    const $subDateInput = $f.find('[name="session_date"]');
+    const pickedSubDate = String($subDateInput.val() || '').trim();
+    const fallbackSubDate = String($subDateInput.attr('data-existing-date') || '').trim();
+    const resolvedSubDate = pickedSubDate || fallbackSubDate;
+
+    const $subTimeInput = $f.find('[name="session_time"]');
+    const pickedSubTime = String($subTimeInput.val() || '').trim();
+    const fallbackSubTime = String($subTimeInput.attr('data-existing-time') || '').trim();
+    const resolvedSubTime = pickedSubTime
+      ? toPersianDigits(pickedSubTime)
+      : toPersianDigits(fallbackSubTime);
+
+    if (!resolvedSubDate) {
+      showToast('لطفاً تاریخ برگزاری جلسه را از تقویم انتخاب کنید.', true);
+      return;
+    }
+
     const subItemData: SessionSubItem = {
       id: existingSubId || Date.now(),
       session_number: String($f.find('[name="session_number"]').val() || 'جلسه جدید').trim(),
@@ -4266,8 +4661,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       status: String($f.find('[name="status"]').val() || 'جلسه آتی') as
         | 'جلسه آتی'
         | 'برگزار شده',
-      session_date: String($f.find('[name="session_date"]').val() || '').trim(),
-      session_time: String($f.find('[name="session_time"]').val() || '').trim(),
+      session_date: resolvedSubDate,
+      session_time: resolvedSubTime,
       pages_to_read: String($f.find('[name="pages_to_read"]').val() || '').trim(),
       pages_read: editingSubSession?.pages_read || 95,
       meeting_link: String($f.find('[name="meeting_link"]').val() || '').trim(),
@@ -4871,9 +5266,56 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     render();
   });
 
+  $wrapper.on('click', '.js-admin-open-ticket-detail', function () {
+    const id = Number($(this).data('ticket-id'));
+    if (!Number.isNaN(id)) {
+      selectedAdminTicketId = id;
+      notifyRoute();
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  });
+
+  $wrapper.on('click', '.js-admin-back-to-tickets-list', () => {
+    selectedAdminTicketId = null;
+    notifyRoute();
+    render();
+  });
+
+  $wrapper.on('click', '.js-admin-close-ticket-btn', function () {
+    const id = Number($(this).data('close-ticket'));
+    const target = state.tickets.find((t) => Number(t.id) === id);
+    if (!target) return;
+    if (target.status === 'بسته‌شده') {
+      showToast('این تیکت قبلاً بسته شده است.', true);
+      return;
+    }
+
+    askDeleteConfirmation(
+      'بستن تیکت پشتیبانی',
+      `آیا از بستن تیکت «${target.subject}» (#${toPersianDigits(target.ticket_code)}) اطمینان دارید؟ پس از بستن تیکت، امکان ارسال پاسخ جدید در آن وجود نخواهد داشت.`,
+      () => {
+        ApiService.closeAdminTicket(id)
+          .then((res) => {
+            state.tickets = state.tickets.map((t) =>
+              Number(t.id) === id ? res.ticket : t
+            );
+            render();
+            showToast('تیکت با موفقیت بسته شد.');
+          })
+          .catch((err) => showToast(err.message || 'خطا در بستن تیکت', true));
+      },
+      { confirmLabel: 'بله، تیکت بسته شود', confirmTone: 'danger' }
+    );
+  });
+
   $wrapper.on('click', '.js-admin-save-ticket', function () {
     const id = Number($(this).data('save-ticket'));
     const existingTicket = state.tickets.find((t) => Number(t.id) === id);
+    if (existingTicket?.status === 'بسته‌شده') {
+      showToast('این تیکت بسته شده است و امکان ارسال پاسخ جدید در آن وجود ندارد.', true);
+      return;
+    }
     const $card = $wrapper.find(`[data-admin-ticket-card="${id}"]`);
     const $textarea = $card.find('.js-admin-ticket-reply-input');
     const admin_reply = String($textarea.val() || '').trim();
@@ -4885,7 +5327,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     const statusChanged = existingTicket && existingTicket.status !== status;
 
     if (!admin_reply && !hasFiles && !statusChanged) {
-      showToast('لطفاً متن پاسخ را وارد کنید، فایل پیوست انتخاب نمایید یا وضعیت تیکت را تغییر دهید.', true);
+      showToast('لطفاً متن پاسخ را وارد کنید یا فایل پیوست انتخاب نمایید.', true);
       return;
     }
 
@@ -4913,6 +5355,10 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         ApiService.deleteAdminTicket(id)
           .then(() => {
             state.tickets = state.tickets.filter((t) => t.id !== id);
+            if (selectedAdminTicketId === id) {
+              selectedAdminTicketId = null;
+              notifyRoute();
+            }
             render();
             showToast('تیکت حذف شد.');
           })
