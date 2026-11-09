@@ -1,8 +1,5 @@
 import $ from 'jquery';
-import {
-  type CourseAudienceComment,
-  type RussianCourseCard,
-} from './CoursesSection.ts';
+import { type RussianCourseCard } from './CoursesSection.ts';
 import { ApiService } from '../services/api.ts';
 import { toPersianDigits } from '../utils/persianNumbers.ts';
 
@@ -35,6 +32,17 @@ export function createCourseDetailPage(
     comments: [...(props.course.comments || [])],
   };
   let commentSubmittedMsg = '';
+  let commentErrorMsg = '';
+  let selectedRating = 0;
+
+  function getStarRatingLabel(stars: number): string {
+    if (stars === 5) return '۵ ستاره (عالی)';
+    if (stars === 4) return '۴ ستاره (خوب)';
+    if (stars === 3) return '۳ ستاره (متوسط)';
+    if (stars === 2) return '۲ ستاره (ضعیف)';
+    if (stars === 1) return '۱ ستاره (بسیار ضعیف)';
+    return 'لطفاً از ۱ تا ۵ ستاره انتخاب کنید';
+  }
 
   const $wrapper = $(`
     <section
@@ -42,6 +50,18 @@ export function createCourseDetailPage(
       class="min-h-screen w-full bg-[#F5EFE6] text-[#231912] pt-28 sm:pt-32 pb-24 px-4 sm:px-8 lg:px-16"
     ></section>
   `);
+
+  function updateStarsVisual(activeValue: number): void {
+    $wrapper.find('.js-course-star-rating-btn').each(function () {
+      const val = Number($(this).data('star-value'));
+      const isFilled = val <= activeValue;
+      $(this)
+        .toggleClass('text-[#D48A29] scale-110', isFilled)
+        .toggleClass('text-[#CFC0AC]', !isFilled)
+        .attr('aria-checked', selectedRating === val ? 'true' : 'false');
+    });
+    $wrapper.find('.js-course-star-rating-label').text(getStarRatingLabel(activeValue));
+  }
 
   function render(): void {
     const course = currentCourse;
@@ -338,6 +358,15 @@ export function createCourseDetailPage(
             `
                 : ''
             }
+            ${
+              commentErrorMsg
+                ? `
+              <div class="p-3.5 rounded-xl bg-[#FDECEC] border border-[#F3B8B8] text-[#8E2424] text-[13px] font-semibold">
+                ${toPersianDigits(commentErrorMsg)}
+              </div>
+            `
+                : ''
+            }
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">نام و نام خانوادگی *</label>
@@ -350,15 +379,37 @@ export function createCourseDetailPage(
                 />
               </div>
               <div>
-                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">امتیاز شما به دوره</label>
-                <select
-                  name="rating"
-                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]"
+                <label id="course-rating-group-label" class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">
+                  امتیاز شما به دوره *
+                </label>
+                <input type="hidden" name="rating" value="${selectedRating || ''}" />
+                <div
+                  role="radiogroup"
+                  aria-labelledby="course-rating-group-label"
+                  class="js-course-star-rating-group w-full px-3.5 py-2 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] flex items-center justify-between gap-2"
                 >
-                  <option value="5">۵ ستاره (عالی)</option>
-                  <option value="4">۴ ستاره (خوب)</option>
-                  <option value="3">۳ ستاره (متوسط)</option>
-                </select>
+                  <div class="flex items-center gap-1" dir="ltr">
+                    ${[1, 2, 3, 4, 5]
+                      .map(
+                        (starVal) => `
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked="${selectedRating === starVal ? 'true' : 'false'}"
+                        aria-label="${toPersianDigits(starVal)} ستاره"
+                        data-star-value="${starVal}"
+                        class="js-course-star-rating-btn text-[22px] leading-none transition-transform duration-150 focus:outline-none focus:ring-2 focus:ring-[#8B5A36] rounded px-0.5 cursor-pointer ${
+                          starVal <= selectedRating ? 'text-[#D48A29] scale-110' : 'text-[#CFC0AC]'
+                        }"
+                      >★</button>
+                    `
+                      )
+                      .join('')}
+                  </div>
+                  <span class="js-course-star-rating-label text-[12px] font-semibold text-[#5C4738]">
+                    ${getStarRatingLabel(selectedRating)}
+                  </span>
+                </div>
               </div>
             </div>
             <div>
@@ -428,12 +479,62 @@ export function createCourseDetailPage(
     props.onRegisterCourse(currentCourse);
   });
 
+  $wrapper.on('mouseenter', '.js-course-star-rating-btn', function () {
+    const hoverVal = Number($(this).data('star-value'));
+    if (hoverVal >= 1 && hoverVal <= 5) {
+      updateStarsVisual(hoverVal);
+    }
+  });
+
+  $wrapper.on('mouseleave', '.js-course-star-rating-group', function () {
+    updateStarsVisual(selectedRating);
+  });
+
+  $wrapper.on('click', '.js-course-star-rating-btn', function () {
+    const val = Number($(this).data('star-value'));
+    if (val >= 1 && val <= 5) {
+      selectedRating = val;
+      commentErrorMsg = '';
+      $wrapper.find('input[name="rating"]').val(String(selectedRating));
+      updateStarsVisual(selectedRating);
+    }
+  });
+
+  $wrapper.on('keydown', '.js-course-star-rating-btn', function (e) {
+    const currentVal = Number($(this).data('star-value')) || selectedRating || 1;
+    let nextVal = currentVal;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      nextVal = Math.min(5, currentVal + 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      nextVal = Math.max(1, currentVal - 1);
+    } else if (['1', '2', '3', '4', '5'].includes(e.key)) {
+      e.preventDefault();
+      nextVal = Number(e.key);
+    } else if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      nextVal = currentVal;
+    } else {
+      return;
+    }
+    selectedRating = nextVal;
+    commentErrorMsg = '';
+    $wrapper.find('input[name="rating"]').val(String(selectedRating));
+    updateStarsVisual(selectedRating);
+    $wrapper
+      .find(`.js-course-star-rating-btn[data-star-value="${nextVal}"]`)
+      .trigger('focus');
+  });
+
   $wrapper.on('click', '.js-switch-course-detail', function () {
     const id = Number($(this).data('switch-course'));
     const nextCourse = (props.allCourses || []).find((c) => c.id === id);
     if (nextCourse) {
       currentCourse = { ...nextCourse, comments: [...(nextCourse.comments || [])] };
       commentSubmittedMsg = '';
+      commentErrorMsg = '';
+      selectedRating = 0;
       if (props.onSelectOtherCourse) {
         props.onSelectOtherCourse(nextCourse);
       }
@@ -446,10 +547,18 @@ export function createCourseDetailPage(
     e.preventDefault();
     const $f = $(this);
     const authorName = String($f.find('[name="author_name"]').val() || '').trim();
-    const rating = Number($f.find('[name="rating"]').val() || 5);
+    const rating = Number(selectedRating || $f.find('[name="rating"]').val() || 0);
     const commentText = String($f.find('[name="comment_text"]').val() || '').trim();
     if (!authorName || !commentText) return;
 
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      commentErrorMsg = 'لطفاً امتیاز خود را بین ۱ تا ۵ ستاره انتخاب نمایید.';
+      commentSubmittedMsg = '';
+      render();
+      return;
+    }
+
+    commentErrorMsg = '';
     ApiService.submitPublicComment({
       author_name: authorName,
       target_title: currentCourse.title,
@@ -458,21 +567,13 @@ export function createCourseDetailPage(
       comment_text: commentText,
     })
       .then(() => {
-        const newComment: CourseAudienceComment = {
-          id: Date.now(),
-          authorName,
-          authorRole: 'متقاضی و مخاطب دوره',
-          createdDate: 'هم‌اکنون',
-          rating,
-          commentText,
-        };
-        currentCourse.comments = [newComment, ...currentCourse.comments];
+        selectedRating = 0;
         commentSubmittedMsg =
           'دیدگاه شما با موفقیت در دیتابیس ثبت شد و پس از تایید مدیریت نمایش داده می‌شود.';
         render();
       })
-      .catch(() => {
-        commentSubmittedMsg = 'دیدگاه شما ثبت شد.';
+      .catch((err: unknown) => {
+        commentErrorMsg = err instanceof Error ? err.message : 'خطا در ثبت دیدگاه.';
         render();
       });
   });

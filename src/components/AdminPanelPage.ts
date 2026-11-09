@@ -12,6 +12,8 @@ import type {
   EnrollmentRecord,
   GalleryImage,
   HeroSettings,
+  LibraryBook,
+  LibraryCategory,
   MemberClassItem,
   MemberSession,
   MemberTicket,
@@ -32,6 +34,7 @@ import { normalizeArticleHtml, sanitizeRichHtml } from '../utils/sanitizeHtml.ts
 export type AdminTabKey =
   | 'dashboard'
   | 'gallery'
+  | 'library'
   | 'sessions'
   | 'classes'
   | 'users'
@@ -58,6 +61,8 @@ export interface AdminPanelPageProps {
     blogPosts?: BlogPost[];
     sessions?: MemberSession[];
     classes?: MemberClassItem[];
+    libraryBooks?: LibraryBook[];
+    libraryCategories?: LibraryCategory[];
   }) => void;
 }
 
@@ -319,6 +324,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     aboutManager: { ...props.initialData.aboutManager },
     contactInfo: { ...props.initialData.contactInfo },
     libraryBooks: [...(props.initialData.libraryBooks || [])],
+    libraryCategories: [...(props.initialData.libraryCategories || [])],
   };
 
   let activeTab: AdminTabKey = props.initialTab || 'dashboard';
@@ -327,8 +333,17 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   let gallerySearch = '';
   let galleryCategoryFilter = 'all';
   let newGalleryImageUrl = '';
-  let galleryPickerTarget: null | 'session' | 'class' | 'blog' | 'blog_inline' = null;
+  let galleryPickerTarget: null | 'session' | 'class' | 'blog' | 'blog_inline' | 'library' = null;
   let blogInlineImageSize: 'full' | 'lg' | 'md' | 'sm' = 'lg';
+
+  // Library management state
+  let librarySearch = '';
+  let libraryCategoryFilter = 'all';
+  let editingLibraryBook: Partial<LibraryBook> | null = null;
+  let viewingLibraryBook: LibraryBook | null = null;
+  let editingLibraryTagsList: string[] = [];
+  let isLibraryCategoryModalOpen = false;
+  let editingLibraryCategoryItem: LibraryCategory | null = null;
 
   // Universal action confirmation modal state (used for Delete, Approve Enrollment, Cancel Enrollment)
   let pendingDeleteConfirm: {
@@ -665,6 +680,24 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         ),
         excerpt: String($blogForm.find('[name="excerpt"]').val() || ''),
         full_content: currentRichHtml,
+      };
+    }
+
+    const $libForm = $wrapper.find('.js-admin-library-book-form');
+    if (editingLibraryBook && $libForm.length) {
+      editingLibraryBook = {
+        ...editingLibraryBook,
+        title: String($libForm.find('[name="title"]').val() || ''),
+        short_description: String($libForm.find('[name="short_description"]').val() || ''),
+        description: String($libForm.find('[name="description"]').val() || ''),
+        memorable_quote: String($libForm.find('[name="memorable_quote"]').val() || ''),
+        recommended_for: String($libForm.find('[name="recommended_for"]').val() || ''),
+        category: String($libForm.find('[name="category"]').val() || ''),
+        cover_url: String(
+          $libForm.find('[name="cover_url"]').val() || editingLibraryBook.cover_url || ''
+        ),
+        notes: String($libForm.find('[name="notes"]').val() || ''),
+        tags: editingLibraryTagsList.join('، '),
       };
     }
   }
@@ -1166,6 +1199,259 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       `;
     }
 
+    if (isLibraryCategoryModalOpen) {
+      const catList = state.libraryCategories || [];
+      html += `
+        <div class="js-admin-lib-cat-backdrop fixed inset-0 z-50 bg-[#1B120C]/65 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div class="w-full max-w-[540px] max-h-[85vh] rounded-2xl bg-[#FAF5EC] border-2 border-[#DEC8AC] shadow-[0_24px_60px_rgba(27,18,12,0.35)] flex flex-col overflow-hidden">
+            <div class="px-6 py-4 border-b border-[#E5D7C5] flex items-center justify-between gap-3">
+              <div>
+                <h3 class="font-display text-[17.5px] font-bold text-[#231912]">مدیریت دسته‌بندی‌ها</h3>
+                <p class="text-[11.5px] text-[#6B5444] mt-0.5">ایجاد، ویرایش و حذف دسته‌بندی‌های کتابخانه در دیتابیس MySQL</p>
+              </div>
+              <button
+                type="button"
+                class="js-admin-close-lib-cat-modal px-2.5 py-1 rounded-lg text-[#4E3B2D] hover:bg-[#EFE3D2] text-[13px] font-semibold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto space-y-5">
+              <form class="js-admin-lib-cat-form space-y-3">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D]">
+                  ${editingLibraryCategoryItem ? `ویرایش نام دسته‌بندی «${toPersianDigits(editingLibraryCategoryItem.name)}»` : 'افزودن دسته‌بندی جدید'}
+                </label>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    name="library_category_name"
+                    required
+                    value="${editingLibraryCategoryItem ? toPersianDigits(editingLibraryCategoryItem.name) : ''}"
+                    placeholder="نام دسته‌بندی را وارد نمایید..."
+                    class="flex-1 px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                  />
+                  ${
+                    editingLibraryCategoryItem
+                      ? `
+                    <button
+                      type="button"
+                      class="js-admin-cancel-edit-lib-cat px-3.5 py-2.5 rounded-xl border border-[#C5B198] text-[#4E3B2D] hover:bg-[#EFE3D2] text-[12px] font-semibold cursor-pointer shrink-0"
+                    >
+                      انصراف
+                    </button>
+                  `
+                      : ''
+                  }
+                  <button
+                    type="submit"
+                    class="px-4 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer shrink-0"
+                  >
+                    ${editingLibraryCategoryItem ? 'ذخیره ویرایش' : '+ ایجاد دسته‌بندی'}
+                  </button>
+                </div>
+              </form>
+
+              <div class="space-y-2.5">
+                <span class="block text-[12px] font-semibold text-[#4E3B2D]">
+                  لیست دسته‌بندی‌های ثبت‌شده (${toPersianDigits(catList.length)} مورد):
+                </span>
+                ${
+                  catList.length === 0
+                    ? `
+                  <div class="p-5 rounded-xl bg-[#F4E9DA]/50 border border-dashed border-[#D8C4AA] text-center text-[12.5px] text-[#6B5444]">
+                    هنوز دسته‌بندی‌ای در دیتابیس ثبت نشده است.
+                  </div>
+                `
+                    : `
+                  <div class="space-y-2">
+                    ${catList
+                      .map((cat) => {
+                        const usedCount = state.libraryBooks.filter(
+                          (b) => (b.category || '').trim() === cat.name.trim()
+                        ).length;
+                        return `
+                          <div class="p-3 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] flex items-center justify-between gap-3">
+                            <div class="min-w-0 flex items-center gap-2 flex-wrap">
+                              <strong class="text-[13px] font-bold text-[#231912]">${toPersianDigits(cat.name)}</strong>
+                              <span class="px-2 py-0.5 rounded-md bg-[#EFE3D2] text-[#6B5444] text-[11px]">
+                                ${toPersianDigits(usedCount)} کتاب
+                              </span>
+                            </div>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                data-edit-lib-cat="${cat.id}"
+                                class="js-admin-edit-lib-cat px-3 py-1.5 rounded-lg bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] text-[11.5px] font-semibold cursor-pointer"
+                              >
+                                ویرایش
+                              </button>
+                              <button
+                                type="button"
+                                data-delete-lib-cat="${cat.id}"
+                                class="js-admin-delete-lib-cat px-3 py-1.5 rounded-lg border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[11.5px] font-semibold cursor-pointer"
+                              >
+                                حذف
+                              </button>
+                            </div>
+                          </div>
+                        `;
+                      })
+                      .join('')}
+                  </div>
+                `
+                }
+              </div>
+            </div>
+
+            <div class="px-6 py-3.5 border-t border-[#E5D7C5] flex justify-end">
+              <button
+                type="button"
+                class="js-admin-close-lib-cat-modal px-4 py-2 rounded-xl border border-[#C5B198] text-[#4E3B2D] hover:bg-[#EFE3D2] text-[12.5px] font-semibold cursor-pointer"
+              >
+                بستن پنجره
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (viewingLibraryBook) {
+      const b = viewingLibraryBook;
+      const bTags = String(b.tags || '')
+        .split(/[،,]/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+      html += `
+        <div class="js-admin-view-lib-book-backdrop fixed inset-0 z-50 bg-[#1B120C]/65 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div class="w-full max-w-[740px] max-h-[88vh] rounded-2xl bg-[#FAF5EC] border-2 border-[#DEC8AC] shadow-[0_24px_60px_rgba(27,18,12,0.35)] flex flex-col overflow-hidden">
+            <div class="px-6 py-4 border-b border-[#E5D7C5] flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <h3 class="font-display text-[18px] font-bold text-[#231912] truncate">
+                  جزئیات کتاب · ${toPersianDigits(b.title)}
+                </h3>
+                ${
+                  b.category
+                    ? `<span class="inline-block mt-1 px-2.5 py-0.5 rounded-md bg-[#EFE3D2] text-[#5A3A22] text-[11px] font-semibold">${toPersianDigits(b.category)}</span>`
+                    : ''
+                }
+              </div>
+              <button
+                type="button"
+                class="js-admin-close-view-lib-book px-3 py-1.5 rounded-xl text-[#4E3B2D] hover:bg-[#EFE3D2] text-[13px] font-semibold cursor-pointer shrink-0"
+              >
+                بستن ✕
+              </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto space-y-5">
+              <div class="flex flex-col sm:flex-row items-start gap-5">
+                ${
+                  b.cover_url
+                    ? `<img src="${b.cover_url}" alt="${b.title}" class="w-32 h-44 object-cover rounded-xl border border-[#D8C4AA] shrink-0" />`
+                    : `<div class="w-32 h-44 rounded-xl bg-[#EFE3D2] border border-[#D8C4AA] flex items-center justify-center text-[12px] text-[#6B5444] shrink-0">بدون تصویر کاور</div>`
+                }
+                <div class="flex-1 min-w-0 space-y-3">
+                  <div>
+                    <span class="text-[11.5px] font-semibold text-[#7A6352] block">عنوان کتاب:</span>
+                    <div class="font-display text-[18px] font-bold text-[#231912] mt-0.5">${toPersianDigits(b.title)}</div>
+                  </div>
+                  ${
+                    b.short_description
+                      ? `
+                    <div>
+                      <span class="text-[11.5px] font-semibold text-[#7A6352] block">خلاصه کتاب:</span>
+                      <p class="text-[13px] text-[#3F2E21] leading-[1.85] mt-1 whitespace-pre-line">${toPersianDigits(b.short_description)}</p>
+                    </div>
+                  `
+                      : ''
+                  }
+                  ${
+                    bTags.length > 0
+                      ? `
+                    <div>
+                      <span class="text-[11.5px] font-semibold text-[#7A6352] block mb-1.5">برچسب‌ها:</span>
+                      <div class="flex flex-wrap gap-1.5">
+                        ${bTags
+                          .map(
+                            (tag) =>
+                              `<span class="px-2.5 py-1 rounded-lg bg-[#F3E7D6] border border-[#D8C4AA] text-[#4E3B2D] text-[11.5px] font-semibold">#${toPersianDigits(tag)}</span>`
+                          )
+                          .join('')}
+                      </div>
+                    </div>
+                  `
+                      : ''
+                  }
+                </div>
+              </div>
+
+              ${
+                b.description
+                  ? `
+                <div class="p-4 rounded-xl bg-[#F4E9DA]/60 border border-[#E5D7C5]">
+                  <h4 class="font-bold text-[13.5px] text-[#231912] mb-1.5">توضیحات</h4>
+                  <p class="text-[13px] text-[#3F2E21] leading-[1.9] whitespace-pre-line">${toPersianDigits(b.description)}</p>
+                </div>
+              `
+                  : ''
+              }
+
+              ${
+                b.memorable_quote
+                  ? `
+                <div class="p-4 rounded-xl bg-[#EFE3D2]/80 border-r-4 border-[#7A4B2A]">
+                  <h4 class="font-bold text-[13px] text-[#7A4B2A] mb-1">جمله‌ای که به یادگار ماند</h4>
+                  <blockquote class="text-[13.5px] italic text-[#231912] leading-[1.9] whitespace-pre-line">«${toPersianDigits(b.memorable_quote)}»</blockquote>
+                </div>
+              `
+                  : ''
+              }
+
+              ${
+                b.recommended_for
+                  ? `
+                <div class="p-4 rounded-xl bg-[#F4E9DA]/60 border border-[#E5D7C5]">
+                  <h4 class="font-bold text-[13.5px] text-[#231912] mb-1.5">به چه کسانی توصیه می‌شود</h4>
+                  <p class="text-[13px] text-[#3F2E21] leading-[1.9] whitespace-pre-line">${toPersianDigits(b.recommended_for)}</p>
+                </div>
+              `
+                  : ''
+              }
+
+              ${
+                b.notes
+                  ? `
+                <div class="p-4 rounded-xl bg-[#F4E9DA]/60 border border-[#E5D7C5]">
+                  <h4 class="font-bold text-[13.5px] text-[#231912] mb-1.5">نکات و یادداشت‌ها</h4>
+                  <p class="text-[13px] text-[#3F2E21] leading-[1.9] whitespace-pre-line">${toPersianDigits(b.notes)}</p>
+                </div>
+              `
+                  : ''
+              }
+            </div>
+
+            <div class="px-6 py-3.5 border-t border-[#E5D7C5] flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                data-edit-lib-book="${b.id}"
+                class="js-admin-edit-lib-book px-4 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer"
+              >
+                ویرایش این کتاب
+              </button>
+              <button
+                type="button"
+                class="js-admin-close-view-lib-book px-4 py-2 rounded-xl border border-[#C5B198] text-[#4E3B2D] hover:bg-[#EFE3D2] text-[12.5px] font-semibold cursor-pointer"
+              >
+                بستن
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     return html;
   }
 
@@ -1410,6 +1696,440 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             )
             .join('')}
         </div>
+      </div>
+    `;
+  }
+
+  // ==================== 1.8 LIBRARY MANAGEMENT TAB ====================
+  function getAvailableLibraryCategoryNames(): string[] {
+    const fromTable = (state.libraryCategories || [])
+      .map((c) => String(c.name || '').trim())
+      .filter(Boolean);
+    const fromBooks = (state.libraryBooks || [])
+      .map((b) => String(b.category || '').trim())
+      .filter(Boolean);
+    return Array.from(new Set([...fromTable, ...fromBooks]));
+  }
+
+  function renderLibraryTab(): string {
+    const q = librarySearch.trim().toLowerCase();
+    const availableCategories = getAvailableLibraryCategoryNames();
+
+    const filteredBooks = state.libraryBooks.filter((b) => {
+      if (
+        libraryCategoryFilter !== 'all' &&
+        String(b.category || '').trim() !== libraryCategoryFilter
+      ) {
+        return false;
+      }
+      if (!q) return true;
+      const haystack = `${b.title || ''} ${b.short_description || ''} ${b.description || ''} ${
+        b.category || ''
+      } ${b.tags || ''} ${b.memorable_quote || ''} ${b.recommended_for || ''} ${
+        b.notes || ''
+      }`.toLowerCase();
+      return haystack.includes(q);
+    });
+
+    return `
+      <div class="space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">مدیریت کتابخانه باشگاه</h2>
+            <p class="text-[13.5px] text-[#6B5444] mt-1">
+              ثبت، مشاهده، ویرایش و حذف کتاب‌های کتابخانه باشگاه به همراه مدیریت دسته‌بندی‌ها و برچسب‌ها در دیتابیس MySQL.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              class="js-admin-open-lib-cat-modal px-4 py-2.5 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] text-[12.5px] font-semibold transition-colors cursor-pointer"
+            >
+              مدیریت دسته‌بندی‌ها
+            </button>
+            <button
+              type="button"
+              class="js-admin-new-lib-book-btn px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer"
+            >
+              + افزودن کتاب جدید
+            </button>
+          </div>
+        </div>
+
+        ${
+          editingLibraryBook
+            ? `
+          <form class="js-admin-library-book-form p-6 rounded-2xl bg-[#FAF5EC] border-2 border-[#C8AF8F] space-y-5" novalidate>
+            <div class="flex items-center justify-between pb-3 border-b border-[#E5D7C5]">
+              <h3 class="font-display text-[17.5px] font-bold text-[#231912]">
+                ${editingLibraryBook.id ? 'ویرایش اطلاعات کتاب' : 'ثبت کتاب جدید در کتابخانه'}
+              </h3>
+              <button
+                type="button"
+                class="js-admin-cancel-lib-book text-[12.5px] font-semibold text-[#6B5444] hover:text-[#231912] cursor-pointer"
+              >
+                انصراف ✕
+              </button>
+            </div>
+
+            <input type="hidden" name="id" value="${editingLibraryBook.id || ''}" />
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">عنوان کتاب *</label>
+                <input
+                  type="text"
+                  name="title"
+                  required
+                  value="${toPersianDigits(editingLibraryBook.title || '')}"
+                  placeholder="عنوان کتاب را وارد نمایید..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                />
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-[12px] font-semibold text-[#4E3B2D]">دسته‌بندی</label>
+                  <button
+                    type="button"
+                    class="js-admin-open-lib-cat-modal text-[11px] font-semibold text-[#7A4B2A] hover:text-[#231912] cursor-pointer"
+                  >
+                    + مدیریت دسته‌بندی‌ها
+                  </button>
+                </div>
+                <select
+                  name="category"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                >
+                  <option value="" ${!editingLibraryBook.category ? 'selected' : ''}>انتخاب دسته‌بندی...</option>
+                  ${availableCategories
+                    .map(
+                      (cat) =>
+                        `<option value="${cat}" ${
+                          editingLibraryBook?.category === cat ? 'selected' : ''
+                        }>${toPersianDigits(cat)}</option>`
+                    )
+                    .join('')}
+                </select>
+              </div>
+
+              <!-- Cover Image Upload & Gallery Picker -->
+              <div class="sm:col-span-2">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">تصویر کاور جلد کتاب</label>
+                <input type="hidden" name="cover_url" value="${editingLibraryBook.cover_url || ''}" />
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9]">
+                  <div class="flex items-center gap-3 min-w-0">
+                    ${
+                      editingLibraryBook.cover_url
+                        ? `<img src="${editingLibraryBook.cover_url}" alt="کاور کتاب" class="w-16 h-22 rounded-lg object-cover border border-[#D5C3AE] shrink-0" />`
+                        : `<div class="w-16 h-22 rounded-lg bg-[#EFE3D2] border border-dashed border-[#C5B198] flex items-center justify-center text-[11px] text-[#6B5444] shrink-0 px-1 text-center">بدون تصویر</div>`
+                    }
+                    <div class="min-w-0">
+                      <div class="text-[12.5px] font-semibold text-[#231912]">
+                        ${editingLibraryBook.cover_url ? 'تصویر کاور انتخاب شده است' : 'تصویری انتخاب نشده است'}
+                      </div>
+                      <p class="text-[11px] text-[#6B5444] mt-0.5">
+                        می‌توانید تصویر جلد کتاب را مستقیماً از سیستم خود بارگذاری کنید یا از گالری تصاویر انتخاب نمایید.
+                      </p>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2 shrink-0">
+                    <input type="file" accept="image/*" class="js-admin-lib-cover-file-input hidden" />
+                    <button
+                      type="button"
+                      class="js-admin-trigger-lib-cover-upload px-3.5 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] text-[12px] font-semibold cursor-pointer"
+                    >
+                      آپلود تصویر کاور
+                    </button>
+                    <button
+                      type="button"
+                      data-gallery-target="library"
+                      class="js-admin-open-gallery-picker px-3.5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold cursor-pointer"
+                    >
+                      انتخاب از گالری تصاویر
+                    </button>
+                    ${
+                      editingLibraryBook.cover_url
+                        ? `
+                      <button
+                        type="button"
+                        class="js-admin-clear-lib-cover px-3 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[11.5px] font-semibold cursor-pointer"
+                      >
+                        حذف تصویر
+                      </button>
+                    `
+                        : ''
+                    }
+                  </div>
+                </div>
+              </div>
+
+              <!-- Multi-Tag Management -->
+              <div class="sm:col-span-2">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">برچسب‌ها</label>
+                <div class="p-3.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] space-y-3">
+                  <div class="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="برچسب را بنویسید و دکمه «افزودن برچسب» یا کلید Enter را بزنید..."
+                      class="js-admin-lib-tag-input flex-1 px-3.5 py-2 rounded-xl bg-[#FAF5EC] border border-[#DFCEB9] text-[12.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                    />
+                    <button
+                      type="button"
+                      class="js-admin-add-lib-tag-btn px-4 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold cursor-pointer shrink-0"
+                    >
+                      + افزودن برچسب
+                    </button>
+                  </div>
+                  ${
+                    editingLibraryTagsList.length > 0
+                      ? `
+                    <div class="flex flex-wrap items-center gap-2">
+                      ${editingLibraryTagsList
+                        .map(
+                          (tag, idx) => `
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FAF5EC] border border-[#D8C4AA] text-[12px] font-semibold text-[#3F2E21]">
+                          <span>#${toPersianDigits(tag)}</span>
+                          <button
+                            type="button"
+                            data-edit-tag-idx="${idx}"
+                            title="ویرایش برچسب"
+                            class="js-admin-edit-lib-tag text-[#7A4B2A] hover:text-[#231912] text-[11px] px-1 cursor-pointer"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            type="button"
+                            data-remove-tag-idx="${idx}"
+                            title="حذف برچسب"
+                            class="js-admin-remove-lib-tag text-[#9E3329] hover:text-[#6E1B14] text-[12px] font-bold px-0.5 cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      `
+                        )
+                        .join('')}
+                    </div>
+                  `
+                      : `<p class="text-[11.5px] text-[#6B5444]">هنوز برچسبی برای این کتاب ثبت نشده است.</p>`
+                  }
+                </div>
+              </div>
+
+              <!-- خلاصه کتاب -->
+              <div class="sm:col-span-2">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">خلاصه کتاب</label>
+                <textarea
+                  name="short_description"
+                  rows="3"
+                  placeholder="خلاصه کتاب را وارد نمایید..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                >${toPersianDigits(editingLibraryBook.short_description || '')}</textarea>
+              </div>
+
+              <!-- توضیحات -->
+              <div class="sm:col-span-2">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">توضیحات</label>
+                <textarea
+                  name="description"
+                  rows="4"
+                  placeholder="توضیحات تکمیلی و معرفی کامل کتاب را وارد نمایید..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                >${toPersianDigits(editingLibraryBook.description || '')}</textarea>
+              </div>
+
+              <!-- جمله‌ای که به یادگار ماند -->
+              <div class="sm:col-span-2">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">جمله‌ای که به یادگار ماند</label>
+                <textarea
+                  name="memorable_quote"
+                  rows="2"
+                  placeholder="برشی ماندگار یا جمله‌ای به یادگار مانده از متن کتاب..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                >${toPersianDigits(editingLibraryBook.memorable_quote || '')}</textarea>
+              </div>
+
+              <!-- به چه کسانی توصیه می‌شود -->
+              <div class="sm:col-span-2">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">به چه کسانی توصیه می‌شود</label>
+                <textarea
+                  name="recommended_for"
+                  rows="2"
+                  placeholder="مطالعه این کتاب به چه مخاطبانی توصیه می‌شود..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                >${toPersianDigits(editingLibraryBook.recommended_for || '')}</textarea>
+              </div>
+
+              <!-- نکات و یادداشت‌ها -->
+              <div class="sm:col-span-2">
+                <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">نکات و یادداشت‌ها</label>
+                <textarea
+                  name="notes"
+                  rows="3"
+                  placeholder="نکات، محورهای تحلیلی و یادداشت‌های مربوط به کتاب..."
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                >${toPersianDigits(editingLibraryBook.notes || '')}</textarea>
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-2.5 pt-2 border-t border-[#E5D7C5]">
+              <button
+                type="button"
+                class="js-admin-cancel-lib-book px-4 py-2.5 rounded-xl border border-[#C5B198] text-[12.5px] font-semibold text-[#4E3B2D] hover:bg-[#EFE3D2] cursor-pointer"
+              >
+                انصراف
+              </button>
+              <button
+                type="submit"
+                class="px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold cursor-pointer"
+              >
+                ${editingLibraryBook.id ? 'بروزرسانی کتاب در دیتابیس' : 'ذخیره کتاب در دیتابیس'}
+              </button>
+            </div>
+          </form>
+        `
+            : ''
+        }
+
+        <!-- Search and Category Filter Bar -->
+        <div class="p-4 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <input
+            type="text"
+            value="${toPersianDigits(librarySearch)}"
+            placeholder="جستجو در عنوان کتاب، خلاصه، توضیحات، دسته‌بندی یا برچسب‌ها..."
+            class="js-admin-lib-search flex-1 px-4 py-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+          />
+          <div class="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              data-lib-cat-filter="all"
+              class="js-admin-lib-cat-filter px-3.5 py-2 rounded-xl text-[12px] font-semibold cursor-pointer transition-colors ${
+                libraryCategoryFilter === 'all'
+                  ? 'bg-[#5A3A22] text-[#FAF5EC]'
+                  : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#E8D8C3]'
+              }"
+            >
+              همه کتاب‌ها (${toPersianDigits(state.libraryBooks.length)})
+            </button>
+            ${availableCategories
+              .map(
+                (cat) => `
+              <button
+                type="button"
+                data-lib-cat-filter="${cat}"
+                class="js-admin-lib-cat-filter px-3.5 py-2 rounded-xl text-[12px] font-semibold cursor-pointer transition-colors ${
+                  libraryCategoryFilter === cat
+                    ? 'bg-[#5A3A22] text-[#FAF5EC]'
+                    : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#E8D8C3]'
+                }"
+              >
+                ${toPersianDigits(cat)}
+              </button>
+            `
+              )
+              .join('')}
+          </div>
+        </div>
+
+        <!-- Books Grid -->
+        ${
+          filteredBooks.length === 0
+            ? `
+          <div class="p-10 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] text-center space-y-2">
+            <div class="font-display text-[17px] font-bold text-[#231912]">کتابی در این بخش یافت نشد</div>
+            <p class="text-[13px] text-[#6B5444]">
+              برای افزودن کتاب جدید به کتابخانه روی دکمه «+ افزودن کتاب جدید» کلیک کنید.
+            </p>
+          </div>
+        `
+            : `
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            ${filteredBooks
+              .map((book) => {
+                const bookTags = String(book.tags || '')
+                  .split(/[،,]/)
+                  .map((t) => t.trim())
+                  .filter(Boolean);
+                return `
+                  <article class="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col justify-between gap-4">
+                    <div class="flex items-start gap-4">
+                      ${
+                        book.cover_url
+                          ? `<img src="${book.cover_url}" alt="${book.title}" class="w-20 h-28 rounded-xl object-cover border border-[#D8C4AA] shrink-0" />`
+                          : `<div class="w-20 h-28 rounded-xl bg-[#EFE3D2] border border-[#D8C4AA] flex items-center justify-center text-[11px] text-[#6B5444] shrink-0 text-center px-1">بدون کاور</div>`
+                      }
+                      <div class="flex-1 min-w-0 space-y-2">
+                        <div class="flex items-start justify-between gap-2">
+                          <h3 class="font-display text-[17px] font-bold text-[#231912] truncate">
+                            ${toPersianDigits(book.title)}
+                          </h3>
+                          ${
+                            book.category
+                              ? `<span class="px-2.5 py-0.5 rounded-md bg-[#EFE3D2] text-[#5A3A22] text-[11px] font-semibold shrink-0">${toPersianDigits(book.category)}</span>`
+                              : ''
+                          }
+                        </div>
+                        ${
+                          book.short_description
+                            ? `<p class="text-[12.5px] text-[#5B4739] line-clamp-2 leading-[1.75]">${toPersianDigits(book.short_description)}</p>`
+                            : `<p class="text-[12px] text-[#8B735E] italic">خلاصه‌ای ثبت نشده است</p>`
+                        }
+                        ${
+                          bookTags.length > 0
+                            ? `
+                          <div class="flex flex-wrap gap-1.5 pt-1">
+                            ${bookTags
+                              .slice(0, 4)
+                              .map(
+                                (tag) =>
+                                  `<span class="px-2 py-0.5 rounded-md bg-[#F4E9DA] border border-[#DFCEB9] text-[#4E3B2D] text-[10.5px] font-semibold">#${toPersianDigits(tag)}</span>`
+                              )
+                              .join('')}
+                            ${
+                              bookTags.length > 4
+                                ? `<span class="text-[10.5px] text-[#6B5444]">+${toPersianDigits(bookTags.length - 4)}</span>`
+                                : ''
+                            }
+                          </div>
+                        `
+                            : ''
+                        }
+                      </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-[#E6D8C5] flex flex-wrap items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        data-view-lib-book="${book.id}"
+                        class="js-admin-view-lib-book px-3.5 py-1.5 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] text-[12px] font-semibold cursor-pointer"
+                      >
+                        مشاهده جزئیات
+                      </button>
+                      <div class="flex items-center gap-2">
+                        <button
+                          type="button"
+                          data-edit-lib-book="${book.id}"
+                          class="js-admin-edit-lib-book px-3.5 py-1.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold cursor-pointer"
+                        >
+                          ویرایش
+                        </button>
+                        <button
+                          type="button"
+                          data-delete-lib-book="${book.id}"
+                          class="js-admin-delete-lib-book px-3.5 py-1.5 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold cursor-pointer"
+                        >
+                          حذف
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                `;
+              })
+              .join('')}
+          </div>
+        `
+        }
       </div>
     `;
   }
@@ -2835,22 +3555,32 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       return t.status === ticketFilter;
     });
 
+    const pendingCount = state.tickets.filter((t) => t.status === 'در انتظار بررسی').length;
+    const repliedCount = state.tickets.filter((t) => t.status === 'پاسخ داده‌شده').length;
+    const closedCount = state.tickets.filter((t) => t.status === 'بسته‌شده').length;
+
     return `
       <div class="space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">مدیریت تیکت‌ها و درخواست‌های اعضا</h2>
-            <p class="text-[13.5px] text-[#6B5444] mt-1">
-              کارت‌های خلاصه تیکت‌های ارسالی اعضا. برای مشاهده مکالمه کامل، ارسال پاسخ یا بستن تیکت روی دکمه «مشاهده جزئیات» کلیک کنید.
-            </p>
+        <div>
+          <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">مدیریت تیکت‌ها و درخواست‌های اعضا</h2>
+          <p class="text-[13.5px] text-[#6B5444] mt-1">
+            کارت‌های خلاصه تیکت‌های ارسالی اعضا. برای مشاهده مکالمه کامل، ارسال پاسخ یا بستن تیکت روی دکمه «مشاهده جزئیات» کلیک کنید.
+          </p>
+        </div>
+
+        <!-- Structured RTL Ticket Filter Bar -->
+        <div class="p-4 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-2 text-[12.5px] font-semibold text-[#4E3B2D]">
+            <span class="w-2 h-2 rounded-full bg-[#5A3A22]"></span>
+            <span>فیلتر بر اساس وضعیت تیکت:</span>
           </div>
           <div class="flex flex-wrap items-center gap-2">
             ${(
               [
-                { key: 'all', label: 'همه تیکت‌ها' },
-                { key: 'در انتظار بررسی', label: 'در انتظار بررسی' },
-                { key: 'پاسخ داده‌شده', label: 'پاسخ داده‌شده' },
-                { key: 'بسته‌شده', label: 'بسته‌شده' },
+                { key: 'all', label: 'همه تیکت‌ها', count: state.tickets.length },
+                { key: 'در انتظار بررسی', label: 'در انتظار بررسی', count: pendingCount },
+                { key: 'پاسخ داده‌شده', label: 'پاسخ داده‌شده', count: repliedCount },
+                { key: 'بسته‌شده', label: 'بسته‌شده', count: closedCount },
               ] as const
             )
               .map(
@@ -2858,13 +3588,18 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <button
                 type="button"
                 data-ticket-filter="${f.key}"
-                class="js-admin-ticket-filter px-3.5 py-2 rounded-xl text-[12px] font-semibold cursor-pointer ${
+                class="js-admin-ticket-filter px-3.5 py-2 rounded-xl text-[12px] font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                   ticketFilter === f.key
-                    ? 'bg-[#5A3A22] text-[#FAF5EC]'
-                    : 'bg-[#FAF5EC] border border-[#E5D7C5] text-[#4E3B2D]'
+                    ? 'bg-[#5A3A22] text-[#FAF5EC] shadow-xs'
+                    : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#E6D5BE]'
                 }"
               >
-                ${f.label}
+                <span>${f.label}</span>
+                <span class="px-1.5 py-0.5 rounded-md text-[10.5px] ${
+                  ticketFilter === f.key
+                    ? 'bg-[#FAF5EC]/20 text-[#FAF5EC]'
+                    : 'bg-[#E5D7C5] text-[#4E3B2D]'
+                }">${toPersianDigits(f.count)}</span>
               </button>
             `
               )
@@ -3985,6 +4720,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         return renderDashboardTab();
       case 'gallery':
         return renderGalleryTab();
+      case 'library':
+        return renderLibraryTab();
       case 'sessions':
         return renderSessionsTab();
       case 'classes':
@@ -4015,6 +4752,11 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         key: 'gallery',
         label: 'گالری تصاویر',
         badge: toPersianDigits(state.gallery.length),
+      },
+      {
+        key: 'library',
+        label: 'کتابخانه',
+        badge: toPersianDigits(state.libraryBooks.length),
       },
       {
         key: 'sessions',
@@ -4245,7 +4987,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       | 'session'
       | 'class'
       | 'blog'
-      | 'blog_inline';
+      | 'blog_inline'
+      | 'library';
     const sizeSelectVal = String($wrapper.find('.js-blog-inline-image-size').val() || '');
     if (sizeSelectVal === 'full' || sizeSelectVal === 'lg' || sizeSelectVal === 'md' || sizeSelectVal === 'sm') {
       blogInlineImageSize = sizeSelectVal;
@@ -4279,6 +5022,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       editingClass.cover_url = url;
     } else if (pickedTarget === 'blog' && editingBlogPost) {
       editingBlogPost.cover_url = url;
+    } else if (pickedTarget === 'library' && editingLibraryBook) {
+      editingLibraryBook.cover_url = url;
     } else if (pickedTarget === 'blog_inline' && editingBlogPost) {
       const imgHtml = `<p><img src="${url}" alt="تصویر مقاله" data-img-size="${blogInlineImageSize}" /></p>`;
       editingBlogPost.full_content = sanitizeRichHtml(
@@ -4291,6 +5036,381 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       pickedTarget === 'blog_inline'
         ? 'تصویر انتخاب‌شده به متن مقاله اضافه شد.'
         : 'تصویر کاور از گالری تصاویر انتخاب شد.'
+    );
+  });
+
+  // --- Library Management Tab & Categories Modal Handlers ---
+  $wrapper.on('input', '.js-admin-lib-search', function () {
+    librarySearch = String($(this).val() || '');
+    render();
+    const $input = $wrapper.find('.js-admin-lib-search');
+    $input.trigger('focus');
+    const len = String($input.val() || '').length;
+    const el = $input.get(0) as HTMLInputElement | undefined;
+    if (el && el.setSelectionRange) {
+      el.setSelectionRange(len, len);
+    }
+  });
+
+  $wrapper.on('click', '.js-admin-lib-cat-filter', function () {
+    libraryCategoryFilter = String($(this).data('lib-cat-filter') || 'all');
+    render();
+  });
+
+  $wrapper.on('click', '.js-admin-new-lib-book-btn', () => {
+    editingLibraryBook = {
+      title: '',
+      short_description: '',
+      description: '',
+      memorable_quote: '',
+      recommended_for: '',
+      category: '',
+      tags: '',
+      cover_url: '',
+      notes: '',
+    };
+    editingLibraryTagsList = [];
+    render();
+  });
+
+  $wrapper.on('click', '.js-admin-cancel-lib-book', () => {
+    editingLibraryBook = null;
+    editingLibraryTagsList = [];
+    render();
+  });
+
+  $wrapper.on('click', '.js-admin-view-lib-book', function () {
+    const id = Number($(this).data('view-lib-book'));
+    const found = state.libraryBooks.find((b) => Number(b.id) === id);
+    if (found) {
+      viewingLibraryBook = found;
+      render();
+    }
+  });
+
+  $wrapper.on('click', '.js-admin-close-view-lib-book', () => {
+    viewingLibraryBook = null;
+    render();
+  });
+
+  $wrapper.on('click', '.js-admin-view-lib-book-backdrop', function (e) {
+    if ($(e.target).hasClass('js-admin-view-lib-book-backdrop')) {
+      viewingLibraryBook = null;
+      render();
+    }
+  });
+
+  $wrapper.on('click', '.js-admin-edit-lib-book', function () {
+    const id = Number($(this).data('edit-lib-book'));
+    const found = state.libraryBooks.find((b) => Number(b.id) === id);
+    if (!found) return;
+    viewingLibraryBook = null;
+    editingLibraryBook = { ...found };
+    editingLibraryTagsList = String(found.tags || '')
+      .split(/[،,]/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  $wrapper.on('click', '.js-admin-trigger-lib-cover-upload', () => {
+    syncOpenFormsFromDom();
+    $wrapper.find('.js-admin-lib-cover-file-input').trigger('click');
+  });
+
+  $wrapper.on('change', '.js-admin-lib-cover-file-input', function (event) {
+    syncOpenFormsFromDom();
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !editingLibraryBook) return;
+    resizeImageToDataUrl(file, 640)
+      .then((dataUrl) => {
+        if (editingLibraryBook) {
+          editingLibraryBook.cover_url = dataUrl;
+          render();
+          showToast('تصویر کاور جلد کتاب بارگذاری شد.');
+        }
+      })
+      .catch((err) => showToast(err.message || 'خطا در بارگذاری تصویر کاور', true));
+  });
+
+  $wrapper.on('click', '.js-admin-clear-lib-cover', () => {
+    syncOpenFormsFromDom();
+    if (editingLibraryBook) {
+      editingLibraryBook.cover_url = '';
+      render();
+    }
+  });
+
+  function addLibraryTagsFromInput(): void {
+    syncOpenFormsFromDom();
+    const raw = String($wrapper.find('.js-admin-lib-tag-input').val() || '').trim();
+    if (!raw) return;
+    const parts = raw
+      .split(/[،,]/)
+      .map((t) => t.trim().replace(/^#+/, '').trim())
+      .filter(Boolean);
+    for (const part of parts) {
+      if (!editingLibraryTagsList.includes(part)) {
+        editingLibraryTagsList.push(part);
+      }
+    }
+    if (editingLibraryBook) {
+      editingLibraryBook.tags = editingLibraryTagsList.join('، ');
+    }
+    render();
+    $wrapper.find('.js-admin-lib-tag-input').trigger('focus');
+  }
+
+  $wrapper.on('click', '.js-admin-add-lib-tag-btn', () => {
+    addLibraryTagsFromInput();
+  });
+
+  $wrapper.on('keydown', '.js-admin-lib-tag-input', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addLibraryTagsFromInput();
+    }
+  });
+
+  $wrapper.on('click', '.js-admin-remove-lib-tag', function () {
+    syncOpenFormsFromDom();
+    const idx = Number($(this).data('remove-tag-idx'));
+    if (!Number.isNaN(idx) && idx >= 0 && idx < editingLibraryTagsList.length) {
+      editingLibraryTagsList.splice(idx, 1);
+      if (editingLibraryBook) {
+        editingLibraryBook.tags = editingLibraryTagsList.join('، ');
+      }
+      render();
+    }
+  });
+
+  $wrapper.on('click', '.js-admin-edit-lib-tag', function () {
+    syncOpenFormsFromDom();
+    const idx = Number($(this).data('edit-tag-idx'));
+    if (!Number.isNaN(idx) && idx >= 0 && idx < editingLibraryTagsList.length) {
+      const tagToEdit = editingLibraryTagsList[idx];
+      editingLibraryTagsList.splice(idx, 1);
+      if (editingLibraryBook) {
+        editingLibraryBook.tags = editingLibraryTagsList.join('، ');
+      }
+      render();
+      const $tagInput = $wrapper.find('.js-admin-lib-tag-input');
+      $tagInput.val(tagToEdit).trigger('focus');
+    }
+  });
+
+  $wrapper.on('submit', '.js-admin-library-book-form', function (e) {
+    e.preventDefault();
+    syncOpenFormsFromDom();
+    if (!editingLibraryBook) return;
+
+    const pendingTagInput = String(
+      $wrapper.find('.js-admin-lib-tag-input').val() || ''
+    ).trim();
+    if (pendingTagInput) {
+      const extraParts = pendingTagInput
+        .split(/[،,]/)
+        .map((t) => t.trim().replace(/^#+/, '').trim())
+        .filter(Boolean);
+      for (const part of extraParts) {
+        if (!editingLibraryTagsList.includes(part)) {
+          editingLibraryTagsList.push(part);
+        }
+      }
+    }
+
+    const title = String(editingLibraryBook.title || '').trim();
+    if (!title) {
+      showToast('لطفاً عنوان کتاب را وارد نمایید.', true);
+      return;
+    }
+
+    const payload: Partial<LibraryBook> & { id?: number } = {
+      id: editingLibraryBook.id ? Number(editingLibraryBook.id) : undefined,
+      title,
+      short_description: String(editingLibraryBook.short_description || '').trim(),
+      description: String(editingLibraryBook.description || '').trim(),
+      memorable_quote: String(editingLibraryBook.memorable_quote || '').trim(),
+      recommended_for: String(editingLibraryBook.recommended_for || '').trim(),
+      category: String(editingLibraryBook.category || '').trim(),
+      tags: editingLibraryTagsList.join('، '),
+      cover_url: String(editingLibraryBook.cover_url || '').trim(),
+      notes: String(editingLibraryBook.notes || '').trim(),
+    };
+
+    const isUpdating = Boolean(payload.id);
+
+    ApiService.saveAdminLibraryBook(payload)
+      .then((res) => {
+        if (isUpdating) {
+          state.libraryBooks = state.libraryBooks.map((b) =>
+            Number(b.id) === Number(res.book.id) ? res.book : b
+          );
+        } else {
+          state.libraryBooks = [res.book, ...state.libraryBooks];
+        }
+        editingLibraryBook = null;
+        editingLibraryTagsList = [];
+        props.onSiteDataUpdated({ libraryBooks: state.libraryBooks });
+        render();
+        showToast(
+          isUpdating
+            ? 'اطلاعات کتاب با موفقیت در دیتابیس بروزرسانی شد.'
+            : 'کتاب جدید با موفقیت در کتابخانه ثبت شد.'
+        );
+      })
+      .catch((err) => showToast(err.message || 'خطا در ذخیره اطلاعات کتاب', true));
+  });
+
+  $wrapper.on('click', '.js-admin-delete-lib-book', function () {
+    const id = Number($(this).data('delete-lib-book'));
+    const target = state.libraryBooks.find((b) => Number(b.id) === id);
+    if (!target) return;
+    askDeleteConfirmation(
+      'حذف کتاب از کتابخانه',
+      `آیا از حذف کتاب «${target.title}» از کتابخانه باشگاه اطمینان دارید؟`,
+      () => {
+        ApiService.deleteAdminLibraryBook(id)
+          .then(() => {
+            state.libraryBooks = state.libraryBooks.filter((b) => Number(b.id) !== id);
+            if (editingLibraryBook && Number(editingLibraryBook.id) === id) {
+              editingLibraryBook = null;
+              editingLibraryTagsList = [];
+            }
+            props.onSiteDataUpdated({ libraryBooks: state.libraryBooks });
+            render();
+            showToast('کتاب مورد نظر از کتابخانه حذف شد.');
+          })
+          .catch((err) => showToast(err.message || 'خطا در حذف کتاب', true));
+      }
+    );
+  });
+
+  // --- Library Categories Modal Handlers ---
+  $wrapper.on('click', '.js-admin-open-lib-cat-modal', () => {
+    syncOpenFormsFromDom();
+    editingLibraryCategoryItem = null;
+    isLibraryCategoryModalOpen = true;
+    render();
+  });
+
+  $wrapper.on('click', '.js-admin-close-lib-cat-modal', () => {
+    syncOpenFormsFromDom();
+    editingLibraryCategoryItem = null;
+    isLibraryCategoryModalOpen = false;
+    render();
+  });
+
+  $wrapper.on('click', '.js-admin-lib-cat-backdrop', function (e) {
+    if ($(e.target).hasClass('js-admin-lib-cat-backdrop')) {
+      syncOpenFormsFromDom();
+      editingLibraryCategoryItem = null;
+      isLibraryCategoryModalOpen = false;
+      render();
+    }
+  });
+
+  $wrapper.on('click', '.js-admin-edit-lib-cat', function () {
+    syncOpenFormsFromDom();
+    const id = Number($(this).data('edit-lib-cat'));
+    const found = (state.libraryCategories || []).find((c) => Number(c.id) === id);
+    if (found) {
+      editingLibraryCategoryItem = { ...found };
+      render();
+      $wrapper.find('[name="library_category_name"]').trigger('focus');
+    }
+  });
+
+  $wrapper.on('click', '.js-admin-cancel-edit-lib-cat', () => {
+    syncOpenFormsFromDom();
+    editingLibraryCategoryItem = null;
+    render();
+  });
+
+  $wrapper.on('submit', '.js-admin-lib-cat-form', function (e) {
+    e.preventDefault();
+    syncOpenFormsFromDom();
+    const name = String(
+      $(this).find('[name="library_category_name"]').val() || ''
+    ).trim();
+    if (!name) {
+      showToast('لطفاً نام دسته‌بندی را وارد نمایید.', true);
+      return;
+    }
+
+    if (editingLibraryCategoryItem) {
+      const oldName = editingLibraryCategoryItem.name;
+      ApiService.updateAdminLibraryCategory({
+        id: editingLibraryCategoryItem.id,
+        name,
+      })
+        .then((res) => {
+          state.libraryCategories = (state.libraryCategories || []).map((c) =>
+            Number(c.id) === Number(res.category.id) ? res.category : c
+          );
+          if (Array.isArray(res.libraryBooks)) {
+            state.libraryBooks = res.libraryBooks;
+          }
+          if (editingLibraryBook && editingLibraryBook.category === oldName) {
+            editingLibraryBook.category = res.category.name;
+          }
+          editingLibraryCategoryItem = null;
+          props.onSiteDataUpdated({
+            libraryBooks: state.libraryBooks,
+            libraryCategories: state.libraryCategories,
+          });
+          render();
+          showToast('دسته‌بندی با موفقیت ویرایش شد.');
+        })
+        .catch((err) => showToast(err.message || 'خطا در ویرایش دسته‌بندی', true));
+      return;
+    }
+
+    ApiService.createAdminLibraryCategory({ name })
+      .then((res) => {
+        state.libraryCategories = [...(state.libraryCategories || []), res.category];
+        if (editingLibraryBook && !editingLibraryBook.category) {
+          editingLibraryBook.category = res.category.name;
+        }
+        props.onSiteDataUpdated({
+          libraryCategories: state.libraryCategories,
+        });
+        render();
+        showToast('دسته‌بندی جدید با موفقیت ایجاد شد.');
+      })
+      .catch((err) => showToast(err.message || 'خطا در ایجاد دسته‌بندی', true));
+  });
+
+  $wrapper.on('click', '.js-admin-delete-lib-cat', function () {
+    syncOpenFormsFromDom();
+    const id = Number($(this).data('delete-lib-cat'));
+    const target = (state.libraryCategories || []).find((c) => Number(c.id) === id);
+    if (!target) return;
+    askDeleteConfirmation(
+      'حذف دسته‌بندی کتابخانه',
+      `آیا از حذف دسته‌بندی «${target.name}» اطمینان دارید؟`,
+      () => {
+        ApiService.deleteAdminLibraryCategory(id)
+          .then(() => {
+            state.libraryCategories = (state.libraryCategories || []).filter(
+              (c) => Number(c.id) !== id
+            );
+            if (
+              editingLibraryCategoryItem &&
+              Number(editingLibraryCategoryItem.id) === id
+            ) {
+              editingLibraryCategoryItem = null;
+            }
+            props.onSiteDataUpdated({
+              libraryCategories: state.libraryCategories,
+            });
+            render();
+            showToast('دسته‌بندی مورد نظر حذف شد.');
+          })
+          .catch((err) => showToast(err.message || 'خطا در حذف دسته‌بندی', true));
+      }
     );
   });
 

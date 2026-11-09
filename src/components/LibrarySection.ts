@@ -164,23 +164,28 @@ export const buildBookEventDetail = buildEventFromLibraryBook;
 export interface LibrarySectionCallbacks {
   onOpenEventDetail?: (eventItem: UpcomingEventCard) => void;
   onRegisterEvent?: (eventItem: UpcomingEventCard) => void;
+  onOpenBookDetail?: (book: LibraryBook) => void;
 }
 
 export function createLibrarySectionComponent(props: {
   libraryBooks: LibraryBook[];
+  libraryCategories?: Array<{ id: number; name: string }>;
   publicSessions?: MemberSession[];
   approvedComments?: UserComment[];
   onOpenEventDetail?: (eventItem: UpcomingEventCard) => void;
   onRegisterEvent?: (eventItem: UpcomingEventCard) => void;
+  onOpenBookDetail?: (book: LibraryBook) => void;
 }): JQuery {
   return createLibrarySection(
     props.libraryBooks,
     {
       onOpenEventDetail: props.onOpenEventDetail,
       onRegisterEvent: props.onRegisterEvent,
+      onOpenBookDetail: props.onOpenBookDetail,
     },
     props.publicSessions || [],
-    props.approvedComments || []
+    props.approvedComments || [],
+    props.libraryCategories || []
   );
 }
 
@@ -188,7 +193,8 @@ export function createLibrarySection(
   books: LibraryBook[],
   callbacks?: LibrarySectionCallbacks,
   activeSessions: MemberSession[] = [],
-  approvedComments: UserComment[] = []
+  approvedComments: UserComment[] = [],
+  libraryCategories: Array<{ id: number; name: string }> = []
 ): JQuery {
   const validActiveSessions = (activeSessions || []).filter(
     (s) => s.status !== 'غیرفعال' && s.status !== 'برگزارشده' && s.status !== 'برگزار شده'
@@ -198,15 +204,21 @@ export function createLibrarySection(
   );
 
   const primarySession = validActiveSessions[0];
-  const currentBookFromLibrary =
-    books.find((b) => Number(b.is_current) === 1) || books[0];
+  const currentBookFromLibrary = books.find((b) => Number(b.is_current) === 1) || null;
 
-  const archiveBooks = books.filter((b) =>
-    currentBookFromLibrary ? b.id !== currentBookFromLibrary.id : true
+  // All actual books stored in MySQL library_books table
+  const allLibraryBooks: LibraryBook[] = Array.isArray(books) ? books : [];
+
+  // Dynamic categories from MySQL library_categories and actual books
+  const categoryNames = Array.from(
+    new Set([
+      ...(libraryCategories || []).map((c) => String(c.name || '').trim()).filter(Boolean),
+      ...allLibraryBooks.map((b) => String(b.category || '').trim()).filter(Boolean),
+    ])
   );
 
   // Derive the "Current Reading Book" card from the primary active session if available,
-  // or fall back to an active library book if one exists.
+  // or fall back to an explicitly marked current library book if one exists.
   const currentBookDisplay = primarySession
     ? {
         title: primarySession.book_title || primarySession.title,
@@ -237,337 +249,382 @@ export function createLibrarySection(
 
   const $section = $(`
     <section
-      id="library"
-      aria-label="کتابخانه باشگاه و آثار منتخب"
+      aria-label="رویدادها و کتابخانه باشگاه"
       class="relative w-full bg-[#F6EFE4] text-[#221811] py-20 sm:py-28 lg:py-32 px-5 sm:px-10 lg:px-20 border-t border-[#E6D9C6]"
     >
       <div class="max-w-7xl mx-auto">
-        <!-- Section Header -->
-        <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 sm:mb-16">
-          <div>
+        <!-- Events & Current Reading Showcase (Connected to #events navigation) -->
+        <div id="events" class="scroll-mt-24">
+          <div class="mb-10 sm:mb-12">
             <h2 class="font-display text-[28px] sm:text-[36px] lg:text-[42px] font-bold leading-[1.3] text-[#1E150F] text-justify">
-              قفسه کتاب‌های خوانده‌شده و کتابِ در حال مطالعه
+              کتابِ در حال هم‌خوانی و نشست‌های پیشِ رو
             </h2>
           </div>
 
-          <!-- Category Filter Tabs -->
-          <div class="flex flex-wrap items-center gap-2 self-start md:self-end" role="tablist" aria-label="فیلتر دسته‌بندی کتاب‌ها">
-            <button
-              type="button"
-              data-filter="all"
-              class="js-lib-filter px-4 py-2 rounded-xl text-[13px] font-semibold transition-all cursor-pointer bg-[#5A3A22] text-[#FAF5EC] shadow-xs"
-            >
-              همه آثار (${toPersianDigits(archiveBooks.length)})
-            </button>
-            <button
-              type="button"
-              data-filter="کلاسیک"
-              class="js-lib-filter px-4 py-2 rounded-xl text-[13px] font-medium transition-all cursor-pointer bg-[#EFE5D6] text-[#4E3B2B] hover:bg-[#E5D7C3]"
-            >
-              ادبیات کلاسیک
-            </button>
-            <button
-              type="button"
-              data-filter="معاصر"
-              class="js-lib-filter px-4 py-2 rounded-xl text-[13px] font-medium transition-all cursor-pointer bg-[#EFE5D6] text-[#4E3B2B] hover:bg-[#E5D7C3]"
-            >
-              ادبیات معاصر
-            </button>
-          </div>
-        </div>
-
-        <!-- Current Reading Book Showcase (Connected to #events navigation) -->
-        ${
-          currentBookDisplay
-            ? `
-          <div id="events" class="mb-14 sm:mb-16 rounded-3xl bg-[#EFE4D3] border border-[#DECBB2] p-6 sm:p-8 lg:p-10 shadow-[0_20px_50px_rgba(45,30,18,0.08)] scroll-mt-24">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
-              <!-- Book Cover -->
-              <div class="lg:col-span-4 xl:col-span-3">
-                <div class="relative mx-auto max-w-[240px] lg:max-w-none aspect-[3/4] rounded-2xl overflow-hidden shadow-[0_18px_40px_rgba(30,18,10,0.22)] border border-[#D4BEA2] bg-[#2D1F14]">
-                  <img
-                    src="${currentBookDisplay.cover_url}"
-                    alt="${currentBookDisplay.title}"
-                    class="w-full h-full object-cover"
-                  />
-                  <div class="absolute top-3 right-3 px-3 py-1 rounded-lg bg-[#1F150E]/85 backdrop-blur-md text-[#F5E6D3] text-[11.5px] font-semibold border border-[#C69B6D]/40">
-                    در حال هم‌خوانی
-                  </div>
-                </div>
-              </div>
-
-              <!-- Book Details & Progress -->
-              <div class="lg:col-span-8 xl:col-span-9 space-y-5">
-                <div class="flex flex-wrap items-center gap-2.5 text-[13px] text-[#7A5130] font-semibold">
-                  ${
-                    currentBookDisplay.category
-                      ? `<span class="text-[#7A5130] font-bold">${toPersianDigits(currentBookDisplay.category)}</span>`
-                      : ''
-                  }
-                  ${
-                    currentBookDisplay.publication_year
-                      ? `<span>•</span><span>انتشار: ${toPersianDigits(currentBookDisplay.publication_year)}</span>`
-                      : ''
-                  }
-                  ${
-                    currentBookDisplay.pages_count
-                      ? `<span>•</span><span>${toPersianDigits(currentBookDisplay.pages_count)} صفحه</span>`
-                      : ''
-                  }
-                </div>
-
-                <div>
-                  <h3 class="font-display text-[24px] sm:text-[30px] font-bold text-[#1E150F] leading-snug text-justify">
-                    ${toPersianDigits(currentBookDisplay.title)}
-                  </h3>
-                  <p class="text-[14px] sm:text-[15px] text-[#5C4738] mt-1 font-medium text-justify">
-                    ${
-                      currentBookDisplay.author
-                        ? `نوشتهٔ ${toPersianDigits(currentBookDisplay.author)}`
-                        : ''
-                    }${
-                currentBookDisplay.author && currentBookDisplay.translator ? ' · ' : ''
-              }${
-                currentBookDisplay.translator
-                  ? `ترجمهٔ ${toPersianDigits(currentBookDisplay.translator)}`
-                  : ''
-              }
-                  </p>
-                </div>
-
-                ${
-                  currentBookDisplay.short_description
-                    ? `<p class="text-[15px] sm:text-[16px] leading-[1.95] text-[#3B2C22] text-justify">
-                        ${toPersianDigits(currentBookDisplay.short_description)}
-                      </p>`
-                    : ''
-                }
-
-                <!-- Schedule & Actions Row -->
-                <div class="pt-3 border-t border-[#DCC8AE] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div class="flex items-center gap-2 text-[13px] text-[#4B382A]">
-                    <span class="w-2 h-2 rounded-full bg-[#3B7A57]"></span>
-                    <span>${
-                      currentBookDisplay.session_schedule
-                        ? toPersianDigits(currentBookDisplay.session_schedule)
-                        : 'برنامه جلسات در جزئیات دوره'
-                    }</span>
-                  </div>
-
-                  <div class="flex flex-wrap items-center gap-2.5">
-                    <button
-                      type="button"
-                      class="js-current-book-details px-4 py-2.5 rounded-xl bg-[#FAF5EC] hover:bg-[#EFE2CE] text-[#3F2E21] border border-[#D5C0A5] text-[12.5px] font-semibold transition-colors cursor-pointer"
-                    >
-                      مشاهده جزئیات
-                    </button>
-                    <button
-                      type="button"
-                      class="js-current-book-register px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold transition-colors shadow-xs cursor-pointer"
-                    >
-                      ثبت نام در این نشست
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        `
-            : `
-          <div id="events" class="mb-14 sm:mb-16 rounded-3xl bg-[#EFE4D3] border border-[#DECBB2] p-8 sm:p-10 text-center scroll-mt-24">
-            <h3 class="font-display text-[20px] sm:text-[24px] font-bold text-[#1E150F]">
-              در حال حاضر دوره هم‌خوانی فعالی ثبت نشده است
-            </h3>
-            <p class="text-[14px] text-[#5C4738] mt-2">
-              به محض تعریف دوره هم‌خوانی جدید توسط مدیریت باشگاه، مشخصات کتاب و برنامه جلسات در این بخش نمایش داده می‌شود.
-            </p>
-          </div>
-        `
-        }
-
-        <!-- Upcoming Events Subsection -->
-        <div class="mb-16 sm:mb-20">
-          <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
-            <div>
-              <div class="inline-flex items-center gap-2 mb-2">
-                <span class="w-2 h-2 rounded-full bg-[#7A4B2A]"></span>
-                <span class="text-[12.5px] font-semibold text-[#7A4B2A]">برنامه نشست‌های حضوری و آنلاین</span>
-              </div>
-              <h3 class="font-display text-[22px] sm:text-[28px] font-bold text-[#1E150F] text-justify">
-                رویدادهای پیش رو در باشگاه بوک‌میت
-              </h3>
-            </div>
-            <p class="text-[13.5px] text-[#5E493A] text-justify">
-              نشست‌های فعال ثبت‌شده در باشگاه کتابخوانی
-            </p>
-          </div>
-
           ${
-            dynamicEvents.length > 0
+            currentBookDisplay
               ? `
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-7">
-              ${dynamicEvents
-                .map(
-                  (ev) => `
-                <article class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 flex flex-col justify-between shadow-[0_10px_28px_rgba(45,30,18,0.05)] hover:border-[#C5A480] transition-all duration-300">
-                  <div class="space-y-3.5">
-                    <div class="flex items-center justify-between gap-2">
-                      ${
-                        ev.badge
-                          ? `<span class="text-[12.5px] font-bold text-[#7A4B2A]">
-                              ${toPersianDigits(ev.badge)}
-                            </span>`
-                          : '<span></span>'
-                      }
-                      <span class="text-[11.5px] font-semibold text-[#235332] bg-[#E4F2E7] px-2.5 py-1 rounded-md">
-                        ${toPersianDigits(ev.capacityText)}
-                      </span>
+            <div class="mb-14 sm:mb-16 rounded-3xl bg-[#EFE4D3] border border-[#DECBB2] p-6 sm:p-8 lg:p-10 shadow-[0_20px_50px_rgba(45,30,18,0.08)]">
+              <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+                <!-- Book Cover -->
+                <div class="lg:col-span-4 xl:col-span-3">
+                  <div class="relative mx-auto max-w-[240px] lg:max-w-none aspect-[3/4] rounded-2xl overflow-hidden shadow-[0_18px_40px_rgba(30,18,10,0.22)] border border-[#D4BEA2] bg-[#2D1F14]">
+                    <img
+                      src="${currentBookDisplay.cover_url}"
+                      alt="${currentBookDisplay.title}"
+                      class="w-full h-full object-cover"
+                    />
+                    <div class="absolute top-3 right-3 px-3 py-1 rounded-lg bg-[#1F150E]/85 backdrop-blur-md text-[#F5E6D3] text-[11.5px] font-semibold border border-[#C69B6D]/40">
+                      در حال هم‌خوانی
                     </div>
+                  </div>
+                </div>
 
-                    <h4 class="font-display text-[18px] sm:text-[19px] font-bold text-[#20160F] leading-[1.6] text-justify">
-                      ${toPersianDigits(ev.title)}
-                    </h4>
-
+                <!-- Book Details & Progress -->
+                <div class="lg:col-span-8 xl:col-span-9 space-y-5">
+                  <div class="flex flex-wrap items-center gap-2.5 text-[13px] text-[#7A5130] font-semibold">
                     ${
-                      ev.summary
-                        ? `<p class="text-[13.5px] leading-[1.85] text-[#524033] text-justify">
-                            ${toPersianDigits(ev.summary)}
-                          </p>`
+                      currentBookDisplay.category
+                        ? `<span class="text-[#7A5130] font-bold">${toPersianDigits(currentBookDisplay.category)}</span>`
+                        : ''
+                    }
+                    ${
+                      currentBookDisplay.publication_year
+                        ? `<span>•</span><span>انتشار: ${toPersianDigits(currentBookDisplay.publication_year)}</span>`
+                        : ''
+                    }
+                    ${
+                      currentBookDisplay.pages_count
+                        ? `<span>•</span><span>${toPersianDigits(currentBookDisplay.pages_count)} صفحه</span>`
                         : ''
                     }
                   </div>
 
-                  <div class="pt-4 mt-5 border-t border-[#E8DAC6] space-y-3">
-                    <div class="space-y-1.5 text-[12.5px] text-[#4E3B2D]">
+                  <div>
+                    <h3 class="font-display text-[24px] sm:text-[30px] font-bold text-[#1E150F] leading-snug text-justify">
+                      ${toPersianDigits(currentBookDisplay.title)}
+                    </h3>
+                    <p class="text-[14px] sm:text-[15px] text-[#5C4738] mt-1 font-medium text-justify">
                       ${
-                        ev.dateText
-                          ? `<div class="flex items-center justify-between">
-                              <span class="text-[#786150]">زمان برگزاری:</span>
-                              <strong class="text-[#231912]">${toPersianDigits(ev.dateText)}</strong>
-                            </div>`
+                        currentBookDisplay.author
+                          ? `نوشتهٔ ${toPersianDigits(currentBookDisplay.author)}`
                           : ''
-                      }
-                      ${
-                        ev.timeText
-                          ? `<div class="flex items-center justify-between">
-                              <span class="text-[#786150]">ساعت نشست:</span>
-                              <strong class="text-[#231912]">${toPersianDigits(ev.timeText)}</strong>
-                            </div>`
-                          : ''
-                      }
-                      ${
-                        ev.hostName
-                          ? `<div class="flex items-center justify-between">
-                              <span class="text-[#786150]">مترجم:</span>
-                              <strong class="text-[#231912]">${toPersianDigits(ev.hostName)}</strong>
-                            </div>`
-                          : ''
-                      }
+                      }${
+                  currentBookDisplay.author && currentBookDisplay.translator ? ' · ' : ''
+                }${
+                  currentBookDisplay.translator
+                    ? `ترجمهٔ ${toPersianDigits(currentBookDisplay.translator)}`
+                    : ''
+                }
+                    </p>
+                  </div>
+
+                  ${
+                    currentBookDisplay.short_description
+                      ? `<p class="text-[15px] sm:text-[16px] leading-[1.95] text-[#3B2C22] text-justify">
+                          ${toPersianDigits(currentBookDisplay.short_description)}
+                        </p>`
+                      : ''
+                  }
+
+                  <!-- Schedule & Actions Row -->
+                  <div class="pt-3 border-t border-[#DCC8AE] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex items-center gap-2 text-[13px] text-[#4B382A]">
+                      <span class="w-2 h-2 rounded-full bg-[#3B7A57]"></span>
+                      <span>${
+                        currentBookDisplay.session_schedule
+                          ? toPersianDigits(currentBookDisplay.session_schedule)
+                          : 'برنامه جلسات در جزئیات دوره'
+                      }</span>
                     </div>
 
-                    <!-- Event Action Buttons -->
-                    <div class="pt-3 border-t border-[#E8DAC6] grid grid-cols-2 gap-2.5">
+                    <div class="flex flex-wrap items-center gap-2.5">
                       <button
                         type="button"
-                        data-event-details="${ev.id}"
-                        class="js-event-view-details py-2.5 px-3 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] text-[#3F2E21] text-[12px] font-semibold transition-colors text-center cursor-pointer"
+                        class="js-current-book-details px-4 py-2.5 rounded-xl bg-[#FAF5EC] hover:bg-[#EFE2CE] text-[#3F2E21] border border-[#D5C0A5] text-[12.5px] font-semibold transition-colors cursor-pointer"
                       >
                         مشاهده جزئیات
                       </button>
                       <button
                         type="button"
-                        data-event-register="${ev.id}"
-                        class="js-event-register-btn py-2.5 px-3 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold transition-colors text-center shadow-xs cursor-pointer"
+                        class="js-current-book-register px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold transition-colors shadow-xs cursor-pointer"
                       >
-                        ثبت نام
+                        ثبت نام در این نشست
                       </button>
                     </div>
                   </div>
-                </article>
+                </div>
+              </div>
+            </div>
+          `
+              : `
+            <div class="mb-14 sm:mb-16 rounded-3xl bg-[#EFE4D3] border border-[#DECBB2] p-8 sm:p-10 text-center">
+              <h3 class="font-display text-[20px] sm:text-[24px] font-bold text-[#1E150F]">
+                در حال حاضر دوره هم‌خوانی فعالی ثبت نشده است
+              </h3>
+              <p class="text-[14px] text-[#5C4738] mt-2 !text-center text-center mx-auto">
+                به محض تعریف دوره هم‌خوانی جدید توسط مدیریت باشگاه، مشخصات کتاب و برنامه جلسات در این بخش نمایش داده می‌شود.
+              </p>
+            </div>
+          `
+          }
+
+          <!-- Upcoming Events Subsection -->
+          <div class="mb-20 sm:mb-24">
+            <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+              <div>
+                <div class="inline-flex items-center gap-2 mb-2">
+                  <span class="w-2 h-2 rounded-full bg-[#7A4B2A]"></span>
+                  <span class="text-[12.5px] font-semibold text-[#7A4B2A]">برنامه نشست‌های حضوری و آنلاین</span>
+                </div>
+                <h3 class="font-display text-[22px] sm:text-[28px] font-bold text-[#1E150F] text-justify">
+                  رویدادهای پیش رو در باشگاه بوک‌میت
+                </h3>
+              </div>
+              <p class="text-[13.5px] text-[#5E493A] text-justify">
+                نشست‌های فعال ثبت‌شده در باشگاه کتابخوانی
+              </p>
+            </div>
+
+            ${
+              dynamicEvents.length > 0
+                ? `
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-7">
+                ${dynamicEvents
+                  .map(
+                    (ev) => `
+                  <article class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 flex flex-col justify-between shadow-[0_10px_28px_rgba(45,30,18,0.05)] hover:border-[#C5A480] transition-all duration-300">
+                    <div class="space-y-3.5">
+                      <div class="flex items-center justify-between gap-2">
+                        ${
+                          ev.badge
+                            ? `<span class="text-[12.5px] font-bold text-[#7A4B2A]">
+                                ${toPersianDigits(ev.badge)}
+                              </span>`
+                            : '<span></span>'
+                        }
+                        <span class="text-[11.5px] font-semibold text-[#235332] bg-[#E4F2E7] px-2.5 py-1 rounded-md">
+                          ${toPersianDigits(ev.capacityText)}
+                        </span>
+                      </div>
+
+                      <h4 class="font-display text-[18px] sm:text-[19px] font-bold text-[#20160F] leading-[1.6] text-justify">
+                        ${toPersianDigits(ev.title)}
+                      </h4>
+
+                      ${
+                        ev.summary
+                          ? `<p class="text-[13.5px] leading-[1.85] text-[#524033] text-justify">
+                              ${toPersianDigits(ev.summary)}
+                            </p>`
+                          : ''
+                      }
+                    </div>
+
+                    <div class="pt-4 mt-5 border-t border-[#E8DAC6] space-y-3">
+                      <div class="space-y-1.5 text-[12.5px] text-[#4E3B2D]">
+                        ${
+                          ev.dateText
+                            ? `<div class="flex items-center justify-between">
+                                <span class="text-[#786150]">زمان برگزاری:</span>
+                                <strong class="text-[#231912]">${toPersianDigits(ev.dateText)}</strong>
+                              </div>`
+                            : ''
+                        }
+                        ${
+                          ev.timeText
+                            ? `<div class="flex items-center justify-between">
+                                <span class="text-[#786150]">ساعت نشست:</span>
+                                <strong class="text-[#231912]">${toPersianDigits(ev.timeText)}</strong>
+                              </div>`
+                            : ''
+                        }
+                        ${
+                          ev.hostName
+                            ? `<div class="flex items-center justify-between">
+                                <span class="text-[#786150]">مترجم:</span>
+                                <strong class="text-[#231912]">${toPersianDigits(ev.hostName)}</strong>
+                              </div>`
+                            : ''
+                        }
+                      </div>
+
+                      <!-- Event Action Buttons -->
+                      <div class="pt-3 border-t border-[#E8DAC6] grid grid-cols-2 gap-2.5">
+                        <button
+                          type="button"
+                          data-event-details="${ev.id}"
+                          class="js-event-view-details py-2.5 px-3 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] text-[#3F2E21] text-[12px] font-semibold transition-colors text-center cursor-pointer"
+                        >
+                          مشاهده جزئیات
+                        </button>
+                        <button
+                          type="button"
+                          data-event-register="${ev.id}"
+                          class="js-event-register-btn py-2.5 px-3 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold transition-colors text-center shadow-xs cursor-pointer"
+                        >
+                          ثبت نام
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                `
+                  )
+                  .join('')}
+              </div>
+            `
+                : `
+              <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-8 text-center">
+                <p class="text-[14px] text-[#5E493A] font-medium !text-center text-center mx-auto">
+                  در حال حاضر رویداد فعالی برای نمایش وجود ندارد.
+                </p>
+              </div>
+            `
+            }
+          </div>
+        </div>
+
+        <!-- Library Books Section (Directly connected to #library navigation) -->
+        <div id="library" class="pt-12 border-t border-[#E2D3BF] scroll-mt-24">
+          <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 sm:mb-12">
+            <div>
+              <div class="inline-flex items-center gap-2 mb-2">
+                <span class="w-2 h-2 rounded-full bg-[#7A4B2A]"></span>
+                <span class="text-[12.5px] font-semibold text-[#7A4B2A]">کتابخانه باشگاه بوک‌میت</span>
+              </div>
+              <h2 class="font-display text-[26px] sm:text-[34px] font-bold leading-[1.3] text-[#1E150F] text-justify">
+                قفسه کتاب‌های باشگاه
+              </h2>
+            </div>
+
+            <!-- Dynamic Category Filter Tabs -->
+            <div class="flex flex-wrap items-center gap-2 self-start md:self-end" role="tablist" aria-label="فیلتر دسته‌بندی کتاب‌ها">
+              <button
+                type="button"
+                data-filter="all"
+                class="js-lib-filter px-4 py-2 rounded-xl text-[13px] font-semibold transition-all cursor-pointer bg-[#5A3A22] text-[#FAF5EC] shadow-xs"
+              >
+                همه کتاب‌ها (${toPersianDigits(allLibraryBooks.length)})
+              </button>
+              ${categoryNames
+                .map(
+                  (cat) => `
+                <button
+                  type="button"
+                  data-filter="${cat}"
+                  class="js-lib-filter px-4 py-2 rounded-xl text-[13px] font-medium transition-all cursor-pointer bg-[#EFE5D6] text-[#4E3B2B] hover:bg-[#E5D7C3]"
+                >
+                  ${toPersianDigits(cat)}
+                </button>
               `
                 )
                 .join('')}
             </div>
+          </div>
+
+          ${
+            allLibraryBooks.length > 0
+              ? `
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-7 js-library-grid">
+              ${allLibraryBooks
+                .map((book) => {
+                  const bookTags = String(book.tags || '')
+                    .split(/[،,]/)
+                    .map((t) => t.trim())
+                    .filter(Boolean);
+                  return `
+                    <article
+                      data-category="${book.category || ''}"
+                      data-book-id="${book.id}"
+                      class="js-library-card js-open-library-book-detail group rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] overflow-hidden shadow-[0_10px_28px_rgba(45,30,18,0.05)] hover:shadow-[0_18px_38px_rgba(45,30,18,0.11)] hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between cursor-pointer"
+                    >
+                      <div>
+                        <!-- Cover Container -->
+                        <div class="relative aspect-[4/4.6] overflow-hidden bg-[#E5D7C3]">
+                          ${
+                            book.cover_url
+                              ? `<img
+                                  src="${book.cover_url}"
+                                  alt="${book.title}"
+                                  class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                  loading="lazy"
+                                />`
+                              : `<div class="w-full h-full flex items-center justify-center text-[13px] font-semibold text-[#6B5444]">بدون تصویر کاور</div>`
+                          }
+                        </div>
+
+                        <!-- Content -->
+                        <div class="p-5">
+                          ${
+                            book.category
+                              ? `<div class="text-[12px] font-bold text-[#7A4B2A] mb-1">
+                                  ${toPersianDigits(book.category)}
+                                </div>`
+                              : ''
+                          }
+                          <h4 class="font-display text-[19px] font-bold text-[#1F1610] leading-snug text-justify group-hover:text-[#7A4B2A] transition-colors">
+                            ${toPersianDigits(book.title)}
+                          </h4>
+                          ${
+                            book.author || book.translator
+                              ? `<p class="text-[12.5px] text-[#6E5746] mt-1 font-medium text-justify">
+                                  ${book.author ? toPersianDigits(book.author) : ''}${
+                                  book.author && book.translator ? ' · ' : ''
+                                }${book.translator ? `ترجمهٔ ${toPersianDigits(book.translator)}` : ''}
+                                </p>`
+                              : ''
+                          }
+                          ${
+                            book.short_description
+                              ? `<p class="text-[13.5px] leading-[1.85] text-[#423226] mt-3 line-clamp-3 text-justify">
+                                  ${toPersianDigits(book.short_description)}
+                                </p>`
+                              : ''
+                          }
+                          ${
+                            bookTags.length > 0
+                              ? `
+                            <div class="flex flex-wrap gap-1.5 mt-3">
+                              ${bookTags
+                                .slice(0, 3)
+                                .map(
+                                  (tag) =>
+                                    `<span class="px-2 py-0.5 rounded-md bg-[#F2E8D9] border border-[#E2D3BF] text-[#4E3B2D] text-[11px] font-medium">#${toPersianDigits(tag)}</span>`
+                                )
+                                .join('')}
+                            </div>
+                          `
+                              : ''
+                          }
+                        </div>
+                      </div>
+
+                      <!-- Card Footer -->
+                      <div class="px-5 py-3.5 bg-[#F2E8D9]/70 border-t border-[#E6D8C4] flex items-center justify-between text-[12px] text-[#5B4637]">
+                        <span class="font-semibold text-[#5A3A22] group-hover:text-[#231912] transition-colors">
+                          مشاهده جزئیات کتاب ←
+                        </span>
+                        ${
+                          book.pages_count
+                            ? `<span>${toPersianDigits(book.pages_count)} صفحه</span>`
+                            : ''
+                        }
+                      </div>
+                    </article>
+                  `;
+                })
+                .join('')}
+            </div>
           `
               : `
-            <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-8 text-center">
-              <p class="text-[14px] text-[#5E493A] font-medium">
-                در حال حاضر رویداد فعالی برای نمایش وجود ندارد.
+            <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-10 text-center">
+              <p class="text-[14px] text-[#5E493A] !text-center text-center mx-auto">
+                هنوز کتابی در کتابخانه باشگاه ثبت نشده است.
               </p>
             </div>
           `
           }
         </div>
-
-        <!-- Archive Grid -->
-        ${
-          archiveBooks.length > 0
-            ? `
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-7 js-library-grid">
-            ${archiveBooks
-              .map(
-                (book) => `
-              <article
-                data-category="${book.category}"
-                class="js-library-card group rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] overflow-hidden shadow-[0_10px_28px_rgba(45,30,18,0.05)] hover:shadow-[0_18px_38px_rgba(45,30,18,0.11)] hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
-              >
-                <div>
-                  <!-- Cover Container -->
-                  <div class="relative aspect-[4/4.6] overflow-hidden bg-[#E5D7C3]">
-                    <img
-                      src="${book.cover_url}"
-                      alt="${book.title}"
-                      class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      loading="lazy"
-                    />
-                  </div>
-
-                  <!-- Content -->
-                  <div class="p-5">
-                    ${
-                      book.category
-                        ? `<div class="text-[12px] font-bold text-[#7A4B2A] mb-1">
-                            ${toPersianDigits(book.category)}
-                          </div>`
-                        : ''
-                    }
-                    <h4 class="font-display text-[19px] font-bold text-[#1F1610] leading-snug text-justify">
-                      ${toPersianDigits(book.title)}
-                    </h4>
-                    <p class="text-[12.5px] text-[#6E5746] mt-1 font-medium text-justify">
-                      ${toPersianDigits(book.author)}${
-                  book.translator ? ` · ترجمهٔ ${toPersianDigits(book.translator)}` : ''
-                }
-                    </p>
-                    ${
-                      book.short_description
-                        ? `<p class="text-[13.5px] leading-[1.85] text-[#423226] mt-3 line-clamp-3 text-justify">
-                            ${toPersianDigits(book.short_description)}
-                          </p>`
-                        : ''
-                    }
-                  </div>
-                </div>
-
-                <!-- Card Footer -->
-                <div class="px-5 py-3.5 bg-[#F2E8D9]/70 border-t border-[#E6D8C4] flex items-center justify-between text-[12px] text-[#5B4637]">
-                  <span>${book.pages_count ? `${toPersianDigits(book.pages_count)} صفحه` : ''}</span>
-                  <span class="font-medium text-[#7A4B2A]">${toPersianDigits(book.session_schedule)}</span>
-                </div>
-              </article>
-            `
-              )
-              .join('')}
-          </div>
-        `
-            : `
-          <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-8 text-center">
-            <p class="text-[14px] text-[#5E493A]">
-              هنوز کتابی در آرشیو کتابخانه ثبت نشده است.
-            </p>
-          </div>
-        `
-        }
       </div>
     </section>
   `);
@@ -594,6 +651,15 @@ export function createLibrarySection(
         $(this).stop(true, true).fadeOut(160);
       }
     });
+  });
+
+  // Open Library Book Detail Page
+  $section.on('click', '.js-open-library-book-detail', function () {
+    const bookId = Number($(this).data('book-id'));
+    const found = allLibraryBooks.find((b) => Number(b.id) === bookId);
+    if (found && callbacks?.onOpenBookDetail) {
+      callbacks.onOpenBookDetail(found);
+    }
   });
 
   // Current Reading Book handlers
@@ -627,4 +693,170 @@ export function createLibrarySection(
   });
 
   return $section;
+}
+
+export function createLibraryBookDetailPageComponent(props: {
+  book: LibraryBook;
+  onBack: () => void;
+}): JQuery {
+  const { book } = props;
+  const tagsList = String(book.tags || '')
+    .split(/[،,]/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  const $page = $(`
+    <section
+      aria-label="جزئیات کتاب در کتابخانه باشگاه"
+      class="relative w-full bg-[#F6EFE4] text-[#221811] py-10 sm:py-14 px-5 sm:px-10 lg:px-20"
+    >
+      <div class="max-w-5xl mx-auto space-y-8">
+        <!-- Back Button -->
+        <div>
+          <button
+            type="button"
+            class="js-back-to-library inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#EFE4D3] hover:bg-[#E4D4BE] text-[#3F2E21] text-[13px] font-semibold transition-colors cursor-pointer"
+          >
+            <span>→</span>
+            <span>بازگشت به کتابخانه باشگاه</span>
+          </button>
+        </div>
+
+        <!-- Hero Book Card -->
+        <div class="rounded-3xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-8 lg:p-10 shadow-[0_20px_50px_rgba(45,30,18,0.06)]">
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+            <div class="md:col-span-4">
+              <div class="mx-auto max-w-[240px] md:max-w-none aspect-[3/4] rounded-2xl overflow-hidden border border-[#D4BEA2] bg-[#EFE3D2] shadow-[0_14px_34px_rgba(30,18,10,0.16)]">
+                ${
+                  book.cover_url
+                    ? `<img src="${book.cover_url}" alt="${book.title}" class="w-full h-full object-cover" />`
+                    : `<div class="w-full h-full flex items-center justify-center text-[13px] font-semibold text-[#6B5444]">بدون تصویر کاور</div>`
+                }
+              </div>
+            </div>
+
+            <div class="md:col-span-8 space-y-5">
+              ${
+                book.category
+                  ? `<div>
+                      <span class="inline-block px-3.5 py-1 rounded-xl bg-[#EFE3D2] border border-[#DECBB2] text-[#7A4B2A] text-[12.5px] font-bold">
+                        دسته‌بندی: ${toPersianDigits(book.category)}
+                      </span>
+                    </div>`
+                  : ''
+              }
+
+              <div>
+                <h1 class="font-display text-[26px] sm:text-[34px] font-bold text-[#1E150F] leading-snug text-justify">
+                  ${toPersianDigits(book.title)}
+                </h1>
+                ${
+                  book.author || book.translator
+                    ? `<p class="text-[14.5px] text-[#5C4738] mt-1.5 font-medium text-justify">
+                        ${book.author ? `نویسنده: ${toPersianDigits(book.author)}` : ''}${
+                        book.author && book.translator ? ' · ' : ''
+                      }${book.translator ? `مترجم: ${toPersianDigits(book.translator)}` : ''}
+                      </p>`
+                    : ''
+                }
+              </div>
+
+              ${
+                book.short_description
+                  ? `
+                <div class="p-4 sm:p-5 rounded-2xl bg-[#F3E9DA]/80 border border-[#E2D2BC] space-y-1.5">
+                  <h2 class="font-display text-[16px] font-bold text-[#231912]">خلاصه کتاب</h2>
+                  <p class="text-[14.5px] leading-[1.95] text-[#3B2C22] whitespace-pre-line text-justify">
+                    ${toPersianDigits(book.short_description)}
+                  </p>
+                </div>
+              `
+                  : ''
+              }
+
+              ${
+                tagsList.length > 0
+                  ? `
+                <div class="space-y-2 pt-1">
+                  <span class="block text-[12.5px] font-bold text-[#5C4738]">برچسب‌ها:</span>
+                  <div class="flex flex-wrap gap-2">
+                    ${tagsList
+                      .map(
+                        (tag) =>
+                          `<span class="px-3 py-1 rounded-xl bg-[#EFE3D2] border border-[#D8C4AA] text-[#4E3B2D] text-[12px] font-semibold">#${toPersianDigits(tag)}</span>`
+                      )
+                      .join('')}
+                  </div>
+                </div>
+              `
+                  : ''
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Memorable Quote -->
+        ${
+          book.memorable_quote
+            ? `
+          <div class="rounded-2xl bg-[#EFE4D3] border-r-4 border-[#7A4B2A] p-6 sm:p-8 shadow-[0_10px_28px_rgba(45,30,18,0.04)] space-y-2">
+            <h2 class="font-display text-[17px] font-bold text-[#7A4B2A]">جمله‌ای که به یادگار ماند</h2>
+            <blockquote class="font-display text-[16px] sm:text-[18px] italic text-[#1E150F] leading-[1.95] whitespace-pre-line text-justify">
+              «${toPersianDigits(book.memorable_quote)}»
+            </blockquote>
+          </div>
+        `
+            : ''
+        }
+
+        <!-- Full Description -->
+        ${
+          book.description
+            ? `
+          <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-8 space-y-3">
+            <h2 class="font-display text-[20px] font-bold text-[#1E150F]">توضیحات</h2>
+            <div class="text-[15px] leading-[2] text-[#3B2C22] whitespace-pre-line text-justify">
+              ${toPersianDigits(book.description)}
+            </div>
+          </div>
+        `
+            : ''
+        }
+
+        <!-- Recommended For -->
+        ${
+          book.recommended_for
+            ? `
+          <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-8 space-y-3">
+            <h2 class="font-display text-[20px] font-bold text-[#1E150F]">به چه کسانی توصیه می‌شود</h2>
+            <div class="text-[15px] leading-[2] text-[#3B2C22] whitespace-pre-line text-justify">
+              ${toPersianDigits(book.recommended_for)}
+            </div>
+          </div>
+        `
+            : ''
+        }
+
+        <!-- Notes -->
+        ${
+          book.notes
+            ? `
+          <div class="rounded-2xl bg-[#FAF5EC] border border-[#E4D6C3] p-6 sm:p-8 space-y-3">
+            <h2 class="font-display text-[20px] font-bold text-[#1E150F]">نکات و یادداشت‌ها</h2>
+            <div class="text-[15px] leading-[2] text-[#3B2C22] whitespace-pre-line text-justify">
+              ${toPersianDigits(book.notes)}
+            </div>
+          </div>
+        `
+            : ''
+        }
+      </div>
+    </section>
+  `);
+
+  $page.on('click', '.js-back-to-library', () => {
+    props.onBack();
+  });
+
+  return $page;
 }

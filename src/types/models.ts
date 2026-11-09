@@ -54,6 +54,12 @@ export interface AboutManagerData {
   credentials_line: string;
 }
 
+export interface LibraryCategory {
+  id: number;
+  name: string;
+  created_at?: string;
+}
+
 export interface LibraryBook {
   id: number;
   is_current: number;
@@ -68,7 +74,13 @@ export interface LibraryBook {
   session_schedule: string;
   cover_url: string;
   short_description: string;
+  description?: string;
+  memorable_quote?: string;
+  recommended_for?: string;
+  tags?: string;
+  notes?: string;
   sort_order: number;
+  created_at?: string;
 }
 
 export interface BlogPost {
@@ -351,6 +363,7 @@ export interface AdminPanelPayload {
   aboutManager: AboutManagerData;
   contactInfo: ContactInfoData;
   libraryBooks: LibraryBook[];
+  libraryCategories?: LibraryCategory[];
 }
 
 export interface ClubRegisterInput {
@@ -383,6 +396,7 @@ export interface BootstrapPayload {
   publicSessions?: MemberSession[];
   publicClasses?: MemberClassItem[];
   approvedComments?: UserComment[];
+  libraryCategories?: LibraryCategory[];
 }
 
 

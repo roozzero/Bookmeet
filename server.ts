@@ -168,6 +168,7 @@ async function startServer() {
         publicSessions,
         publicClasses,
         approvedComments,
+        libraryCategories,
       ] = await Promise.all([
         mysqlDb.getNavigationLinks(),
         mysqlDb.getHeroSettings(),
@@ -180,6 +181,7 @@ async function startServer() {
         mysqlDb.getPublicActiveSessions(),
         mysqlDb.getPublicActiveClasses(),
         mysqlDb.getApprovedComments(),
+        mysqlDb.getLibraryCategories(),
       ]);
 
       res.json({
@@ -194,6 +196,7 @@ async function startServer() {
         publicSessions,
         publicClasses,
         approvedComments,
+        libraryCategories,
       });
     } catch (error) {
       console.error('Database fetch error (/api/bootstrap):', error);
@@ -211,12 +214,17 @@ async function startServer() {
         res.status(400).json({ error: 'لطفاً نام و متن دیدگاه خود را وارد نمایید.' });
         return;
       }
+      const numRating = Number(rating);
+      if (!Number.isFinite(numRating) || numRating < 1 || numRating > 5) {
+        res.status(400).json({ error: 'لطفاً امتیاز خود را با انتخاب ۱ تا ۵ ستاره مشخص نمایید.' });
+        return;
+      }
       const saved = await mysqlDb.saveUserComment({
         author_name: String(author_name).trim(),
         author_phone: String(author_phone || '').trim(),
         target_title: String(target_title).trim(),
         target_type: String(target_type || 'نشست کتاب‌خوانی').trim(),
-        rating: Number(rating || 5),
+        rating: Math.round(numRating),
         comment_text: String(comment_text).trim(),
         status: 'در انتظار تایید',
       });
@@ -947,6 +955,65 @@ async function startServer() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'خطا در بروزرسانی وضعیت ثبت‌نام کاربر';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/admin/library-books', requireAdmin, async (req, res) => {
+    try {
+      const saved = await mysqlDb.saveAdminLibraryBook(req.body || {});
+      res.json({ success: true, book: saved });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ذخیره اطلاعات کتاب در کتابخانه';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.delete('/api/admin/library-books/:id', requireAdmin, async (req, res) => {
+    try {
+      await mysqlDb.deleteAdminLibraryBook(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در حذف کتاب از کتابخانه';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.post('/api/admin/library-categories', requireAdmin, async (req, res) => {
+    try {
+      const category = await mysqlDb.saveAdminLibraryCategory(req.body || {});
+      res.json({ success: true, category });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ایجاد دسته‌بندی کتابخانه';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.put('/api/admin/library-categories/:id', requireAdmin, async (req, res) => {
+    try {
+      const category = await mysqlDb.saveAdminLibraryCategory({
+        id: Number(req.params.id),
+        name: String(req.body?.name || ''),
+      });
+      const libraryBooks = await mysqlDb.getLibraryBooks();
+      res.json({ success: true, category, libraryBooks });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در ویرایش دسته‌بندی کتابخانه';
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.delete('/api/admin/library-categories/:id', requireAdmin, async (req, res) => {
+    try {
+      await mysqlDb.deleteAdminLibraryCategory(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'خطا در حذف دسته‌بندی کتابخانه';
       res.status(400).json({ error: message });
     }
   });

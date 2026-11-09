@@ -7,6 +7,7 @@ import { createAboutClubSectionComponent } from './components/AboutClubSection.t
 import { createAboutManagerSectionComponent } from './components/AboutManagerSection.ts';
 import {
   createLibrarySectionComponent,
+  createLibraryBookDetailPageComponent,
   mapSessionToEventCard,
   buildBookEventDetail,
   type ClubEventDetailItem,
@@ -36,6 +37,7 @@ import type {
   BlogPost,
   BootstrapPayload,
   ClubMember,
+  LibraryBook,
   MemberPanelPayload,
 } from './types/models.ts';
 
@@ -99,6 +101,7 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
       'دکتری ادبیات تطبیقی · ۱۲ سال تجربه تسهیل‌گری نشست‌های کتاب · نویسنده و پژوهشگر روایت',
   },
   libraryBooks: [],
+  libraryCategories: [],
   publicSessions: [],
   publicClasses: [],
   approvedComments: [],
@@ -358,6 +361,7 @@ function mountApplication(
         ApiService.fetchBootstrapData()
           .then((fresh) => {
             payload.libraryBooks = fresh.libraryBooks || [];
+            payload.libraryCategories = fresh.libraryCategories || [];
             payload.publicSessions = fresh.publicSessions || [];
             payload.publicClasses = fresh.publicClasses || [];
             payload.approvedComments = fresh.approvedComments || [];
@@ -384,6 +388,7 @@ function mountApplication(
         ApiService.fetchBootstrapData()
           .then((fresh) => {
             payload.libraryBooks = fresh.libraryBooks || [];
+            payload.libraryCategories = fresh.libraryCategories || [];
             payload.publicSessions = fresh.publicSessions || [];
             payload.publicClasses = fresh.publicClasses || [];
             payload.approvedComments = fresh.approvedComments || [];
@@ -416,6 +421,12 @@ function mountApplication(
           payload.blogPosts = updated.blogPosts;
           allPosts = updated.blogPosts;
         }
+        if (updated.libraryBooks) {
+          payload.libraryBooks = updated.libraryBooks;
+        }
+        if (updated.libraryCategories) {
+          payload.libraryCategories = updated.libraryCategories;
+        }
         if (updated.sessions) {
           payload.publicSessions = updated.sessions.filter(
             (s) => s.status !== 'غیرفعال'
@@ -423,6 +434,7 @@ function mountApplication(
           ApiService.fetchBootstrapData()
             .then((fresh) => {
               payload.libraryBooks = fresh.libraryBooks || [];
+              payload.libraryCategories = fresh.libraryCategories || [];
               payload.publicSessions = fresh.publicSessions || [];
               payload.approvedComments = fresh.approvedComments || [];
             })
@@ -591,11 +603,16 @@ function mountApplication(
 
     const $library = createLibrarySectionComponent({
       libraryBooks: payload.libraryBooks || [],
+      libraryCategories: payload.libraryCategories || [],
       publicSessions: payload.publicSessions || [],
       approvedComments: payload.approvedComments || [],
       onOpenEventDetail: (eventItem) => {
         pushRoute(`/event/${eventItem.id}`);
         renderEventDetailPageView(eventItem, true);
+      },
+      onOpenBookDetail: (book) => {
+        pushRoute(`/library/${book.id}`);
+        renderLibraryBookDetailPageView(book, true);
       },
       onRegisterEvent: (eventItem) => {
         if (currentMember && !isAdminMember(currentMember)) {
@@ -663,6 +680,61 @@ function mountApplication(
     }
   }
 
+  function renderLibraryBookDetailPageView(
+    book: LibraryBook,
+    skipPush = false
+  ): void {
+    if (!skipPush) {
+      pushRoute(`/library/${book.id}`);
+    } else {
+      saveActiveRoute(`/library/${book.id}`);
+    }
+    $app.empty();
+
+    const $shell = $(
+      '<div dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
+    );
+
+    const $loginModal = createClubAuthModalComponent({
+      onAuthSuccess: (member) => {
+        handleMemberAuthSuccess(member);
+      },
+    });
+
+    const $navbar = createNavbarComponent({
+      navigationLinks: payload.navigationLinks,
+      ctaText: getNavbarCtaLabel(),
+      activeHref: '#library',
+      isStationaryCta: Boolean(currentMember),
+      onNavigate: (href) => {
+        renderMainHomeView(href);
+      },
+      onLoginClick: () => {
+        pendingEnrollment = null;
+        if (currentMember) {
+          openAppropriatePanel(currentMember);
+        } else {
+          $loginModal.removeClass('hidden');
+        }
+      },
+    });
+
+    const $bookDetailPage = createLibraryBookDetailPageComponent({
+      book,
+      onBack: () => {
+        pushRoute('/library');
+        renderMainHomeView('#library', true);
+      },
+    });
+
+    const $scrollToTopBtn = createScrollToTopButtonComponent();
+
+    $shell.append($navbar, $bookDetailPage, $scrollToTopBtn, $loginModal);
+    $app.append($shell);
+
+    $('html, body').stop(true).animate({ scrollTop: 0 }, 250);
+  }
+
   function renderCourseDetailPageView(
     course: RussianCourseCard,
     skipPush = false
@@ -724,13 +796,9 @@ function mountApplication(
       },
     });
 
-    const $contact = createContactSectionComponent({
-      contactInfo: payload.contactInfo || FALLBACK_BOOTSTRAP.contactInfo,
-    });
-
     const $scrollToTopBtn = createScrollToTopButtonComponent();
 
-    $shell.append($navbar, $courseDetailPage, $contact, $scrollToTopBtn, $loginModal);
+    $shell.append($navbar, $courseDetailPage, $scrollToTopBtn, $loginModal);
     $app.append($shell);
 
     $('html, body').stop(true).animate({ scrollTop: 0 }, 250);
@@ -797,13 +865,9 @@ function mountApplication(
       },
     });
 
-    const $contact = createContactSectionComponent({
-      contactInfo: payload.contactInfo || FALLBACK_BOOTSTRAP.contactInfo,
-    });
-
     const $scrollToTopBtn = createScrollToTopButtonComponent();
 
-    $shell.append($navbar, $eventDetailPage, $contact, $scrollToTopBtn, $loginModal);
+    $shell.append($navbar, $eventDetailPage, $scrollToTopBtn, $loginModal);
     $app.append($shell);
 
     $('html, body').stop(true).animate({ scrollTop: 0 }, 250);
@@ -858,13 +922,9 @@ function mountApplication(
       },
     });
 
-    const $contact = createContactSectionComponent({
-      contactInfo: payload.contactInfo || FALLBACK_BOOTSTRAP.contactInfo,
-    });
-
     const $scrollToTopBtn = createScrollToTopButtonComponent();
 
-    $shell.append($navbar, $postPage, $contact, $scrollToTopBtn, $loginModal);
+    $shell.append($navbar, $postPage, $scrollToTopBtn, $loginModal);
     $app.append($shell);
 
     $('html, body').stop(true).animate({ scrollTop: 0 }, 250);
@@ -884,7 +944,8 @@ function mountApplication(
         } else if (
           savedFirst === 'event' ||
           savedFirst === 'course' ||
-          savedFirst === 'blog'
+          savedFirst === 'blog' ||
+          savedFirst === 'library'
         ) {
           pathname = savedRoute;
           pushRoute(savedRoute, true);
@@ -908,6 +969,18 @@ function mountApplication(
         return;
       }
       renderMainHomeView(undefined, true, true);
+      return;
+    }
+
+    // Library book detail route: /library/:id
+    if (first === 'library' && segments[1]) {
+      const bookId = Number(segments[1]);
+      const matchedBook = (payload.libraryBooks || []).find((b) => Number(b.id) === bookId);
+      if (matchedBook) {
+        renderLibraryBookDetailPageView(matchedBook, true);
+        return;
+      }
+      renderMainHomeView('#library', true);
       return;
     }
 

@@ -16,6 +16,8 @@ import type {
   FeaturedBook,
   GalleryImage,
   HeroSettings,
+  LibraryBook,
+  LibraryCategory,
   MemberClassItem,
   MemberLibraryItem,
   MemberPanelPayload,
@@ -891,6 +893,128 @@ export const ApiService = {
         error: (jqXHR, textStatus, errorThrown) =>
           reject(
             new Error(jqXHR.responseJSON?.error || errorThrown || textStatus || 'خطا')
+          ),
+      });
+    });
+  },
+
+  saveAdminLibraryBook(
+    payload: Partial<LibraryBook> & { id?: number }
+  ): Promise<{ success: boolean; book: LibraryBook }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/admin/library-books',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data: { success: boolean; book: LibraryBook }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(
+              jqXHR.responseJSON?.error ||
+                errorThrown ||
+                textStatus ||
+                'خطا در ذخیره اطلاعات کتاب'
+            )
+          ),
+      });
+    });
+  },
+
+  deleteAdminLibraryBook(id: number): Promise<{ success: boolean }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/admin/library-books/${id}`,
+        method: 'DELETE',
+        dataType: 'json',
+        success: (data: { success: boolean }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(
+              jqXHR.responseJSON?.error ||
+                errorThrown ||
+                textStatus ||
+                'خطا در حذف کتاب از کتابخانه'
+            )
+          ),
+      });
+    });
+  },
+
+  createAdminLibraryCategory(payload: {
+    name: string;
+  }): Promise<{ success: boolean; category: LibraryCategory }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '/api/admin/library-categories',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        dataType: 'json',
+        success: (data: { success: boolean; category: LibraryCategory }) =>
+          resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(
+              jqXHR.responseJSON?.error ||
+                errorThrown ||
+                textStatus ||
+                'خطا در ایجاد دسته‌بندی'
+            )
+          ),
+      });
+    });
+  },
+
+  updateAdminLibraryCategory(payload: {
+    id: number;
+    name: string;
+  }): Promise<{
+    success: boolean;
+    category: LibraryCategory;
+    libraryBooks: LibraryBook[];
+  }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/admin/library-categories/${payload.id}`,
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify({ name: payload.name }),
+        dataType: 'json',
+        success: (data: {
+          success: boolean;
+          category: LibraryCategory;
+          libraryBooks: LibraryBook[];
+        }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(
+              jqXHR.responseJSON?.error ||
+                errorThrown ||
+                textStatus ||
+                'خطا در ویرایش دسته‌بندی'
+            )
+          ),
+      });
+    });
+  },
+
+  deleteAdminLibraryCategory(id: number): Promise<{ success: boolean }> {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: `/api/admin/library-categories/${id}`,
+        method: 'DELETE',
+        dataType: 'json',
+        success: (data: { success: boolean }) => resolve(data),
+        error: (jqXHR, textStatus, errorThrown) =>
+          reject(
+            new Error(
+              jqXHR.responseJSON?.error ||
+                errorThrown ||
+                textStatus ||
+                'خطا در حذف دسته‌بندی'
+            )
           ),
       });
     });

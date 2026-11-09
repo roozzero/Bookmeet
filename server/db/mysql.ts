@@ -59,6 +59,12 @@ export interface AboutManagerRow {
   credentials_line: string;
 }
 
+export interface LibraryCategoryRow {
+  id: number;
+  name: string;
+  created_at?: string;
+}
+
 export interface LibraryBookRow {
   id: number;
   is_current: number;
@@ -73,7 +79,13 @@ export interface LibraryBookRow {
   session_schedule: string;
   cover_url: string;
   short_description: string;
+  description?: string;
+  memorable_quote?: string;
+  recommended_for?: string;
+  tags?: string;
+  notes?: string;
   sort_order: number;
+  created_at?: string;
 }
 
 export interface BlogPostRow {
@@ -575,16 +587,27 @@ class MySQLDatabaseManager {
         is_current TINYINT(1) NOT NULL DEFAULT 0,
         title VARCHAR(180) NOT NULL,
         original_title VARCHAR(180) NOT NULL DEFAULT '',
-        author VARCHAR(150) NOT NULL,
+        author VARCHAR(150) NOT NULL DEFAULT '',
         translator VARCHAR(150) NOT NULL DEFAULT '',
-        category VARCHAR(80) NOT NULL DEFAULT 'کلاسیک',
-        publication_year INT NOT NULL DEFAULT 1400,
-        pages_count INT NOT NULL DEFAULT 300,
+        category VARCHAR(80) NOT NULL DEFAULT '',
+        publication_year INT NOT NULL DEFAULT 0,
+        pages_count INT NOT NULL DEFAULT 0,
         reading_progress_percent INT NOT NULL DEFAULT 0,
         session_schedule VARCHAR(180) NOT NULL DEFAULT '',
         cover_url LONGTEXT NOT NULL,
         short_description TEXT NOT NULL,
+        description LONGTEXT NULL,
+        memorable_quote TEXT NULL,
+        recommended_for TEXT NULL,
+        tags TEXT NULL,
+        notes LONGTEXT NULL,
         sort_order INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+      `CREATE TABLE IF NOT EXISTS library_categories (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(120) NOT NULL UNIQUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
@@ -930,7 +953,29 @@ class MySQLDatabaseManager {
       );
     }
 
-    // 6. Backfill exact Jalali joined_date from created_at on club_members where placeholder was stored
+    // 6. Safely add extended book metadata columns to library_books if missing
+    const libraryBookColumnsToEnsure: Array<{ name: string; definition: string }> = [
+      { name: 'description', definition: 'LONGTEXT NULL' },
+      { name: 'memorable_quote', definition: 'TEXT NULL' },
+      { name: 'recommended_for', definition: 'TEXT NULL' },
+      { name: 'tags', definition: 'TEXT NULL' },
+      { name: 'notes', definition: 'LONGTEXT NULL' },
+    ];
+
+    for (const col of libraryBookColumnsToEnsure) {
+      const [colRows] = await this.pool.execute<RowDataPacket[]>(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'library_books' AND COLUMN_NAME = ?`,
+        [dbName, col.name]
+      );
+      if (colRows.length === 0) {
+        await this.pool.execute(
+          `ALTER TABLE library_books ADD COLUMN \`${col.name}\` ${col.definition}`
+        );
+      }
+    }
+
+    // 7. Backfill exact Jalali joined_date from created_at on club_members where placeholder was stored
     const [membersToBackfill] = await this.pool.execute<RowDataPacket[]>(
       "SELECT id, created_at, joined_date FROM club_members WHERE joined_date = '' OR joined_date = '۱۴۰۵' OR joined_date = 'آبان ۱۴۰۵'"
     );
@@ -1140,22 +1185,24 @@ class MySQLDatabaseManager {
   }
 
   public async getLibraryBooks(): Promise<LibraryBookRow[]> {
-    const [rows, hiddenSessions] = await Promise.all([
-      this.pool.execute<RowDataPacket[]>(
-        'SELECT * FROM library_books ORDER BY sort_order ASC, id DESC'
-      ),
-      this.pool.execute<RowDataPacket[]>(
-        "SELECT book_title, title FROM member_sessions WHERE status IN ('غیرفعال', 'برگزارشده', 'برگزار شده')"
-      ),
-    ]);
-    const hiddenTitles = new Set<string>();
-    for (const s of hiddenSessions[0]) {
-      if (s.book_title) hiddenTitles.add(String(s.book_title).trim());
-      if (s.title) hiddenTitles.add(String(s.title).trim());
-    }
-    return (rows[0] as LibraryBookRow[]).filter(
-      (b) => !hiddenTitles.has(String(b.title || '').trim())
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM library_books ORDER BY sort_order ASC, id DESC'
     );
+    return (rows as LibraryBookRow[]).map((b) => ({
+      ...b,
+      description: b.description ?? '',
+      memorable_quote: b.memorable_quote ?? '',
+      recommended_for: b.recommended_for ?? '',
+      tags: b.tags ?? '',
+      notes: b.notes ?? '',
+    }));
+  }
+
+  public async getLibraryCategories(): Promise<LibraryCategoryRow[]> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM library_categories ORDER BY id ASC'
+    );
+    return rows as LibraryCategoryRow[];
   }
 
   public async getPublicActiveSessions(): Promise<MemberSessionRow[]> {
@@ -2255,6 +2302,14 @@ class MySQLDatabaseManager {
 
     const userSessions = allSessions
       .filter((s) => {
+        const allSubsHeld =
+          Array.isArray(s.sub_sessions) &&
+          s.sub_sessions.length > 0 &&
+          s.sub_sessions.every(
+            (sub) => sub.status === 'برگزار شده' || String(sub.status) === 'برگزارشده'
+          );
+        const isSessionHeld =
+          s.status === 'برگزارشده' || s.status === 'برگزار شده' || allSubsHeld;
         const rec = (s.enrolled_members || []).find(
           (e) =>
             e.member_phone === canonicalPhone ||
@@ -2264,6 +2319,7 @@ class MySQLDatabaseManager {
           return rec.status !== 'لغو شده';
         }
         return (
+          isSessionHeld ||
           s.member_phone === canonicalPhone ||
           normalizeIdentifierDigits(s.member_phone) === normalizedPhone
         );
@@ -2274,8 +2330,37 @@ class MySQLDatabaseManager {
             e.member_phone === canonicalPhone ||
             normalizeIdentifierDigits(e.member_phone) === normalizedPhone
         );
-        const isSessionHeld = s.status === 'برگزارشده' || s.status === 'برگزار شده';
-        const isApproved = rec ? rec.status === 'فعال' : s.status === 'فعال' || isSessionHeld;
+        const allSubsHeld =
+          Array.isArray(s.sub_sessions) &&
+          s.sub_sessions.length > 0 &&
+          s.sub_sessions.every(
+            (sub) => sub.status === 'برگزار شده' || String(sub.status) === 'برگزارشده'
+          );
+        const isSessionHeld =
+          s.status === 'برگزارشده' || s.status === 'برگزار شده' || allSubsHeld;
+        const enrollmentStatus: 'فعال' | 'غیرفعال' = rec
+          ? rec.status === 'فعال'
+            ? 'فعال'
+            : 'غیرفعال'
+          : 'فعال';
+
+        if (isSessionHeld) {
+          const normalizedSubs = (s.sub_sessions || []).map((sub) => ({
+            ...sub,
+            status: 'برگزار شده' as const,
+            meeting_link: enrollmentStatus === 'فعال' ? sub.meeting_link : '',
+          }));
+          return {
+            ...s,
+            status: 'برگزار شده' as const,
+            enrollment_status: enrollmentStatus,
+            meeting_link_or_room:
+              enrollmentStatus === 'فعال' ? s.meeting_link_or_room : '',
+            sub_sessions: normalizedSubs,
+          };
+        }
+
+        const isApproved = rec ? rec.status === 'فعال' : s.status === 'فعال';
         if (!isApproved) {
           // Strip protected session links and notes while pending admin approval
           return {
@@ -2293,7 +2378,7 @@ class MySQLDatabaseManager {
         }
         return {
           ...s,
-          status: isSessionHeld ? ('برگزارشده' as const) : ('فعال' as const),
+          status: 'فعال' as const,
           enrollment_status: 'فعال' as const,
         };
       });
@@ -3102,6 +3187,7 @@ class MySQLDatabaseManager {
     aboutManager: AboutManagerRow;
     contactInfo: ContactInfoRow;
     libraryBooks: LibraryBookRow[];
+    libraryCategories: LibraryCategoryRow[];
   }> {
     const [
       rawSessions,
@@ -3117,6 +3203,7 @@ class MySQLDatabaseManager {
       aboutManager,
       contactInfo,
       libraryBooks,
+      libraryCategories,
     ] = await Promise.all([
       this.pool.execute<RowDataPacket[]>(
         'SELECT * FROM member_sessions ORDER BY sort_order ASC, id DESC'
@@ -3147,6 +3234,7 @@ class MySQLDatabaseManager {
       this.getAboutManager(),
       this.getContactInfo(),
       this.getLibraryBooks(),
+      this.getLibraryCategories(),
     ]);
 
     const sessions = await this.mapSessionRowsWithEnrollments(rawSessions[0]);
@@ -3169,6 +3257,7 @@ class MySQLDatabaseManager {
       aboutManager,
       contactInfo,
       libraryBooks,
+      libraryCategories,
     };
   }
 
@@ -3300,9 +3389,14 @@ class MySQLDatabaseManager {
       const nextFullDesc = input.full_description ?? current.full_description ?? '';
       const nextStatus = input.status || current.status || 'فعال';
       const nextRoom = input.meeting_link_or_room ?? current.meeting_link_or_room;
-      const nextSubs = Array.isArray(input.sub_sessions)
-        ? JSON.stringify(input.sub_sessions)
-        : String(current.sub_sessions_json || '[]');
+      const isMarkedHeld = nextStatus === 'برگزارشده' || nextStatus === 'برگزار شده';
+      const rawSubsList = Array.isArray(input.sub_sessions)
+        ? input.sub_sessions
+        : safeJsonParse<SessionSubItemRow[]>(current.sub_sessions_json, []);
+      const finalSubsList = isMarkedHeld
+        ? rawSubsList.map((sub) => ({ ...sub, status: 'برگزار شده' as const }))
+        : rawSubsList;
+      const nextSubs = JSON.stringify(finalSubsList);
 
       await this.pool.execute(
         `UPDATE member_sessions
@@ -3333,18 +3427,6 @@ class MySQLDatabaseManager {
           Number(input.id),
         ]
       );
-
-      await this.syncSessionBookToLibrary({
-        book_title: String(nextBookTitle),
-        author: String(nextBookAuthor || ''),
-        translator: String(nextTranslator || ''),
-        category: String(nextCategory || ''),
-        publication_year: nextPublicationYear,
-        pages_count: nextPagesCount,
-        cover_url: String(nextCover),
-        session_schedule: [nextDate, nextTime].filter(Boolean).join(' · '),
-        short_description: String(nextShortDesc || ''),
-      });
 
       const [updatedRows] = await this.pool.execute<RowDataPacket[]>(
         'SELECT * FROM member_sessions WHERE id = ? LIMIT 1',
@@ -3401,18 +3483,6 @@ class MySQLDatabaseManager {
       ]
     );
 
-    await this.syncSessionBookToLibrary({
-      book_title: bookTitle,
-      author: bookAuthor,
-      translator,
-      category,
-      publication_year: publicationYear,
-      pages_count: pagesCount,
-      cover_url: coverUrl,
-      session_schedule: [sessionDate, sessionTime].filter(Boolean).join(' · '),
-      short_description: shortDescription,
-    });
-
     const [createdRows] = await this.pool.execute<RowDataPacket[]>(
       'SELECT * FROM member_sessions WHERE id = ? LIMIT 1',
       [result.insertId]
@@ -3421,64 +3491,220 @@ class MySQLDatabaseManager {
     return mapped[0];
   }
 
-  private async syncSessionBookToLibrary(input: {
-    book_title: string;
-    author: string;
-    translator: string;
-    category: string;
-    publication_year: number;
-    pages_count: number;
-    cover_url: string;
-    session_schedule: string;
-    short_description: string;
-  }): Promise<void> {
-    if (!input.book_title) return;
-    const [existing] = await this.pool.execute<RowDataPacket[]>(
-      'SELECT id FROM library_books WHERE title = ? LIMIT 1',
-      [input.book_title]
-    );
-    if (existing.length > 0) {
-      await this.pool.execute(
-        `UPDATE library_books
-         SET author = ?, translator = ?, category = ?, publication_year = ?, pages_count = ?, cover_url = ?, session_schedule = ?, short_description = ?
-         WHERE id = ?`,
-        [
-          input.author || '',
-          input.translator || '',
-          input.category || '',
-          input.publication_year || 0,
-          input.pages_count || 0,
-          input.cover_url || '/assets/book-current.png',
-          input.session_schedule,
-          input.short_description || '',
-          existing[0].id,
-        ]
-      );
-      return;
+  public async saveAdminLibraryBook(
+    input: Partial<LibraryBookRow> & { id?: number }
+  ): Promise<LibraryBookRow> {
+    const title = String(input.title || '').trim();
+    if (!title) {
+      throw new Error('عنوان کتاب الزامی است.');
     }
 
-    const [countRows] = await this.pool.execute<RowDataPacket[]>(
-      'SELECT COUNT(*) AS cnt FROM library_books WHERE is_current = 1'
-    );
-    const isCurrent = Number(countRows[0]?.cnt || 0) === 0 ? 1 : 0;
+    if (input.id) {
+      const [rows] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM library_books WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      if (rows.length === 0) {
+        throw new Error('کتاب مورد نظر در کتابخانه یافت نشد.');
+      }
+      const current = rows[0] as LibraryBookRow;
 
-    await this.pool.execute(
+      const nextTitle = title;
+      const nextAuthor =
+        input.author !== undefined ? String(input.author).trim() : String(current.author || '');
+      const nextTranslator =
+        input.translator !== undefined
+          ? String(input.translator).trim()
+          : String(current.translator || '');
+      const nextCategory =
+        input.category !== undefined
+          ? String(input.category).trim()
+          : String(current.category || '');
+      const nextCoverUrl =
+        input.cover_url !== undefined
+          ? String(input.cover_url).trim()
+          : String(current.cover_url || '');
+      const nextShortDesc =
+        input.short_description !== undefined
+          ? String(input.short_description).trim()
+          : String(current.short_description || '');
+      const nextDescription =
+        input.description !== undefined
+          ? String(input.description).trim()
+          : String(current.description || '');
+      const nextMemorableQuote =
+        input.memorable_quote !== undefined
+          ? String(input.memorable_quote).trim()
+          : String(current.memorable_quote || '');
+      const nextRecommendedFor =
+        input.recommended_for !== undefined
+          ? String(input.recommended_for).trim()
+          : String(current.recommended_for || '');
+      const nextTags =
+        input.tags !== undefined ? String(input.tags).trim() : String(current.tags || '');
+      const nextNotes =
+        input.notes !== undefined ? String(input.notes).trim() : String(current.notes || '');
+
+      await this.pool.execute(
+        `UPDATE library_books
+         SET title = ?, author = ?, translator = ?, category = ?, cover_url = ?,
+             short_description = ?, description = ?, memorable_quote = ?,
+             recommended_for = ?, tags = ?, notes = ?
+         WHERE id = ?`,
+        [
+          nextTitle,
+          nextAuthor,
+          nextTranslator,
+          nextCategory,
+          nextCoverUrl,
+          nextShortDesc,
+          nextDescription,
+          nextMemorableQuote,
+          nextRecommendedFor,
+          nextTags,
+          nextNotes,
+          Number(input.id),
+        ]
+      );
+
+      const [updated] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM library_books WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      return updated[0] as LibraryBookRow;
+    }
+
+    const author = String(input.author || '').trim();
+    const translator = String(input.translator || '').trim();
+    const category = String(input.category || '').trim();
+    const coverUrl = String(input.cover_url || '').trim();
+    const shortDescription = String(input.short_description || '').trim();
+    const description = String(input.description || '').trim();
+    const memorableQuote = String(input.memorable_quote || '').trim();
+    const recommendedFor = String(input.recommended_for || '').trim();
+    const tags = String(input.tags || '').trim();
+    const notes = String(input.notes || '').trim();
+
+    const [result] = await this.pool.execute<ResultSetHeader>(
       `INSERT INTO library_books
-        (is_current, title, original_title, author, translator, category, publication_year, pages_count, reading_progress_percent, session_schedule, cover_url, short_description, sort_order)
-       VALUES (?, ?, '', ?, ?, ?, ?, ?, 0, ?, ?, ?, 1)`,
+        (is_current, title, original_title, author, translator, category, publication_year, pages_count, reading_progress_percent, session_schedule, cover_url, short_description, description, memorable_quote, recommended_for, tags, notes, sort_order)
+       VALUES (0, ?, '', ?, ?, ?, 0, 0, 0, '', ?, ?, ?, ?, ?, ?, ?, 0)`,
       [
-        isCurrent,
-        input.book_title,
-        input.author || '',
-        input.translator || '',
-        input.category || '',
-        input.publication_year || 0,
-        input.pages_count || 0,
-        input.session_schedule,
-        input.cover_url || '/assets/book-current.png',
-        input.short_description || '',
+        title,
+        author,
+        translator,
+        category,
+        coverUrl,
+        shortDescription,
+        description,
+        memorableQuote,
+        recommendedFor,
+        tags,
+        notes,
       ]
     );
+
+    const [created] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM library_books WHERE id = ? LIMIT 1',
+      [result.insertId]
+    );
+    return created[0] as LibraryBookRow;
+  }
+
+  public async deleteAdminLibraryBook(id: number): Promise<void> {
+    await this.pool.execute('DELETE FROM library_books WHERE id = ?', [Number(id)]);
+  }
+
+  public async saveAdminLibraryCategory(input: {
+    id?: number;
+    name: string;
+  }): Promise<LibraryCategoryRow> {
+    const cleanName = String(input.name || '').trim();
+    if (!cleanName) {
+      throw new Error('نام دسته‌بندی نمی‌تواند خالی باشد.');
+    }
+
+    if (input.id) {
+      const [existing] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM library_categories WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      if (existing.length === 0) {
+        throw new Error('دسته‌بندی مورد نظر یافت نشد.');
+      }
+      const oldName = String(existing[0].name || '').trim();
+
+      const [dup] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT id FROM library_categories WHERE name = ? AND id != ? LIMIT 1',
+        [cleanName, Number(input.id)]
+      );
+      if (dup.length > 0) {
+        throw new Error('این نام دسته‌بندی قبلاً ثبت شده است.');
+      }
+
+      await this.pool.execute('UPDATE library_categories SET name = ? WHERE id = ?', [
+        cleanName,
+        Number(input.id),
+      ]);
+
+      if (oldName && oldName !== cleanName) {
+        await this.pool.execute('UPDATE library_books SET category = ? WHERE category = ?', [
+          cleanName,
+          oldName,
+        ]);
+      }
+
+      const [updated] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT * FROM library_categories WHERE id = ? LIMIT 1',
+        [Number(input.id)]
+      );
+      return updated[0] as LibraryCategoryRow;
+    }
+
+    const [dup] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT id FROM library_categories WHERE name = ? LIMIT 1',
+      [cleanName]
+    );
+    if (dup.length > 0) {
+      throw new Error('این دسته‌بندی قبلاً ایجاد شده است.');
+    }
+
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      'INSERT INTO library_categories (name) VALUES (?)',
+      [cleanName]
+    );
+
+    const [created] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM library_categories WHERE id = ? LIMIT 1',
+      [result.insertId]
+    );
+    return created[0] as LibraryCategoryRow;
+  }
+
+  public async deleteAdminLibraryCategory(id: number): Promise<void> {
+    const [existing] = await this.pool.execute<RowDataPacket[]>(
+      'SELECT * FROM library_categories WHERE id = ? LIMIT 1',
+      [Number(id)]
+    );
+    if (existing.length === 0) {
+      throw new Error('دسته‌بندی مورد نظر یافت نشد.');
+    }
+    const catName = String(existing[0].name || '').trim();
+
+    if (catName) {
+      const [booksUsing] = await this.pool.execute<RowDataPacket[]>(
+        'SELECT COUNT(*) AS cnt FROM library_books WHERE category = ?',
+        [catName]
+      );
+      const count = Number(booksUsing[0]?.cnt || 0);
+      if (count > 0) {
+        throw new Error(
+          `امکان حذف دسته‌بندی «${catName}» وجود ندارد؛ زیرا ${toPersianDigitsServer(count)} کتاب در این دسته‌بندی ثبت شده است. ابتدا دسته‌بندی آن کتاب‌ها را تغییر دهید.`
+        );
+      }
+    }
+
+    await this.pool.execute('DELETE FROM library_categories WHERE id = ?', [Number(id)]);
   }
 
   public async deleteAdminSession(id: number): Promise<void> {
@@ -4156,6 +4382,12 @@ class MySQLDatabaseManager {
       return updated[0] as UserCommentRow;
     }
 
+    const parsedRating = Number(input.rating);
+    const validRating =
+      Number.isFinite(parsedRating) && parsedRating >= 1 && parsedRating <= 5
+        ? Math.round(parsedRating)
+        : 5;
+
     const [result] = await this.pool.execute<ResultSetHeader>(
       `INSERT INTO user_comments
         (author_name, author_phone, target_title, target_type, rating, comment_text, admin_reply, status, created_date, sort_order)
@@ -4165,7 +4397,7 @@ class MySQLDatabaseManager {
         String(input.author_phone || '').trim(),
         String(input.target_title || 'عمومی').trim(),
         String(input.target_type || 'مقاله وبلاگ').trim(),
-        Number(input.rating || 5),
+        validRating,
         String(input.comment_text || '').trim(),
         String(input.admin_reply || '').trim(),
         input.status || 'در انتظار تایید',

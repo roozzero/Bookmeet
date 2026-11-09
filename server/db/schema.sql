@@ -87,18 +87,30 @@ CREATE TABLE IF NOT EXISTS `library_books` (
   `is_current` TINYINT(1) NOT NULL DEFAULT 0,
   `title` VARCHAR(180) NOT NULL,
   `original_title` VARCHAR(180) NOT NULL DEFAULT '',
-  `author` VARCHAR(150) NOT NULL,
+  `author` VARCHAR(150) NOT NULL DEFAULT '',
   `translator` VARCHAR(150) NOT NULL DEFAULT '',
-  `category` VARCHAR(80) NOT NULL DEFAULT 'کلاسیک',
-  `publication_year` INT NOT NULL DEFAULT 1400,
-  `pages_count` INT NOT NULL DEFAULT 300,
+  `category` VARCHAR(80) NOT NULL DEFAULT '',
+  `publication_year` INT NOT NULL DEFAULT 0,
+  `pages_count` INT NOT NULL DEFAULT 0,
   `reading_progress_percent` INT NOT NULL DEFAULT 0,
   `session_schedule` VARCHAR(180) NOT NULL DEFAULT '',
   `cover_url` LONGTEXT NOT NULL,
   `short_description` TEXT NOT NULL,
+  `description` LONGTEXT NULL,
+  `memorable_quote` TEXT NULL,
+  `recommended_for` TEXT NULL,
+  `tags` TEXT NULL,
+  `notes` LONGTEXT NULL,
   `sort_order` INT NOT NULL DEFAULT 0,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX `idx_library_books_sort` (`sort_order`, `is_current`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 6.5. Library Categories
+CREATE TABLE IF NOT EXISTS `library_categories` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(120) NOT NULL UNIQUE,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 7. Blog Posts

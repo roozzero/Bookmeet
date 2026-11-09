@@ -923,13 +923,14 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     // Defined sessions first (supporting both 'تعریف شده' and 'جلسه آتی'), then Held sessions
     const definedList = (params.subSessions || []).filter(
       (item) =>
-        (item.status === 'تعریف شده' || item.status === 'جلسه آتی') &&
+        item.status !== 'برگزار شده' &&
+        String(item.status) !== 'برگزارشده' &&
         (subSessionFilter === 'all' || subSessionFilter === 'تعریف شده') &&
         matchesSearch(item)
     );
     const heldList = (params.subSessions || []).filter(
       (item) =>
-        item.status === 'برگزار شده' &&
+        (item.status === 'برگزار شده' || String(item.status) === 'برگزارشده') &&
         (subSessionFilter === 'all' || subSessionFilter === 'برگزار شده') &&
         matchesSearch(item)
     );
@@ -1185,11 +1186,24 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       return haystack.includes(query);
     };
 
-    const isHeldSessionStatus = (status: string): boolean =>
-      status === 'برگزارشده' || status === 'برگزار شده';
+    const isHeldSessionStatus = (session: MemberSession): boolean => {
+      if (session.status === 'برگزارشده' || session.status === 'برگزار شده') {
+        return true;
+      }
+      const subs = session.sub_sessions || [];
+      if (
+        subs.length > 0 &&
+        subs.every(
+          (sub) => sub.status === 'برگزار شده' || String(sub.status) === 'برگزارشده'
+        )
+      ) {
+        return true;
+      }
+      return false;
+    };
 
     const upcomingSessions = state.sessions.filter((session) => {
-      if (isHeldSessionStatus(session.status)) return false;
+      if (isHeldSessionStatus(session)) return false;
       if (sessionsListFilter === 'برگزارشده') return false;
       if (sessionsListFilter === 'فعال') {
         if (session.status !== 'فعال' && session.status !== 'ثبت‌نام‌شده') return false;
@@ -1200,18 +1214,20 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     });
 
     const heldSessions = state.sessions.filter((session) => {
-      if (!isHeldSessionStatus(session.status)) return false;
+      if (!isHeldSessionStatus(session)) return false;
       if (sessionsListFilter !== 'all' && sessionsListFilter !== 'برگزارشده') return false;
       return matchesSessionQuery(session);
     });
 
-    const hasPendingSessions = state.sessions.some((s) => s.status === 'غیرفعال');
+    const hasPendingSessions = state.sessions.some(
+      (s) => !isHeldSessionStatus(s) && s.status === 'غیرفعال'
+    );
 
     const renderSessionEnrollmentCard = (session: MemberSession): string => {
       const totalCount = (session.sub_sessions || []).length;
       const coverImg = session.cover_url || '/assets/book-current.png';
-      const isInactive = session.status === 'غیرفعال';
-      const isHeld = isHeldSessionStatus(session.status);
+      const isHeld = isHeldSessionStatus(session);
+      const isInactive = !isHeld && session.status === 'غیرفعال';
 
       return `
         <article
@@ -2174,9 +2190,9 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
             ${
               isClosed
                 ? `
-              <div class="p-5 rounded-2xl bg-[#EAE0D2]/80 border border-[#D5C3AE] text-center space-y-1">
-                <div class="text-[14px] font-bold text-[#4E3B2D]">این تیکت توسط مدیریت باشگاه بسته شده است</div>
-                <p class="text-[12.5px] text-[#6B5444]">
+              <div class="p-5 rounded-2xl bg-[#EAE0D2]/80 border border-[#D5C3AE] flex flex-col items-center justify-center text-center space-y-1.5">
+                <div class="text-[14px] font-bold text-[#4E3B2D] text-center">این تیکت توسط مدیریت باشگاه بسته شده است</div>
+                <p class="text-[12.5px] text-[#6B5444] !text-center text-center mx-auto">
                   امکان ارسال پیام جدید در تیکت بسته‌شده وجود ندارد. در صورت نیاز می‌توانید تیکت جدیدی ثبت نمایید.
                 </p>
               </div>
@@ -2905,6 +2921,25 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     `);
   }
 
+  function refreshPanelStateInBackground(): void {
+    ApiService.fetchMemberPanelData(state.member.phone)
+      .then((fresh) => {
+        state = {
+          ...state,
+          sessions: [...(fresh.sessions || [])],
+          classes: [...(fresh.classes || [])],
+          library: [...(fresh.library || [])],
+          tickets: [...(fresh.tickets || [])],
+          calendarEvents: [...(fresh.calendarEvents || [])],
+          announcements: [...(fresh.announcements || [])],
+        };
+        render();
+      })
+      .catch(() => {
+        // Ignore silent background sync error
+      });
+  }
+
   // Event Delegations
   $wrapper.on('click', '.js-panel-tab-btn', function () {
     const nextTab = $(this).data('tab') as PanelTabKey;
@@ -2920,6 +2955,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       profileSavedBannerMessage = '';
       notifyRoute();
       render();
+      refreshPanelStateInBackground();
     }
   });
 
@@ -2935,6 +2971,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
       profileSavedBannerMessage = '';
       notifyRoute();
       render();
+      refreshPanelStateInBackground();
     }
   });
 
