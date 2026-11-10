@@ -48,8 +48,8 @@ export function createAboutClubSectionComponent(
           </div>
 
           <!-- Clean Unboxed Editorial Metrics Row with Incremental Motion Graphics -->
-          <div class="js-about-stats pt-6 border-t border-[#dbd1bd] grid grid-cols-3 gap-6">
-            <div>
+          <div class="js-about-stats pt-6 border-t border-[#dbd1bd] grid grid-cols-3 gap-4 sm:gap-6 text-center sm:text-right">
+            <div class="flex flex-col items-center sm:items-start text-center sm:text-right">
               <div
                 class="js-stat-counter text-xl sm:text-2xl font-bold text-[#38281b] tabular-nums"
                 data-prefix="${stat1.prefix}"
@@ -63,7 +63,7 @@ export function createAboutClubSectionComponent(
               </div>
             </div>
 
-            <div>
+            <div class="flex flex-col items-center sm:items-start text-center sm:text-right">
               <div
                 class="js-stat-counter text-xl sm:text-2xl font-bold text-[#38281b] tabular-nums"
                 data-prefix="${stat2.prefix}"
@@ -77,7 +77,7 @@ export function createAboutClubSectionComponent(
               </div>
             </div>
 
-            <div>
+            <div class="flex flex-col items-center sm:items-start text-center sm:text-right">
               <div
                 class="js-stat-counter text-xl sm:text-2xl font-bold text-[#38281b] tabular-nums"
                 data-prefix="${stat3.prefix}"

@@ -192,11 +192,11 @@ export function createContactSectionComponent(
               </div>
 
               <!-- Organized Social Media Icon Row -->
-              <div class="flex flex-col sm:flex-row md:flex-col items-start sm:items-center md:items-end gap-2.5 w-full md:w-auto justify-between">
+              <div class="flex flex-col items-center md:items-end gap-2.5 w-full md:w-auto justify-center md:justify-between text-center md:text-right">
                 <span class="text-[11px] font-medium text-[#6e5947]">
                   همراه ما در شبکه‌های اجتماعی باشید
                 </span>
-                <div class="flex items-center gap-2" role="list" aria-label="شبکه‌های اجتماعی باشگاه کتابوشکا">
+                <div class="flex items-center justify-center md:justify-end gap-2" role="list" aria-label="شبکه‌های اجتماعی باشگاه کتابوشکا">
                   <!-- Instagram -->
                   <a
                     href="${footer.instagram_url || '#instagram'}"
@@ -280,11 +280,13 @@ export function createContactSectionComponent(
             ${
               footerLinks.length > 0 || hasFooterContact
                 ? `
-              <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#e5dccb] text-[12px] text-[#5c4a3a]">
+              <div class="${
+                hasFooterContact ? 'flex' : 'hidden md:flex'
+              } flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#e5dccb] text-[12px] text-[#5c4a3a]">
                 ${
                   footerLinks.length > 0
                     ? `
-                  <nav aria-label="لینک‌های فوتر" class="flex flex-wrap items-center gap-x-5 gap-y-2">
+                  <nav aria-label="لینک‌های فوتر" class="hidden md:flex flex-wrap items-center gap-x-5 gap-y-2">
                     ${footerLinks
                       .map(
                         (link) => `
@@ -299,13 +301,13 @@ export function createContactSectionComponent(
                       .join('')}
                   </nav>
                 `
-                    : '<div></div>'
+                    : '<div class="hidden md:block"></div>'
                 }
 
                 ${
                   hasFooterContact
                     ? `
-                  <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11.5px] text-[#5c4a3a]">
+                  <div class="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1.5 text-[11.5px] text-[#5c4a3a]">
                     ${
                       footer.phone
                         ? `<span>تلفن: <strong class="font-semibold text-[#2c1b0e]">${toPersianDigits(footer.phone)}</strong></span>`
@@ -330,14 +332,14 @@ export function createContactSectionComponent(
                 : ''
             }
 
-            <div class="pt-1 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-[#75604d]">
-              <div>
+            <div class="pt-1 flex flex-col md:flex-row items-center justify-center md:justify-between gap-2 text-[11px] text-[#75604d] text-center md:text-right">
+              <div class="w-full md:w-auto text-center md:text-right">
                 ${toPersianDigits(
                   footer.copyright_text ||
                     'تمامی حقوق مادی و معنوی برای باشگاه کتابخوانی کتابوشکا محفوظ است · ۱۴۰۵'
                 )}
               </div>
-              <div>
+              <div class="hidden md:block">
                 ${toPersianDigits(footer.tagline_text || 'حلقه‌های مطالعاتی و نقد ادبیات داستانی')}
               </div>
             </div>

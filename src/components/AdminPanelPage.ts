@@ -1411,44 +1411,49 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </button>
             </div>
 
-            <div class="p-6 overflow-y-auto space-y-5">
-              <div class="flex flex-col sm:flex-row items-start gap-5">
-                ${
-                  b.cover_url
-                    ? `<img src="${b.cover_url}" alt="${b.title}" class="w-32 h-44 object-cover rounded-xl border border-[#D8C4AA] shrink-0" />`
-                    : `<div class="w-32 h-44 rounded-xl bg-[#EFE3D2] border border-[#D8C4AA] flex items-center justify-center text-[12px] text-[#6B5444] shrink-0">بدون تصویر کاور</div>`
-                }
-                <div class="flex-1 min-w-0 space-y-3 w-full">
-                  <div>
+            <div class="p-5 sm:p-6 overflow-y-auto space-y-5">
+              <div class="space-y-4">
+                <div class="flex flex-row items-center gap-4">
+                  ${
+                    b.cover_url
+                      ? `<img src="${b.cover_url}" alt="${b.title}" class="w-24 h-34 sm:w-32 sm:h-44 object-cover rounded-xl border border-[#D8C4AA] shrink-0" />`
+                      : `<div class="w-24 h-34 sm:w-32 sm:h-44 rounded-xl bg-[#EFE3D2] border border-[#D8C4AA] flex items-center justify-center text-[11px] sm:text-[12px] text-[#6B5444] shrink-0 text-center px-2">بدون تصویر کاور</div>`
+                  }
+                  <div class="flex-1 min-w-0 text-right space-y-1.5">
                     <span class="text-[11.5px] font-semibold text-[#7A6352] block">عنوان کتاب:</span>
-                    <div class="font-display text-[18px] font-bold text-[#231912] mt-0.5">${toPersianDigits(b.title)}</div>
+                    <div class="font-display text-[17px] sm:text-[20px] font-bold text-[#231912] leading-[1.6] break-words">${toPersianDigits(b.title)}</div>
+                    ${
+                      b.category
+                        ? `<span class="inline-block px-2.5 py-0.5 rounded-md bg-[#EFE3D2] text-[#5A3A22] text-[11px] font-semibold">${toPersianDigits(b.category)}</span>`
+                        : ''
+                    }
                   </div>
+                </div>
 
-                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
-                    <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
-                      <span class="block text-[11px] text-[#7A6352]">نام نویسنده:</span>
-                      <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.author ? toPersianDigits(b.author) : '—'}</strong>
-                    </div>
-                    <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
-                      <span class="block text-[11px] text-[#7A6352]">مترجم:</span>
-                      <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.translator ? toPersianDigits(b.translator) : '—'}</strong>
-                    </div>
-                    <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
-                      <span class="block text-[11px] text-[#7A6352]">نام ناشر:</span>
-                      <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.publisher ? toPersianDigits(b.publisher) : '—'}</strong>
-                    </div>
-                    <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
-                      <span class="block text-[11px] text-[#7A6352]">سال انتشار:</span>
-                      <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.publication_year && Number(b.publication_year) > 0 ? toPersianDigits(b.publication_year) : '—'}</strong>
-                    </div>
-                    <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
-                      <span class="block text-[11px] text-[#7A6352]">نوبت چاپ:</span>
-                      <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.edition_number ? toPersianDigits(b.edition_number) : '—'}</strong>
-                    </div>
-                    <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
-                      <span class="block text-[11px] text-[#7A6352]">تعداد صفحات:</span>
-                      <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.pages_count && Number(b.pages_count) > 0 ? `${toPersianDigits(b.pages_count)} صفحه` : '—'}</strong>
-                    </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                  <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
+                    <span class="block text-[11px] text-[#7A6352]">نام نویسنده:</span>
+                    <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.author ? toPersianDigits(b.author) : '—'}</strong>
+                  </div>
+                  <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
+                    <span class="block text-[11px] text-[#7A6352]">مترجم:</span>
+                    <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.translator ? toPersianDigits(b.translator) : '—'}</strong>
+                  </div>
+                  <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
+                    <span class="block text-[11px] text-[#7A6352]">نام ناشر:</span>
+                    <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.publisher ? toPersianDigits(b.publisher) : '—'}</strong>
+                  </div>
+                  <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
+                    <span class="block text-[11px] text-[#7A6352]">سال انتشار:</span>
+                    <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.publication_year && Number(b.publication_year) > 0 ? toPersianDigits(b.publication_year) : '—'}</strong>
+                  </div>
+                  <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
+                    <span class="block text-[11px] text-[#7A6352]">نوبت چاپ:</span>
+                    <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.edition_number ? toPersianDigits(b.edition_number) : '—'}</strong>
+                  </div>
+                  <div class="p-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5]">
+                    <span class="block text-[11px] text-[#7A6352]">تعداد صفحات:</span>
+                    <strong class="block text-[12.5px] text-[#231912] mt-0.5">${b.pages_count && Number(b.pages_count) > 0 ? `${toPersianDigits(b.pages_count)} صفحه` : '—'}</strong>
                   </div>
                 </div>
               </div>
@@ -1802,17 +1807,17 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 class="w-full h-10 px-3.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912]"
               />
             </div>
-            <div class="flex items-center gap-2 shrink-0">
+            <div class="grid grid-cols-2 sm:flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
               <input type="file" accept="image/*" class="js-admin-gallery-file-input hidden" />
               <button
                 type="button"
-                class="js-admin-trigger-gallery-file h-10 px-3.5 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#3F2E21] whitespace-nowrap cursor-pointer"
+                class="js-admin-trigger-gallery-file w-full sm:w-auto h-10 px-3.5 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#3F2E21] text-center justify-center whitespace-nowrap cursor-pointer"
               >
                 انتخاب فایل
               </button>
               <button
                 type="submit"
-                class="h-10 px-4 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold whitespace-nowrap cursor-pointer"
+                class="w-full sm:w-auto h-10 px-4 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold text-center justify-center whitespace-nowrap cursor-pointer"
               >
                 ثبت در گالری
               </button>
@@ -1838,14 +1843,14 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             placeholder="جستجو در عنوان تصاویر گالری..."
             class="js-admin-gallery-search w-full px-4 py-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
           />
-          <div class="flex flex-wrap items-center gap-2">
+          <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
             ${['all', 'کاور کتاب', 'وبلاگ و کلاس‌ها', 'تصاویر باشگاه']
               .map(
                 (cat) => `
               <button
                 type="button"
                 data-gallery-cat="${cat}"
-                class="js-admin-gallery-cat min-w-[115px] h-8 px-3 rounded-lg text-[12px] font-semibold inline-flex items-center justify-center cursor-pointer transition-colors ${
+                class="js-admin-gallery-cat w-full sm:w-auto sm:min-w-[115px] h-9 sm:h-8 px-3 rounded-lg text-[12px] font-semibold inline-flex items-center justify-center cursor-pointer transition-colors ${
                   galleryCategoryFilter === cat
                     ? 'bg-[#5A3A22] text-[#FAF5EC]'
                     : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D]'
@@ -1934,16 +1939,16 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               ثبت، مشاهده، ویرایش و حذف کتاب‌های کتابخانه باشگاه به همراه مدیریت دسته‌بندی‌ها و برچسب‌ها در دیتابیس MySQL.
             </p>
           </div>
-          <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div class="grid grid-cols-2 sm:flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
             <button
               type="button"
-              class="js-admin-open-lib-cat-modal px-4 py-2.5 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] text-[12.5px] font-semibold transition-colors cursor-pointer"
+              class="js-admin-open-lib-cat-modal w-full sm:w-auto px-3.5 sm:px-4 py-2.5 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] text-[12px] sm:text-[12.5px] font-semibold text-center justify-center transition-colors cursor-pointer"
             >
               مدیریت دسته‌بندی‌ها
             </button>
             <button
               type="button"
-              class="js-admin-new-lib-book-btn px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer"
+              class="js-admin-new-lib-book-btn w-full sm:w-auto px-3.5 sm:px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] sm:text-[13px] font-semibold text-center justify-center transition-colors cursor-pointer"
             >
               + افزودن کتاب جدید
             </button>
@@ -2104,29 +2109,46 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                       </p>
                     </div>
                   </div>
-                  <div class="flex flex-wrap items-center gap-2 shrink-0">
+                  <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                     <input type="file" accept="image/*" class="js-admin-lib-cover-file-input hidden" />
                     <button
                       type="button"
-                      class="js-admin-trigger-lib-cover-upload px-3.5 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] text-[12px] font-semibold cursor-pointer"
+                      title="آپلود تصویر کاور"
+                      aria-label="آپلود تصویر کاور"
+                      class="js-admin-trigger-lib-cover-upload w-10 h-10 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] inline-flex items-center justify-center cursor-pointer transition-colors"
                     >
-                      آپلود تصویر کاور
+                      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                      </svg>
                     </button>
                     <button
                       type="button"
                       data-gallery-target="library"
-                      class="js-admin-open-gallery-picker px-3.5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold cursor-pointer"
+                      title="انتخاب از گالری تصاویر"
+                      aria-label="انتخاب از گالری تصاویر"
+                      class="js-admin-open-gallery-picker w-10 h-10 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] inline-flex items-center justify-center cursor-pointer transition-colors"
                     >
-                      انتخاب از گالری تصاویر
+                      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                      </svg>
                     </button>
                     ${
                       editingLibraryBook.cover_url
                         ? `
                       <button
                         type="button"
-                        class="js-admin-clear-lib-cover px-3 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[11.5px] font-semibold cursor-pointer"
+                        title="حذف تصویر"
+                        aria-label="حذف تصویر"
+                        class="js-admin-clear-lib-cover w-10 h-10 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] inline-flex items-center justify-center cursor-pointer transition-colors"
                       >
-                        حذف تصویر
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
                       </button>
                     `
                         : ''
@@ -2139,15 +2161,15 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <div class="sm:col-span-2 lg:col-span-4">
                 <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1.5">برچسب‌ها</label>
                 <div class="p-3.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] space-y-3">
-                  <div class="flex items-center gap-2">
+                  <div class="flex flex-col gap-2.5">
                     <input
                       type="text"
                       placeholder="برچسب را بنویسید و دکمه «افزودن برچسب» یا کلید Enter را بزنید..."
-                      class="js-admin-lib-tag-input flex-1 px-3.5 py-2 rounded-xl bg-[#FAF5EC] border border-[#DFCEB9] text-[12.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                      class="js-admin-lib-tag-input w-full px-3.5 py-2.5 rounded-xl bg-[#FAF5EC] border border-[#DFCEB9] text-[12.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
                     />
                     <button
                       type="button"
-                      class="js-admin-add-lib-tag-btn px-4 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold cursor-pointer shrink-0"
+                      class="js-admin-add-lib-tag-btn w-full px-4 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold text-center justify-center cursor-pointer"
                     >
                       + افزودن برچسب
                     </button>
@@ -2244,18 +2266,18 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </div>
             </div>
 
-            <div class="flex justify-end gap-2.5 pt-2 border-t border-[#E5D7C5]">
+            <div class="grid grid-cols-2 gap-3 pt-2 border-t border-[#E5D7C5] w-full sm:w-auto sm:min-w-[280px] sm:mr-auto">
               <button
                 type="button"
-                class="js-admin-cancel-lib-book px-4 py-2.5 rounded-xl border border-[#C5B198] text-[12.5px] font-semibold text-[#4E3B2D] hover:bg-[#EFE3D2] cursor-pointer"
+                class="js-admin-cancel-lib-book w-full px-4 py-2.5 rounded-xl border border-[#C5B198] text-[12.5px] font-semibold text-[#4E3B2D] hover:bg-[#EFE3D2] text-center justify-center cursor-pointer"
               >
                 انصراف
               </button>
               <button
                 type="submit"
-                class="px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold cursor-pointer"
+                class="w-full px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold text-center justify-center cursor-pointer"
               >
-                ${editingLibraryBook.id ? 'بروزرسانی کتاب در دیتابیس' : 'ذخیره کتاب در دیتابیس'}
+                بروزرسانی
               </button>
             </div>
           </form>
@@ -2271,35 +2293,62 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             placeholder="جستجو در عنوان کتاب، خلاصه، توضیحات، دسته‌بندی یا برچسب‌ها..."
             class="js-admin-lib-search flex-1 px-4 py-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
           />
-          <div class="flex flex-wrap items-center gap-2 shrink-0">
-            <button
-              type="button"
-              data-lib-cat-filter="all"
-              class="js-admin-lib-cat-filter px-3.5 py-2 rounded-xl text-[12px] font-semibold cursor-pointer transition-colors ${
-                libraryCategoryFilter === 'all'
-                  ? 'bg-[#5A3A22] text-[#FAF5EC]'
-                  : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#E8D8C3]'
-              }"
+          <div class="w-full sm:w-auto shrink-0">
+            <select
+              aria-label="فیلتر دسته‌بندی کتابخانه"
+              class="js-admin-lib-cat-select ${
+                availableCategories.length > 4 ? 'block' : 'block md:hidden'
+              } w-full sm:w-auto sm:min-w-[210px] px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[12.5px] font-semibold text-[#231912] focus:outline-none focus:border-[#8B5A36]"
             >
-              همه کتاب‌ها (${toPersianDigits(state.libraryBooks.length)})
-            </button>
-            ${availableCategories
-              .map(
-                (cat) => `
-              <button
-                type="button"
-                data-lib-cat-filter="${cat}"
-                class="js-admin-lib-cat-filter px-3.5 py-2 rounded-xl text-[12px] font-semibold cursor-pointer transition-colors ${
-                  libraryCategoryFilter === cat
-                    ? 'bg-[#5A3A22] text-[#FAF5EC]'
-                    : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#E8D8C3]'
-                }"
-              >
-                ${toPersianDigits(cat)}
-              </button>
+              <option value="all" ${libraryCategoryFilter === 'all' ? 'selected' : ''}>
+                همه کتاب‌ها (${toPersianDigits(state.libraryBooks.length)})
+              </option>
+              ${availableCategories
+                .map(
+                  (cat) => `
+                <option value="${cat}" ${libraryCategoryFilter === cat ? 'selected' : ''}>
+                  ${toPersianDigits(cat)}
+                </option>
+              `
+                )
+                .join('')}
+            </select>
+            ${
+              availableCategories.length <= 4
+                ? `
+              <div class="hidden md:flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  data-lib-cat-filter="all"
+                  class="js-admin-lib-cat-filter px-3.5 py-2 rounded-xl text-[12px] font-semibold cursor-pointer transition-colors ${
+                    libraryCategoryFilter === 'all'
+                      ? 'bg-[#5A3A22] text-[#FAF5EC]'
+                      : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#E8D8C3]'
+                  }"
+                >
+                  همه کتاب‌ها (${toPersianDigits(state.libraryBooks.length)})
+                </button>
+                ${availableCategories
+                  .map(
+                    (cat) => `
+                  <button
+                    type="button"
+                    data-lib-cat-filter="${cat}"
+                    class="js-admin-lib-cat-filter px-3.5 py-2 rounded-xl text-[12px] font-semibold cursor-pointer transition-colors ${
+                      libraryCategoryFilter === cat
+                        ? 'bg-[#5A3A22] text-[#FAF5EC]'
+                        : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#E8D8C3]'
+                    }"
+                  >
+                    ${toPersianDigits(cat)}
+                  </button>
+                `
+                  )
+                  .join('')}
+              </div>
             `
-              )
-              .join('')}
+                : ''
+            }
           </div>
         </div>
 
@@ -2455,7 +2504,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           </div>
           <button
             type="button"
-            class="js-admin-new-session-btn px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+            class="js-admin-new-session-btn w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold text-center justify-center transition-colors cursor-pointer shrink-0"
           >
             + افزودن دوره هم‌خوانی جدید
           </button>
@@ -2584,7 +2633,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             placeholder="جستجو در عنوان دوره، نام کتاب، نویسنده یا مترجم..."
             class="js-admin-session-search flex-1 px-4 py-2 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
           />
-          <div class="flex flex-wrap items-center gap-2 shrink-0">
+          <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 shrink-0">
             ${(
               [
                 { key: 'all', label: 'همه دوره‌ها' },
@@ -2598,7 +2647,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <button
                 type="button"
                 data-session-filter="${f.key}"
-                class="js-admin-session-filter px-3.5 h-8 rounded-lg text-[12px] font-semibold inline-flex items-center justify-center cursor-pointer transition-colors ${
+                class="js-admin-session-filter px-3.5 h-9 sm:h-8 rounded-lg text-[12px] font-semibold inline-flex items-center justify-center cursor-pointer transition-colors ${
                   sessionStatusFilter === f.key
                     ? 'bg-[#5A3A22] text-[#FAF5EC]'
                     : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D]'
@@ -2633,9 +2682,9 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     <span class="px-2.5 py-1 rounded-lg bg-[#1E140E]/65">${toPersianDigits((s.sub_sessions || []).length)} زیرجلسه</span>
                   </div>
                 </div>
-                <div class="p-5 space-y-2.5">
+                <div class="p-4 sm:p-5 space-y-2.5">
                   <h3 class="font-display text-[16.5px] font-bold text-[#231912] truncate">${toPersianDigits(s.title)}</h3>
-                  <div class="text-[12.5px] text-[#5B4739] grid grid-cols-2 gap-y-1.5 gap-x-3">
+                  <div class="text-[12px] sm:text-[12.5px] text-[#5B4739] grid grid-cols-2 gap-y-2 gap-x-3">
                     <div>نام کتاب: <strong class="text-[#231912]">${toPersianDigits(s.book_title)}</strong></div>
                     <div>نویسنده: <strong class="text-[#231912]">${toPersianDigits(s.book_author || '—')}</strong></div>
                     <div>مترجم: <strong class="text-[#231912]">${toPersianDigits(s.translator || s.mentor_name || '—')}</strong></div>
@@ -2643,7 +2692,11 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     <div>تعداد صفحات: <strong class="text-[#231912]">${s.pages_count ? `${toPersianDigits(s.pages_count)} صفحه` : '—'}</strong></div>
                     <div>سال انتشار: <strong class="text-[#231912]">${s.publication_year ? toPersianDigits(s.publication_year) : '—'}</strong></div>
                     <div>انتشارات: <strong class="text-[#231912]">${toPersianDigits(s.publisher || '—')}</strong></div>
-                    <div>زمان: <strong class="text-[#231912]">${formatPersianDateDisplay(s.session_date || '—')}${s.session_time ? ` · ساعت ${toPersianDigits(s.session_time)}` : ''}</strong></div>
+                    <div>تاریخ: <strong class="text-[#231912]">${formatPersianDateDisplay(s.session_date || '—')}</strong></div>
+                    <div class="col-span-2 pt-1 border-t border-[#E6D8C5]/70">
+                      <span class="block text-[#7A6352]">ساعت:</span>
+                      <strong class="block text-[#231912] mt-0.5">${s.session_time ? toPersianDigits(s.session_time) : '—'}</strong>
+                    </div>
                   </div>
                   ${renderEnrolledMembersBlock({
                     targetType: 'session',
@@ -2653,28 +2706,28 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   })}
                 </div>
               </div>
-              <div class="px-5 pb-5 pt-3 border-t border-[#E6D8C5] flex flex-wrap items-center justify-between gap-2">
+              <div class="px-3.5 sm:px-5 pb-4 sm:pb-5 pt-3 border-t border-[#E6D8C5] flex items-center justify-between gap-1.5 sm:gap-2 flex-nowrap">
                 <button
                   type="button"
                   data-manage-session-subs="${s.id}"
-                  class="js-admin-manage-session-subs px-3.5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold cursor-pointer"
+                  class="js-admin-manage-session-subs px-2.5 sm:px-3.5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[11px] sm:text-[12px] font-semibold whitespace-nowrap cursor-pointer shrink-0"
                 >
-                  صفحه جلسات دوره (${toPersianDigits((s.sub_sessions || []).length)})
+                  صفحه جلسات (${toPersianDigits((s.sub_sessions || []).length)})
                 </button>
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-1 sm:gap-1.5 flex-nowrap shrink-0">
                   ${
                     normStatus !== 'برگزار شده'
                       ? `
                     <button
                       type="button"
                       data-mark-held-session="${s.id}"
-                      class="js-admin-mark-session-held px-3 py-2 rounded-xl bg-[#E4F2E7] hover:bg-[#235332] text-[#235332] hover:text-[#FAF5EC] border border-[#BBD9C2] text-[12px] font-semibold cursor-pointer transition-colors"
+                      class="js-admin-mark-session-held px-2 sm:px-3 py-2 rounded-xl bg-[#E4F2E7] hover:bg-[#235332] text-[#235332] hover:text-[#FAF5EC] border border-[#BBD9C2] text-[11px] sm:text-[12px] font-semibold whitespace-nowrap cursor-pointer transition-colors"
                     >
                       برگزار شده
                     </button>
                   `
                       : `
-                    <span class="px-3 py-2 rounded-xl bg-[#E4F2E7] text-[#235332] border border-[#BBD9C2] text-[11.5px] font-bold">
+                    <span class="px-2 sm:px-3 py-2 rounded-xl bg-[#E4F2E7] text-[#235332] border border-[#BBD9C2] text-[11px] font-bold whitespace-nowrap">
                       ✓ برگزار شده
                     </span>
                   `
@@ -2682,14 +2735,14 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   <button
                     type="button"
                     data-edit-session="${s.id}"
-                    class="js-admin-edit-session px-3 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] text-[#3F2E21] text-[12px] font-semibold cursor-pointer"
+                    class="js-admin-edit-session px-2 sm:px-3 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] text-[#3F2E21] text-[11px] sm:text-[12px] font-semibold whitespace-nowrap cursor-pointer"
                   >
                     ویرایش
                   </button>
                   <button
                     type="button"
                     data-delete-session="${s.id}"
-                    class="js-admin-delete-session px-3 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold cursor-pointer"
+                    class="js-admin-delete-session px-2 sm:px-3 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[11px] sm:text-[12px] font-semibold whitespace-nowrap cursor-pointer"
                   >
                     حذف
                   </button>
@@ -2728,7 +2781,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
 
     return `
       <div class="space-y-6">
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 class="font-display text-[19px] sm:text-[21px] font-bold text-[#231912]">
               صفحه جلسات: ${toPersianDigits(params.parentTitle)}
@@ -2737,16 +2790,16 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               کارت‌های جلسات آتی و برگزار شده این دوره را جستجو، فیلتر، اضافه، ویرایش یا حذف نمایید.
             </p>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="grid grid-cols-2 gap-2.5 w-full sm:w-auto shrink-0">
             <button
               type="button"
-              class="js-admin-open-add-subsession px-4 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer"
+              class="js-admin-open-add-subsession w-full px-3 sm:px-4 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] sm:text-[12.5px] font-semibold text-center justify-center cursor-pointer"
             >
               + افزودن کارت جلسه جدید
             </button>
             <button
               type="button"
-              class="js-admin-close-subs-view px-4 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] text-[#3F2E21] text-[12.5px] font-semibold cursor-pointer"
+              class="js-admin-close-subs-view w-full px-3 sm:px-4 py-2.5 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] text-[#3F2E21] text-[12px] sm:text-[12.5px] font-semibold text-center justify-center cursor-pointer"
             >
               → بازگشت به لیست
             </button>
@@ -2875,7 +2928,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             placeholder="جستجو در شماره جلسه، عنوان مبحث یا تاریخ برگزاری..."
             class="js-admin-subsession-search flex-1 px-4 py-2 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
           />
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="grid grid-cols-3 sm:flex items-center gap-2 shrink-0">
             ${(
               [
                 { key: 'all', label: 'همه جلسات' },
@@ -2888,7 +2941,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <button
                 type="button"
                 data-subsession-filter="${f.key}"
-                class="js-admin-subsession-filter w-[104px] h-8 rounded-lg text-[12px] font-semibold inline-flex items-center justify-center cursor-pointer transition-colors ${
+                class="js-admin-subsession-filter w-full sm:w-[104px] h-9 sm:h-8 rounded-lg text-[11.5px] sm:text-[12px] font-semibold inline-flex items-center justify-center cursor-pointer transition-colors ${
                   subSessionStatusFilter === f.key
                     ? 'bg-[#5A3A22] text-[#FAF5EC]'
                     : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D]'
@@ -2909,25 +2962,32 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               const displayStatus = normalizeSubSessionStatus(sub.status);
               return `
             <div class="p-4 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col justify-between gap-3">
-              <div class="space-y-2">
-                <div class="flex items-center justify-between gap-2">
-                  <span class="px-2.5 py-1 rounded-lg text-[11.5px] font-bold ${
+              <div class="space-y-2.5">
+                <div class="flex items-start justify-between gap-2">
+                  <h4 class="font-display text-[15px] sm:text-[15.5px] font-bold text-[#231912] leading-[1.6]">
+                    ${toPersianDigits(sub.session_number)} · ${toPersianDigits(sub.title)}
+                  </h4>
+                  <span class="px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 ${
                     displayStatus === 'جلسه آتی'
                       ? 'bg-[#E4F2E7] text-[#235332]'
                       : 'bg-[#EFE0CC] text-[#6E4526]'
                   }">
-                    ${toPersianDigits(sub.session_number)} · ${displayStatus}
-                  </span>
-                  <span class="text-[11.5px] text-[#6B5444]">
-                    ${formatPersianDateDisplay(sub.session_date)}${
-                      sub.session_time ? ` · ساعت ${toPersianDigits(sub.session_time)}` : ''
-                    }
+                    ${displayStatus}
                   </span>
                 </div>
-                <h4 class="font-display text-[15.5px] font-bold text-[#231912]">${toPersianDigits(sub.title)}</h4>
+                <div class="grid grid-cols-2 gap-2 px-3 py-2 rounded-xl bg-[#F4E9DA]/65 border border-[#E5D7C5] text-[11.5px] text-[#5B4739]">
+                  <div>
+                    <span class="text-[#7A6352]">روز:</span>
+                    <strong class="text-[#231912] mr-1">${formatPersianDateDisplay(sub.session_date)}</strong>
+                  </div>
+                  <div>
+                    <span class="text-[#7A6352]">ساعت:</span>
+                    <strong class="text-[#231912] mr-1">${sub.session_time ? toPersianDigits(sub.session_time) : '—'}</strong>
+                  </div>
+                </div>
                 <p class="text-[12px] text-[#5B4739]">سر فصل جلسه: ${toPersianDigits(sub.pages_to_read || String(sub.pages_read || '—'))}</p>
               </div>
-              <div class="pt-2 border-t border-[#E6D8C5] flex flex-wrap items-center justify-end gap-2">
+              <div class="pt-2.5 border-t border-[#E6D8C5] flex items-center justify-end gap-1.5 sm:gap-2 flex-nowrap">
                 ${
                   displayStatus !== 'برگزار شده'
                     ? `
@@ -2936,13 +2996,13 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     data-parent-type="${params.parentType}"
                     data-parent-id="${params.parentId}"
                     data-sub-id="${sub.id}"
-                    class="js-admin-mark-subsession-held px-3 py-1.5 rounded-lg bg-[#E4F2E7] hover:bg-[#235332] text-[#235332] hover:text-[#FAF5EC] border border-[#BBD9C2] text-[11.5px] font-semibold cursor-pointer transition-colors"
+                    class="js-admin-mark-subsession-held px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#E4F2E7] hover:bg-[#235332] text-[#235332] hover:text-[#FAF5EC] border border-[#BBD9C2] text-[11px] sm:text-[11.5px] font-semibold whitespace-nowrap cursor-pointer transition-colors"
                   >
                     برگزار شده
                   </button>
                 `
                     : `
-                  <span class="px-2.5 py-1 rounded-lg bg-[#E4F2E7] text-[#235332] border border-[#BBD9C2] text-[11px] font-bold">
+                  <span class="px-2.5 py-1.5 rounded-lg bg-[#E4F2E7] text-[#235332] border border-[#BBD9C2] text-[11px] font-bold whitespace-nowrap">
                     ✓ برگزار شده
                   </span>
                 `
@@ -2952,7 +3012,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   data-parent-type="${params.parentType}"
                   data-parent-id="${params.parentId}"
                   data-sub-id="${sub.id}"
-                  class="js-admin-edit-subsession px-3 py-1.5 rounded-lg bg-[#F3E7D6] hover:bg-[#E5D4BC] text-[#3F2E21] text-[11.5px] font-semibold cursor-pointer"
+                  class="js-admin-edit-subsession px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#F3E7D6] hover:bg-[#E5D4BC] text-[#3F2E21] text-[11px] sm:text-[11.5px] font-semibold whitespace-nowrap cursor-pointer"
                 >
                   ویرایش
                 </button>
@@ -2961,7 +3021,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   data-parent-type="${params.parentType}"
                   data-parent-id="${params.parentId}"
                   data-sub-id="${sub.id}"
-                  class="js-admin-delete-subsession px-3 py-1.5 rounded-lg border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[11.5px] font-semibold cursor-pointer"
+                  class="js-admin-delete-subsession px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[11px] sm:text-[11.5px] font-semibold whitespace-nowrap cursor-pointer"
                 >
                   حذف این جلسه
                 </button>
@@ -3010,7 +3070,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           </div>
           <button
             type="button"
-            class="js-admin-new-class-btn px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+            class="js-admin-new-class-btn w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold text-center justify-center transition-colors cursor-pointer shrink-0"
           >
             + افزودن کلاس جدید
           </button>
@@ -3217,7 +3277,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             placeholder="جستجو در عنوان کلاس، سرفصل یا نام مدرس..."
             class="js-admin-class-search flex-1 px-4 py-2 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
           />
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="grid grid-cols-3 sm:flex items-center gap-2 shrink-0">
             ${(
               [
                 { key: 'all', label: 'همه کلاس‌ها' },
@@ -3230,7 +3290,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <button
                 type="button"
                 data-class-filter="${f.key}"
-                class="js-admin-class-filter w-[104px] h-8 rounded-lg text-[12px] font-semibold inline-flex items-center justify-center cursor-pointer transition-colors ${
+                class="js-admin-class-filter w-full sm:w-[104px] h-9 sm:h-8 rounded-lg text-[12px] font-semibold inline-flex items-center justify-center cursor-pointer transition-colors ${
                   classStatusFilter === f.key
                     ? 'bg-[#5A3A22] text-[#FAF5EC]'
                     : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D]'
@@ -3266,30 +3326,30 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     )}</span>
                   </div>
                 </div>
-                <div class="p-5 space-y-2.5">
+                <div class="p-4 sm:p-5 space-y-2.5">
                   <h3 class="font-display text-[16.5px] font-bold text-[#231912] text-justify leading-[1.65]">${toPersianDigits(c.title)}</h3>
                   <p class="text-[12.5px] text-[#5B4739] text-justify leading-[1.8]">${toPersianDigits(c.description)}</p>
-                  <div class="pt-2 border-t border-[#E6D8C5] text-[12px] text-[#5B4739] grid grid-cols-1 sm:grid-cols-2 gap-1">
-                    <div>مدرس: <strong class="text-[#231912]">${toPersianDigits(c.instructor_name || '—')}</strong></div>
-                    <div>برنامه: <strong class="text-[#231912]">${toPersianDigits(c.schedule_summary || '—')}</strong></div>
+                  <div class="pt-2.5 border-t border-[#E6D8C5] text-[12px] text-[#5B4739] grid grid-cols-2 gap-2">
+                    <div class="p-2 rounded-lg bg-[#F4E9DA]/55 border border-[#E5D7C5]/80">مدرس: <strong class="text-[#231912]">${toPersianDigits(c.instructor_name || '—')}</strong></div>
+                    <div class="p-2 rounded-lg bg-[#F4E9DA]/55 border border-[#E5D7C5]/80">برنامه: <strong class="text-[#231912]">${toPersianDigits(c.schedule_summary || '—')}</strong></div>
                     ${
                       c.start_date
-                        ? `<div>شروع: <strong class="text-[#231912]">${toPersianDigits(c.start_date)}</strong></div>`
+                        ? `<div class="p-2 rounded-lg bg-[#F4E9DA]/55 border border-[#E5D7C5]/80">شروع: <strong class="text-[#231912]">${toPersianDigits(c.start_date)}</strong></div>`
                         : ''
                     }
                     ${
                       c.end_date
-                        ? `<div>پایان: <strong class="text-[#231912]">${toPersianDigits(c.end_date)}</strong></div>`
+                        ? `<div class="p-2 rounded-lg bg-[#F4E9DA]/55 border border-[#E5D7C5]/80">پایان: <strong class="text-[#231912]">${toPersianDigits(c.end_date)}</strong></div>`
                         : ''
                     }
                     ${
                       c.duration_label
-                        ? `<div>مدت: <strong class="text-[#231912]">${toPersianDigits(c.duration_label)}</strong></div>`
+                        ? `<div class="p-2 rounded-lg bg-[#F4E9DA]/55 border border-[#E5D7C5]/80">مدت: <strong class="text-[#231912]">${toPersianDigits(c.duration_label)}</strong></div>`
                         : ''
                     }
                     ${
                       c.capacity_label
-                        ? `<div>ظرفیت: <strong class="text-[#235332]">${toPersianDigits(c.capacity_label)}</strong></div>`
+                        ? `<div class="p-2 rounded-lg bg-[#F4E9DA]/55 border border-[#E5D7C5]/80">ظرفیت: <strong class="text-[#235332]">${toPersianDigits(c.capacity_label)}</strong></div>`
                         : ''
                     }
                   </div>
@@ -3360,7 +3420,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           </div>
           <button
             type="button"
-            class="js-admin-new-user-btn px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+            class="js-admin-new-user-btn w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold text-center justify-center transition-colors cursor-pointer shrink-0"
           >
             + افزودن کاربر جدید
           </button>
@@ -3433,7 +3493,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             placeholder="جستجو در جدول کاربران بر اساس نام، شماره تلفن، ایمیل یا سطح روسی..."
             class="js-admin-user-search flex-1 px-4 py-2 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
           />
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="grid grid-cols-3 sm:flex items-center gap-2 shrink-0">
             ${(
               [
                 { key: 'all', label: 'همه کاربران' },
@@ -3446,7 +3506,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <button
                 type="button"
                 data-user-filter="${f.key}"
-                class="js-admin-user-filter w-[104px] h-8 rounded-lg text-[12px] font-semibold inline-flex items-center justify-center cursor-pointer transition-colors ${
+                class="js-admin-user-filter w-full sm:w-[104px] h-9 sm:h-8 rounded-lg text-[12px] font-semibold inline-flex items-center justify-center cursor-pointer transition-colors ${
                   userStatusFilter === f.key
                     ? 'bg-[#5A3A22] text-[#FAF5EC]'
                     : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D]'
@@ -3461,8 +3521,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         </div>
 
         <!-- Users Profile Table -->
-        <div class="rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] overflow-hidden shadow-xs">
-          <div class="overflow-x-auto">
+        <div class="w-full max-w-full rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] overflow-hidden shadow-xs">
+          <div class="w-full overflow-x-auto overscroll-x-contain">
             <table class="w-full text-right border-collapse min-w-[940px]">
               <thead>
                 <tr class="bg-[#EFE3D2] text-[#3F2E21] text-[12px] font-bold border-b border-[#DFCEB9]">
@@ -3670,8 +3730,8 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
         return `
           <div data-admin-ticket-card="${ticket.id}" class="space-y-6">
             <!-- Top Navigation & Actions Bar -->
-            <div class="p-5 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div class="space-y-2">
+            <div class="p-4 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div class="space-y-2.5 min-w-0 flex-1">
                 <button
                   type="button"
                   class="js-admin-back-to-tickets-list inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#7A4B2A] hover:text-[#231912] cursor-pointer"
@@ -3679,39 +3739,51 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   <span>→</span>
                   <span>بازگشت به لیست تیکت‌ها</span>
                 </button>
-                <div class="flex items-center gap-2.5 flex-wrap">
+                <div class="flex items-center justify-between sm:justify-start gap-2.5 flex-wrap">
                   <span class="font-mono text-[12px] font-bold px-2.5 py-1 rounded-md bg-[#EFE3D2] text-[#4E3B2D]">
                     #${toPersianDigits(ticket.ticket_code)}
                   </span>
-                  <h2 class="font-display text-[19px] sm:text-[21px] font-bold text-[#231912]">
-                    ${toPersianDigits(ticket.subject)}
-                  </h2>
                   <span class="px-2.5 py-0.5 rounded-md border text-[11.5px] font-semibold ${statusBadgeClass}">
                     ${toPersianDigits(ticket.status)}
                   </span>
                 </div>
-                <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12px] text-[#5B4739]">
-                  <span>صاحب تیکت: <strong class="text-[#231912]">${ownerLabel}</strong></span>
-                  <span>بخش: <strong class="text-[#231912]">${toPersianDigits(ticket.department)}</strong></span>
-                  <span>تاریخ ایجاد: <strong class="text-[#231912]">${toPersianDigits(ticket.created_at)}</strong></span>
-                  <span>آخرین پاسخ: <strong class="text-[#231912]">${toPersianDigits(latestReplyDate)}</strong></span>
+                <h2 class="font-display text-[18px] sm:text-[21px] font-bold text-[#231912] leading-[1.5]">
+                  ${toPersianDigits(ticket.subject)}
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap items-center gap-x-5 gap-y-1.5 text-[12px] text-[#5B4739] pt-2 border-t border-[#E6D8C5]">
+                  <div class="flex items-center justify-between sm:justify-start gap-1.5">
+                    <span>صاحب تیکت:</span>
+                    <strong class="text-[#231912] truncate">${ownerLabel}</strong>
+                  </div>
+                  <div class="flex items-center justify-between sm:justify-start gap-1.5">
+                    <span>بخش:</span>
+                    <strong class="text-[#231912]">${toPersianDigits(ticket.department)}</strong>
+                  </div>
+                  <div class="flex items-center justify-between sm:justify-start gap-1.5">
+                    <span>تاریخ ایجاد:</span>
+                    <strong class="text-[#231912]">${toPersianDigits(ticket.created_at)}</strong>
+                  </div>
+                  <div class="flex items-center justify-between sm:justify-start gap-1.5">
+                    <span>آخرین پاسخ:</span>
+                    <strong class="text-[#231912]">${toPersianDigits(latestReplyDate)}</strong>
+                  </div>
                 </div>
               </div>
 
-              <div class="flex flex-wrap items-center gap-2 shrink-0 self-start md:self-center">
+              <div class="grid grid-cols-2 gap-2.5 w-full md:w-auto shrink-0 self-stretch md:self-center">
                 ${
                   !isClosed
                     ? `
                   <button
                     type="button"
                     data-close-ticket="${ticket.id}"
-                    class="js-admin-close-ticket-btn px-4 py-2 rounded-xl bg-[#7A5411] hover:bg-[#5E3F0A] text-[#FAF5EC] text-[12px] font-semibold transition-colors cursor-pointer"
+                    class="js-admin-close-ticket-btn w-full px-4 py-2 rounded-xl bg-[#7A5411] hover:bg-[#5E3F0A] text-[#FAF5EC] text-[12px] font-semibold text-center justify-center transition-colors cursor-pointer"
                   >
                     بستن تیکت
                   </button>
                 `
                     : `
-                  <span class="px-3.5 py-2 rounded-xl bg-[#EAE0D2] border border-[#D5C3AE] text-[#5B4739] text-[12px] font-semibold">
+                  <span class="w-full px-3.5 py-2 rounded-xl bg-[#EAE0D2] border border-[#D5C3AE] text-[#5B4739] text-[12px] font-semibold text-center inline-flex items-center justify-center">
                     🔒 تیکت بسته شده
                   </span>
                 `
@@ -3719,7 +3791,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 <button
                   type="button"
                   data-delete-ticket="${ticket.id}"
-                  class="js-admin-delete-ticket px-3.5 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold cursor-pointer"
+                  class="js-admin-delete-ticket w-full px-3.5 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold text-center justify-center cursor-pointer"
                 >
                   حذف تیکت
                 </button>
@@ -3727,12 +3799,12 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             </div>
 
             <!-- Full Conversation Thread -->
-            <div class="p-5 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] space-y-4">
-              <div class="flex items-center justify-between pb-3 border-b border-[#E6D8C5]">
-                <h3 class="font-display text-[16.5px] font-bold text-[#231912]">
+            <div class="p-4 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] space-y-4">
+              <div class="flex items-center justify-between gap-2 pb-3 border-b border-[#E6D8C5] min-w-0">
+                <h3 class="font-display text-[15px] sm:text-[16.5px] font-bold text-[#231912] truncate min-w-0" title="تاریخچه کامل گفت‌وگو و فایل‌های پیوست (${toPersianDigits(messagesList.length)} پیام)">
                   تاریخچه کامل گفت‌وگو و فایل‌های پیوست (${toPersianDigits(messagesList.length)} پیام)
                 </h3>
-                <span class="text-[11.5px] text-[#7A6352]">اولویت: ${toPersianDigits(ticket.priority || 'عادی')}</span>
+                <span class="text-[11.5px] text-[#7A6352] shrink-0">اولویت: ${toPersianDigits(ticket.priority || 'عادی')}</span>
               </div>
 
               <div class="space-y-3">
@@ -3751,10 +3823,10 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                         <div class="flex items-center justify-between gap-2 text-[11.5px] ${
                           isAdmin ? 'text-[#235332]' : 'text-[#6B5444]'
                         }">
-                          <span class="font-bold">
+                          <span class="font-bold truncate">
                             ${isAdmin ? 'پاسخ مدیر باشگاه / دبیرخانه' : `پیام کاربر (${ownerLabel})`}
                           </span>
-                          <span>${toPersianDigits(msg.created_at || ticket.created_at)}</span>
+                          <span class="shrink-0">${toPersianDigits(msg.created_at || ticket.created_at)}</span>
                         </div>
                         ${
                           msg.text
@@ -3798,28 +3870,28 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     </div>
                     <span class="text-[10.5px] text-[#7A6352]">فرمت‌های مجاز: تصویر، PDF، Word، ZIP (حداکثر ۵ مگابایت)</span>
                   </div>
-                  <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
-                    <div class="flex items-center gap-2">
-                      <label class="text-[12px] font-semibold text-[#4E3B2D]">وضعیت پس از ثبت:</label>
-                      <select class="js-admin-ticket-status-select px-3 py-1.5 rounded-xl bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[12.5px] text-[#231912]">
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                      <label class="text-[12px] font-semibold text-[#4E3B2D] shrink-0">وضعیت پس از ثبت:</label>
+                      <select class="js-admin-ticket-status-select w-full sm:w-auto px-3 py-2 rounded-xl bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[12.5px] text-[#231912]">
                         <option value="پاسخ داده‌شده" ${ticket.status === 'پاسخ داده‌شده' ? 'selected' : ''}>پاسخ داده‌شده</option>
                         <option value="در انتظار بررسی" ${ticket.status === 'در انتظار بررسی' ? 'selected' : ''}>در انتظار بررسی</option>
                       </select>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="grid grid-cols-2 gap-2.5 w-full sm:w-auto">
                       <button
                         type="button"
                         data-close-ticket="${ticket.id}"
-                        class="js-admin-close-ticket-btn px-4 py-2 rounded-xl border border-[#C5B198] hover:bg-[#EFE2CE] text-[#4E3B2D] text-[12px] font-semibold cursor-pointer"
+                        class="js-admin-close-ticket-btn w-full px-4 py-2.5 rounded-xl border border-[#C5B198] hover:bg-[#EFE2CE] text-[#4E3B2D] text-[12px] font-semibold text-center justify-center cursor-pointer"
                       >
                         بستن تیکت
                       </button>
                       <button
                         type="button"
                         data-save-ticket="${ticket.id}"
-                        class="js-admin-save-ticket px-5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer"
+                        class="js-admin-save-ticket w-full px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold text-center justify-center cursor-pointer"
                       >
-                        ارسال پاسخ دبیرخانه
+                        ارسال پاسخ
                       </button>
                     </div>
                   </div>
@@ -3857,7 +3929,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             <span class="w-2 h-2 rounded-full bg-[#5A3A22]"></span>
             <span>فیلتر بر اساس وضعیت تیکت:</span>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
+          <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
             ${(
               [
                 { key: 'all', label: 'همه تیکت‌ها', count: state.tickets.length },
@@ -3871,14 +3943,14 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <button
                 type="button"
                 data-ticket-filter="${f.key}"
-                class="js-admin-ticket-filter px-3.5 py-2 rounded-xl text-[12px] font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                class="js-admin-ticket-filter w-full sm:w-auto justify-between sm:justify-center px-3 py-2 rounded-xl text-[11.5px] sm:text-[12px] font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                   ticketFilter === f.key
                     ? 'bg-[#5A3A22] text-[#FAF5EC] shadow-xs'
                     : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#E6D5BE]'
                 }"
               >
-                <span>${f.label}</span>
-                <span class="px-1.5 py-0.5 rounded-md text-[10.5px] ${
+                <span class="truncate">${f.label}</span>
+                <span class="px-1.5 py-0.5 rounded-md text-[10.5px] shrink-0 ${
                   ticketFilter === f.key
                     ? 'bg-[#FAF5EC]/20 text-[#FAF5EC]'
                     : 'bg-[#E5D7C5] text-[#4E3B2D]'
@@ -3992,7 +4064,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           </div>
           <button
             type="button"
-            class="js-admin-new-announcement-btn px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+            class="js-admin-new-announcement-btn w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold text-center justify-center transition-colors cursor-pointer shrink-0 self-stretch sm:self-auto"
           >
             + انتشار اطلاعیه جدید
           </button>
@@ -4116,11 +4188,36 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 <p class="text-[12px] text-[#6B5444] mt-0.5">نام کاربری ویژه ورود مدیر: <strong dir="ltr" class="font-mono text-[#231912]">admin</strong></p>
               </div>
             </div>
-            <div class="flex items-center gap-2.5">
+            <div class="flex items-center gap-2">
               <input type="file" accept="image/*" class="js-admin-avatar-input hidden" />
-              <button type="button" class="js-admin-trigger-avatar px-4 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12.5px] font-semibold text-[#3F2E21] cursor-pointer">
-                انتخاب تصویر جدید
+              <button
+                type="button"
+                title="انتخاب تصویر جدید"
+                aria-label="انتخاب تصویر جدید"
+                class="js-admin-trigger-avatar w-10 h-10 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] inline-flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                  <circle cx="12" cy="13" r="4"></circle>
+                </svg>
               </button>
+              ${
+                pendingAdminAvatar
+                  ? `
+                <button
+                  type="button"
+                  title="حذف تصویر پروفایل"
+                  aria-label="حذف تصویر پروفایل"
+                  class="js-admin-remove-avatar w-10 h-10 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] inline-flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                </button>
+              `
+                  : ''
+              }
             </div>
           </div>
 
@@ -4166,7 +4263,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           }
 
           <div class="flex justify-end">
-            <button type="button" class="js-admin-save-profile-btn px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13.5px] font-semibold cursor-pointer">
+            <button type="button" class="js-admin-save-profile-btn w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13.5px] font-semibold text-center justify-center cursor-pointer">
               ذخیره تغییرات پروفایل مدیر
             </button>
           </div>
@@ -4320,16 +4417,28 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                   <div class="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      class="js-admin-trigger-blog-cover-upload px-3.5 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] text-[12px] font-semibold cursor-pointer"
+                      title="آپلود تصویر از دستگاه"
+                      aria-label="آپلود تصویر از دستگاه"
+                      class="js-admin-trigger-blog-cover-upload w-10 h-10 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] inline-flex items-center justify-center cursor-pointer transition-colors"
                     >
-                      + آپلود تصویر از دستگاه
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                      </svg>
                     </button>
                     <button
                       type="button"
                       data-gallery-target="blog"
-                      class="js-admin-open-gallery-picker px-4 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer"
+                      title="انتخاب تصویر کاور از گالری تصاویر"
+                      aria-label="انتخاب تصویر کاور از گالری تصاویر"
+                      class="js-admin-open-gallery-picker w-10 h-10 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] inline-flex items-center justify-center cursor-pointer transition-colors"
                     >
-                      انتخاب تصویر کاور از گالری تصاویر
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                      </svg>
                     </button>
                   </div>
                 </div>
@@ -4350,121 +4459,181 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 <div class="rounded-xl border border-[#DFCEB9] bg-[#FAF5EC] overflow-hidden shadow-2xs">
                   <!-- Rich Text Formatting Toolbar -->
                   <div class="px-3 py-2 bg-[#EFE3D2] border-b border-[#DFCEB9] flex flex-wrap items-center gap-1.5">
+                    <!-- Block format dropdown for compact mobile & quick selection -->
+                    <select
+                      aria-label="قالب متن"
+                      class="js-blog-editor-format-select h-8 px-2.5 rounded-lg bg-[#FAF5EC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                    >
+                      <option value="p">پاراگراف</option>
+                      <option value="h2">تیتر H2</option>
+                      <option value="h3">زیرعنوان H3</option>
+                      <option value="quote">نقل‌قول</option>
+                    </select>
                     <button
                       type="button"
                       data-editor-cmd="bold"
                       title="ضخیم (Bold)"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-bold text-[#231912] cursor-pointer"
+                      aria-label="ضخیم (Bold)"
+                      class="js-blog-editor-tool h-8 w-8 inline-flex items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[13px] font-bold text-[#231912] cursor-pointer"
                     >
-                      B بولد
+                      B
                     </button>
                     <button
                       type="button"
                       data-editor-cmd="italic"
                       title="مورب (Italic)"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] italic font-semibold text-[#231912] cursor-pointer"
+                      aria-label="مورب (Italic)"
+                      class="js-blog-editor-tool h-8 w-8 inline-flex items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[13px] italic font-serif font-bold text-[#231912] cursor-pointer"
                     >
-                      I ایتالیک
+                      I
                     </button>
                     <button
                       type="button"
                       data-editor-cmd="underline"
                       title="زیرخط‌دار (Underline)"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] underline font-semibold text-[#231912] cursor-pointer"
+                      aria-label="زیرخط‌دار (Underline)"
+                      class="js-blog-editor-tool h-8 w-8 inline-flex items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[13px] underline font-bold text-[#231912] cursor-pointer"
                     >
-                      U زیرخط
+                      U
                     </button>
-                    <span class="w-px h-5 bg-[#D5C3AE] mx-0.5"></span>
+                    <span class="hidden sm:inline-block w-px h-5 bg-[#D5C3AE] mx-0.5"></span>
                     <button
                       type="button"
                       data-editor-cmd="h2"
                       title="تیتر اصلی (H2)"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-bold text-[#231912] cursor-pointer"
+                      aria-label="تیتر اصلی (H2)"
+                      class="js-blog-editor-tool hidden sm:inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[11.5px] font-bold text-[#231912] cursor-pointer"
                     >
-                      تیتر H2
+                      H2
                     </button>
                     <button
                       type="button"
                       data-editor-cmd="h3"
                       title="زیرعنوان (H3)"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                      aria-label="زیرعنوان (H3)"
+                      class="js-blog-editor-tool hidden sm:inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[11.5px] font-semibold text-[#231912] cursor-pointer"
                     >
-                      زیرعنوان H3
+                      H3
                     </button>
                     <button
                       type="button"
                       data-editor-cmd="p"
                       title="پاراگراف معمولی"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                      aria-label="پاراگراف معمولی"
+                      class="js-blog-editor-tool hidden sm:inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-bold text-[#231912] cursor-pointer"
                     >
-                      پاراگراف
+                      ¶
                     </button>
                     <button
                       type="button"
                       data-editor-cmd="quote"
                       title="نقل‌قول (Blockquote)"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                      aria-label="نقل‌قول (Blockquote)"
+                      class="js-blog-editor-tool hidden sm:inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[14px] font-bold text-[#231912] cursor-pointer"
                     >
-                      « نقل‌قول »
+                      ❝
                     </button>
                     <span class="w-px h-5 bg-[#D5C3AE] mx-0.5"></span>
                     <button
                       type="button"
                       data-editor-cmd="ul"
                       title="لیست نقطه‌ای"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                      aria-label="لیست نقطه‌ای"
+                      class="js-blog-editor-tool h-8 w-8 inline-flex items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#231912] cursor-pointer"
                     >
-                      • لیست نقطه‌ای
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="8" y1="6" x2="21" y2="6"></line>
+                        <line x1="8" y1="12" x2="21" y2="12"></line>
+                        <line x1="8" y1="18" x2="21" y2="18"></line>
+                        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                        <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                      </svg>
                     </button>
                     <button
                       type="button"
                       data-editor-cmd="ol"
                       title="لیست شماره‌دار"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                      aria-label="لیست شماره‌دار"
+                      class="js-blog-editor-tool h-8 w-8 inline-flex items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#231912] cursor-pointer"
                     >
-                      ۱. لیست شماره‌دار
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="10" y1="6" x2="21" y2="6"></line>
+                        <line x1="10" y1="12" x2="21" y2="12"></line>
+                        <line x1="10" y1="18" x2="21" y2="18"></line>
+                        <path d="M4 6h1v4"></path>
+                        <path d="M4 10h2"></path>
+                        <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path>
+                      </svg>
                     </button>
                     <span class="w-px h-5 bg-[#D5C3AE] mx-0.5"></span>
                     <button
                       type="button"
                       data-editor-cmd="align-right"
                       title="تراز از راست"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                      aria-label="تراز از راست"
+                      class="js-blog-editor-tool h-8 w-8 inline-flex items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#231912] cursor-pointer"
                     >
-                      راست‌چین
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="21" y1="6" x2="3" y2="6"></line>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                        <line x1="21" y1="18" x2="7" y2="18"></line>
+                      </svg>
                     </button>
                     <button
                       type="button"
                       data-editor-cmd="align-center"
                       title="وسط‌چین"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                      aria-label="وسط‌چین"
+                      class="js-blog-editor-tool h-8 w-8 inline-flex items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#231912] cursor-pointer"
                     >
-                      وسط‌چین
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="18" y1="10" x2="6" y2="10"></line>
+                        <line x1="21" y1="6" x2="3" y2="6"></line>
+                        <line x1="21" y1="14" x2="3" y2="14"></line>
+                        <line x1="18" y1="18" x2="6" y2="18"></line>
+                      </svg>
                     </button>
                     <button
                       type="button"
                       data-editor-cmd="align-left"
                       title="چپ‌چین"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                      aria-label="چپ‌چین"
+                      class="js-blog-editor-tool h-8 w-8 inline-flex items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#231912] cursor-pointer"
                     >
-                      چپ‌چین
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="17" y1="10" x2="3" y2="10"></line>
+                        <line x1="21" y1="6" x2="3" y2="6"></line>
+                        <line x1="21" y1="14" x2="3" y2="14"></line>
+                        <line x1="17" y1="18" x2="3" y2="18"></line>
+                      </svg>
                     </button>
                     <button
                       type="button"
                       data-editor-cmd="align-justify"
                       title="تراز دوطرفه (Justify)"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                      aria-label="تراز دوطرفه (Justify)"
+                      class="js-blog-editor-tool h-8 w-8 inline-flex items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#231912] cursor-pointer"
                     >
-                      هم‌تراز
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="21" y1="10" x2="3" y2="10"></line>
+                        <line x1="21" y1="6" x2="3" y2="6"></line>
+                        <line x1="21" y1="14" x2="3" y2="14"></line>
+                        <line x1="21" y1="18" x2="3" y2="18"></line>
+                      </svg>
                     </button>
                     <span class="w-px h-5 bg-[#D5C3AE] mx-0.5"></span>
                     <button
                       type="button"
                       data-editor-cmd="link"
                       title="درج لینک"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                      aria-label="درج لینک"
+                      class="js-blog-editor-tool h-8 w-8 inline-flex items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#231912] cursor-pointer"
                     >
-                      🔗 لینک
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                      </svg>
                     </button>
                     <button
                       type="button"
@@ -4483,25 +4652,31 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                       type="button"
                       data-editor-cmd="undo"
                       title="بازگشت به قبل (Undo)"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                      aria-label="بازگشت به قبل (Undo)"
+                      class="js-blog-editor-tool h-8 w-8 inline-flex items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[14px] font-bold text-[#231912] cursor-pointer"
                     >
-                      ↶ واگرد
+                      ↶
                     </button>
                     <button
                       type="button"
                       data-editor-cmd="redo"
                       title="انجام مجدد (Redo)"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#231912] cursor-pointer"
+                      aria-label="انجام مجدد (Redo)"
+                      class="js-blog-editor-tool h-8 w-8 inline-flex items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[14px] font-bold text-[#231912] cursor-pointer"
                     >
-                      ↷ از نو
+                      ↷
                     </button>
                     <button
                       type="button"
                       data-editor-cmd="clear"
                       title="پاک‌سازی فرمت متن انتخاب‌شده"
-                      class="js-blog-editor-tool h-8 px-2.5 rounded-lg bg-[#FAF5EC] hover:bg-[#FBEAE8] border border-[#E6B8B3] text-[11.5px] font-semibold text-[#9E3329] cursor-pointer mr-auto"
+                      aria-label="پاک‌سازی فرمت متن انتخاب‌شده"
+                      class="js-blog-editor-tool h-8 w-8 inline-flex items-center justify-center rounded-lg bg-[#FAF5EC] hover:bg-[#FBEAE8] border border-[#E6B8B3] text-[#9E3329] cursor-pointer mr-auto"
                     >
-                      پاک‌سازی فرمت
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M20 20H7L3 16C2 15 2 13 3 12L13 2L22 11L20 20Z"></path>
+                        <line x1="17" y1="17" x2="11" y2="11"></line>
+                      </svg>
                     </button>
                   </div>
 
@@ -4536,16 +4711,28 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                         <input type="file" accept="image/*" class="js-blog-inline-image-file hidden" />
                         <button
                           type="button"
-                          class="js-blog-trigger-inline-upload px-3 py-1.5 rounded-lg bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[11.5px] font-semibold cursor-pointer"
+                          title="آپلود تصویر از دستگاه"
+                          aria-label="آپلود تصویر از دستگاه"
+                          class="js-blog-trigger-inline-upload w-9 h-9 rounded-lg bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] inline-flex items-center justify-center cursor-pointer"
                         >
-                          + آپلود تصویر از دستگاه
+                          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                          </svg>
                         </button>
                         <button
                           type="button"
                           data-gallery-target="blog_inline"
-                          class="js-admin-open-gallery-picker px-3 py-1.5 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#C5B198] text-[#3F2E21] text-[11.5px] font-semibold cursor-pointer"
+                          title="انتخاب از گالری باشگاه"
+                          aria-label="انتخاب از گالری باشگاه"
+                          class="js-admin-open-gallery-picker w-9 h-9 rounded-lg bg-[#FAF5EC] hover:bg-[#E5D4BC] border border-[#C5B198] text-[#3F2E21] inline-flex items-center justify-center cursor-pointer"
                         >
-                          انتخاب از گالری باشگاه
+                          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                          </svg>
                         </button>
                       </div>
                       <div class="flex items-center gap-1.5">
@@ -4612,18 +4799,18 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </div>
             </div>
 
-            <div class="pt-3 border-t border-[#E6D8C5] flex items-center justify-end gap-3">
+            <div class="pt-3 border-t border-[#E6D8C5] grid grid-cols-2 sm:w-auto sm:mr-auto gap-3">
               <button
                 type="button"
-                class="js-admin-cancel-blog px-5 py-2.5 rounded-xl border border-[#C5B198] text-[13px] font-semibold text-[#4E3B2D] cursor-pointer"
+                class="js-admin-cancel-blog w-full px-5 py-2.5 rounded-xl border border-[#C5B198] text-[13px] font-semibold text-[#4E3B2D] text-center justify-center cursor-pointer"
               >
-                انصراف و بازگشت
+                انصراف
               </button>
               <button
                 type="submit"
-                class="px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13.5px] font-semibold cursor-pointer"
+                class="w-full px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13.5px] font-semibold text-center justify-center cursor-pointer"
               >
-                ذخیره و انتشار مقاله در وبلاگ
+                ذخیره
               </button>
             </div>
           </form>
@@ -4648,7 +4835,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           </div>
           <button
             type="button"
-            class="js-admin-new-blog-btn px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+            class="js-admin-new-blog-btn w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold text-center justify-center transition-colors cursor-pointer shrink-0 self-stretch sm:self-auto"
           >
             + ایجاد مقاله جدید
           </button>
@@ -4731,7 +4918,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               بررسی، تایید، رد یا پاسخگویی به دیدگاه‌ها و نظرات ثبت‌شده اعضا درباره مقالات و نشست‌های باشگاه.
             </p>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
+          <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
             ${(
               [
                 { key: 'all', label: 'همه نظرات' },
@@ -4745,7 +4932,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <button
                 type="button"
                 data-comment-filter="${f.key}"
-                class="js-admin-comment-filter px-3.5 py-2 rounded-xl text-[12px] font-semibold cursor-pointer ${
+                class="js-admin-comment-filter w-full sm:w-auto px-3.5 py-2 rounded-xl text-[12px] font-semibold text-center justify-center cursor-pointer ${
                   commentFilter === f.key
                     ? 'bg-[#5A3A22] text-[#FAF5EC]'
                     : 'bg-[#FAF5EC] border border-[#E5D7C5] text-[#4E3B2D]'
@@ -4800,29 +4987,29 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                     class="js-admin-comment-reply-input w-full px-3.5 py-2 rounded-xl bg-[#FDFBF7] border border-[#DFCEB9] text-[13px] text-[#231912]"
                   >${toPersianDigits(comment.admin_reply || '')}</textarea>
                 </div>
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <div class="flex items-center gap-2">
-                    <label class="text-[12px] font-semibold text-[#4E3B2D]">وضعیت انتشار:</label>
-                    <select class="js-admin-comment-status-select px-3 py-1.5 rounded-xl bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[12.5px] text-[#231912]">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div class="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                    <label class="text-[12px] font-semibold text-[#4E3B2D] shrink-0">وضعیت انتشار:</label>
+                    <select class="js-admin-comment-status-select w-full sm:w-auto px-3 py-2 rounded-xl bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[12.5px] text-[#231912]">
                       <option value="تایید شده" ${comment.status === 'تایید شده' ? 'selected' : ''}>تایید شده</option>
                       <option value="در انتظار تایید" ${comment.status === 'در انتظار تایید' ? 'selected' : ''}>در انتظار تایید</option>
                       <option value="رد شده" ${comment.status === 'رد شده' ? 'selected' : ''}>رد شده</option>
                     </select>
                   </div>
-                  <div class="flex items-center gap-2">
+                  <div class="grid grid-cols-2 gap-2.5 w-full sm:w-auto">
                     <button
                       type="button"
                       data-delete-comment="${comment.id}"
-                      class="js-admin-delete-comment px-3.5 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold cursor-pointer"
+                      class="js-admin-delete-comment w-full px-4 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold text-center justify-center cursor-pointer"
                     >
-                      حذف نظر
+                      حذف
                     </button>
                     <button
                       type="button"
                       data-save-comment="${comment.id}"
-                      class="js-admin-save-comment px-5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold cursor-pointer"
+                      class="js-admin-save-comment w-full px-5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold text-center justify-center cursor-pointer"
                     >
-                      ذخیره وضعیت و پاسخ
+                      ذخیره
                     </button>
                   </div>
                 </div>
@@ -5239,7 +5426,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             placeholder="جستجو در نام فرستنده، ایمیل، موضوع یا متن پیام..."
             class="js-admin-contact-msg-search flex-1 px-4 py-2 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
           />
-          <div class="flex flex-wrap items-center gap-2 shrink-0">
+          <div class="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
             ${(
               [
                 { key: 'all', label: `همه (${toPersianDigits(allMessages.length)})` },
@@ -5252,7 +5439,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <button
                 type="button"
                 data-contact-msg-filter="${f.key}"
-                class="js-admin-contact-msg-filter px-3.5 py-2 rounded-xl text-[12px] font-semibold cursor-pointer transition-colors ${
+                class="js-admin-contact-msg-filter w-full sm:w-auto px-2.5 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-[12px] font-semibold text-center justify-center truncate cursor-pointer transition-colors ${
                   contactMessageFilter === f.key
                     ? 'bg-[#5A3A22] text-[#FAF5EC]'
                     : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#EFE3D2]'
@@ -5275,12 +5462,12 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               .map((msg) => {
                 const isRead = Number(msg.is_read || 0) === 1;
                 return `
-                  <article class="p-5 sm:p-6 rounded-2xl border transition-all ${
+                  <article class="p-4 sm:p-6 rounded-2xl border transition-all ${
                     isRead
                       ? 'bg-[#FAF5EC] border-[#E5D7C5]'
                       : 'bg-[#FDF9F1] border-2 border-[#8B5A36] shadow-[0_10px_26px_rgba(122,75,42,0.08)]'
                   } space-y-4">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                       <div class="space-y-1 min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                           <span class="px-2.5 py-0.5 rounded-md text-[11px] font-bold ${
@@ -5299,11 +5486,11 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                         </h3>
                       </div>
 
-                      <div class="flex flex-wrap items-center gap-2 shrink-0">
+                      <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
                         <button
                           type="button"
                           data-open-contact-msg="${msg.id}"
-                          class="js-admin-open-contact-msg px-3.5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold cursor-pointer transition-colors"
+                          class="js-admin-open-contact-msg flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold text-center justify-center cursor-pointer transition-colors"
                         >
                           مشاهده کامل پیام
                         </button>
@@ -5311,7 +5498,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                           type="button"
                           data-contact-msg-id="${msg.id}"
                           data-next-read="${isRead ? '0' : '1'}"
-                          class="js-admin-toggle-contact-msg-read px-3.5 py-2 rounded-xl border text-[12px] font-semibold cursor-pointer transition-colors ${
+                          class="js-admin-toggle-contact-msg-read px-3 py-2 rounded-xl border text-[12px] font-semibold cursor-pointer transition-colors ${
                             isRead
                               ? 'bg-[#F4E9DA]/80 border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#EFE3D2]'
                               : 'bg-[#E4F2E7] border-[#BBD9C2] text-[#235332] hover:bg-[#D2E9D7]'
@@ -5322,7 +5509,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                         <button
                           type="button"
                           data-delete-contact-msg="${msg.id}"
-                          class="js-admin-delete-contact-msg px-3.5 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold cursor-pointer transition-colors"
+                          class="js-admin-delete-contact-msg px-3 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold cursor-pointer transition-colors"
                         >
                           حذف
                         </button>
@@ -5500,6 +5687,11 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               aria-label="باز و بسته کردن منوی پنل مدیریت"
               class="js-toggle-admin-mobile-nav lg:hidden inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#EFE3D2] hover:bg-[#E4D3BC] text-[#3F2E21] text-[12.5px] font-semibold transition-colors cursor-pointer shrink-0"
             >
+              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
               <span>${activeNavItem.label}</span>
               <svg class="w-4 h-4 transition-transform ${isAdminMobileSidebarOpen ? 'rotate-180' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="6 9 12 15 18 9"></polyline>
@@ -5541,7 +5733,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             <div class="pt-4 mt-4 border-t border-[#E6D8C5] space-y-2">
               <button
                 type="button"
-                class="js-admin-back-to-site w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#5B4636] hover:bg-[#EFE3D2] text-right transition-colors cursor-pointer"
+                class="js-admin-back-to-site hidden lg:block w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#5B4636] hover:bg-[#EFE3D2] text-right transition-colors cursor-pointer"
               >
                 ← مشاهده صفحه اصلی سایت
               </button>
@@ -5755,6 +5947,11 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
 
   $wrapper.on('click', '.js-admin-lib-cat-filter', function () {
     libraryCategoryFilter = String($(this).data('lib-cat-filter') || 'all');
+    render();
+  });
+
+  $wrapper.on('change', '.js-admin-lib-cat-select', function () {
+    libraryCategoryFilter = String($(this).val() || 'all');
     render();
   });
 
@@ -7292,6 +7489,12 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     $wrapper.find('.js-admin-avatar-input').trigger('click');
   });
 
+  $wrapper.on('click', '.js-admin-remove-avatar', () => {
+    pendingAdminAvatar = '';
+    render();
+    showToast('تصویر پروفایل حذف شد؛ برای ثبت نهایی روی «ذخیره تغییرات پروفایل مدیر» کلیک کنید.');
+  });
+
   $wrapper.on('change', '.js-admin-avatar-input', function (event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -7585,6 +7788,23 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   $wrapper.on('click', '.js-blog-close-image-bar', () => {
     $wrapper.find('.js-blog-image-bar').addClass('hidden');
     savedImageSelectionRange = null;
+  });
+
+  $wrapper.on('change', '.js-blog-editor-format-select', function () {
+    const cmd = String($(this).val() || 'p');
+    const editorEl = $wrapper.find('.js-admin-blog-wysiwyg')[0] as HTMLElement | undefined;
+    if (!editorEl) return;
+    editorEl.focus();
+    if (cmd === 'h2') {
+      document.execCommand('formatBlock', false, 'H2');
+    } else if (cmd === 'h3') {
+      document.execCommand('formatBlock', false, 'H3');
+    } else if (cmd === 'quote') {
+      document.execCommand('formatBlock', false, 'BLOCKQUOTE');
+    } else {
+      document.execCommand('formatBlock', false, 'P');
+    }
+    syncBlogWysiwygToHiddenInput();
   });
 
   $wrapper.on('click', '.js-blog-editor-tool', function (e) {

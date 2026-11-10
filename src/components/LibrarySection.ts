@@ -255,22 +255,26 @@ export function createLibrarySection(
                   </div>
 
                   <div>
-                    <h3 class="font-display text-[24px] sm:text-[30px] font-bold text-[#1E150F] leading-snug text-justify">
+                    <h3 class="font-display text-[19px] sm:text-[30px] font-bold text-[#1E150F] leading-snug text-right sm:text-justify break-words">
                       ${toPersianDigits(currentBookDisplay.title)}
                     </h3>
-                    <p class="text-[14px] sm:text-[15px] text-[#5C4738] mt-1 font-medium text-justify">
+                    <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13.5px] sm:text-[15px] text-[#5C4738] font-medium">
                       ${
                         currentBookDisplay.author
-                          ? `نوشتهٔ ${toPersianDigits(currentBookDisplay.author)}`
+                          ? `<span class="inline-flex items-center gap-1">نوشتهٔ <strong class="font-semibold text-[#2B1C12]">${toPersianDigits(currentBookDisplay.author)}</strong></span>`
                           : ''
-                      }${
-                  currentBookDisplay.author && currentBookDisplay.translator ? ' · ' : ''
-                }${
-                  currentBookDisplay.translator
-                    ? `ترجمهٔ ${toPersianDigits(currentBookDisplay.translator)}`
-                    : ''
-                }
-                    </p>
+                      }
+                      ${
+                        currentBookDisplay.author && currentBookDisplay.translator
+                          ? `<span class="text-[#C5B198] select-none">|</span>`
+                          : ''
+                      }
+                      ${
+                        currentBookDisplay.translator
+                          ? `<span class="inline-flex items-center gap-1">ترجمهٔ <strong class="font-semibold text-[#2B1C12]">${toPersianDigits(currentBookDisplay.translator)}</strong></span>`
+                          : ''
+                      }
+                    </div>
                   </div>
 
                   ${
@@ -292,18 +296,18 @@ export function createLibrarySection(
                       }</span>
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-2.5">
+                    <div class="grid grid-cols-2 sm:flex items-center gap-2.5 w-full sm:w-auto">
                       <button
                         type="button"
-                        class="js-current-book-details px-4 py-2.5 rounded-xl bg-[#FAF5EC] hover:bg-[#EFE2CE] text-[#3F2E21] border border-[#D5C0A5] text-[12.5px] font-semibold transition-colors cursor-pointer"
+                        class="js-current-book-details w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#FAF5EC] hover:bg-[#EFE2CE] text-[#3F2E21] border border-[#D5C0A5] text-[12.5px] font-semibold transition-colors text-center justify-center inline-flex items-center cursor-pointer"
                       >
                         مشاهده جزئیات
                       </button>
                       <button
                         type="button"
-                        class="js-current-book-register px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold transition-colors shadow-xs cursor-pointer"
+                        class="js-current-book-register w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold transition-colors shadow-xs text-center justify-center inline-flex items-center cursor-pointer"
                       >
-                        ثبت نام در این نشست
+                        ثبت نام نشست
                       </button>
                     </div>
                   </div>

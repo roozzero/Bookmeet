@@ -1,11 +1,20 @@
 import $ from 'jquery';
 import type { NavigationLink } from '../types/models.ts';
 
+export interface NavbarPanelMenuItem {
+  key: string;
+  label: string;
+}
+
 export interface NavbarProps {
   navigationLinks: NavigationLink[];
   ctaText: string;
   activeHref?: string;
   isStationaryCta?: boolean;
+  panelMode?: 'public' | 'admin' | 'member';
+  panelMenuItems?: NavbarPanelMenuItem[];
+  activePanelKey?: string;
+  onPanelMenuSelect?: (key: string) => void;
   onNavigate?: (href: string, label: string) => void;
   onLoginClick?: () => void;
 }
@@ -13,6 +22,8 @@ export interface NavbarProps {
 export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
   const logoSrc = '/assets/Bookmate%20Persian%20Logo%20with%20Colorful%20Books.png';
   const ctaMotionClass = props.isStationaryCta ? '' : 'club-login-btn--rocking';
+  const mode = props.panelMode || 'public';
+  const isPanelMode = mode === 'admin' || mode === 'member';
 
   const $header = $(`
     <header
@@ -25,7 +36,13 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
           <button
             type="button"
             class="js-mobile-nav-toggle lg:hidden w-10 h-10 rounded-xl bg-[#f7f2e6] border border-[#d6c8b2] text-[#3b2a1e] flex items-center justify-center cursor-pointer hover:bg-[#ebe1cd] transition-colors"
-            aria-label="باز کردن منوی اصلی"
+            aria-label="${
+              mode === 'admin'
+                ? 'باز کردن منوی پنل مدیریت'
+                : mode === 'member'
+                ? 'باز کردن منوی پنل کاربری'
+                : 'باز کردن منوی اصلی'
+            }"
             aria-expanded="false"
           >
             <svg class="js-mobile-nav-icon-open w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -72,7 +89,13 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
       <!-- Collapsible Mobile Navigation Drawer -->
       <nav
         class="js-mobile-nav-drawer hidden lg:hidden mt-3 pt-3 border-t border-[#d8ccb6] grid grid-cols-2 sm:grid-cols-4 gap-2"
-        aria-label="منوی موبایل"
+        aria-label="${
+          mode === 'admin'
+            ? 'منوی موبایل پنل مدیریت'
+            : mode === 'member'
+            ? 'منوی موبایل پنل کاربری'
+            : 'منوی موبایل سایت'
+        }"
       ></nav>
     </header>
   `);
@@ -118,20 +141,7 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
       >${link.label}</button>
     `);
 
-    const $mobileLink = $(`
-      <button
-        type="button"
-        data-href="${link.href}"
-        data-label="${link.label}"
-        class="js-mobile-nav-link px-3 py-2.5 rounded-xl text-right text-[13px] font-medium transition-colors cursor-pointer ${
-          isInitialActive
-            ? 'bg-[#3b2a1e] text-[#faf6ec] font-semibold'
-            : 'bg-[#f7f2e6] text-[#3b2a1e] hover:bg-[#e8decb] border border-[#ded2bc]'
-        }"
-      >${link.label}</button>
-    `);
-
-    const handleNavClick = (e: JQuery.ClickEvent) => {
+    const handleDesktopNavClick = (e: JQuery.ClickEvent) => {
       e.preventDefault();
       $desktopNav
         .find('.js-nav-link')
@@ -142,14 +152,16 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
         .removeClass('text-[#4a392b] border-transparent')
         .addClass('text-[#23180f] font-semibold border-[#3b2a1e]');
 
-      $mobileDrawer
-        .find('.js-mobile-nav-link')
-        .removeClass('bg-[#3b2a1e] text-[#faf6ec] font-semibold')
-        .addClass('bg-[#f7f2e6] text-[#3b2a1e] border border-[#ded2bc]');
-      $mobileDrawer
-        .find(`.js-mobile-nav-link[data-href="${link.href}"]`)
-        .removeClass('bg-[#f7f2e6] text-[#3b2a1e] border border-[#ded2bc]')
-        .addClass('bg-[#3b2a1e] text-[#faf6ec] font-semibold');
+      if (!isPanelMode) {
+        $mobileDrawer
+          .find('.js-mobile-nav-link')
+          .removeClass('bg-[#3b2a1e] text-[#faf6ec] font-semibold')
+          .addClass('bg-[#f7f2e6] text-[#3b2a1e] border border-[#ded2bc]');
+        $mobileDrawer
+          .find(`.js-mobile-nav-link[data-href="${link.href}"]`)
+          .removeClass('bg-[#f7f2e6] text-[#3b2a1e] border border-[#ded2bc]')
+          .addClass('bg-[#3b2a1e] text-[#faf6ec] font-semibold');
+      }
 
       closeMobileDrawer();
 
@@ -158,12 +170,62 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
       }
     };
 
-    $link.on('click', handleNavClick);
-    $mobileLink.on('click', handleNavClick);
-
+    $link.on('click', handleDesktopNavClick);
     $desktopNav.append($link);
-    $mobileDrawer.append($mobileLink);
+
+    if (!isPanelMode) {
+      const $mobileLink = $(`
+        <button
+          type="button"
+          data-href="${link.href}"
+          data-label="${link.label}"
+          class="js-mobile-nav-link px-3 py-2.5 rounded-xl text-right text-[13px] font-medium transition-colors cursor-pointer ${
+            isInitialActive
+              ? 'bg-[#3b2a1e] text-[#faf6ec] font-semibold'
+              : 'bg-[#f7f2e6] text-[#3b2a1e] hover:bg-[#e8decb] border border-[#ded2bc]'
+          }"
+        >${link.label}</button>
+      `);
+      $mobileLink.on('click', handleDesktopNavClick);
+      $mobileDrawer.append($mobileLink);
+    }
   });
+
+  if (isPanelMode && Array.isArray(props.panelMenuItems)) {
+    props.panelMenuItems.forEach((item, idx) => {
+      const isInitialActive = props.activePanelKey
+        ? props.activePanelKey === item.key
+        : idx === 0;
+      const $panelMobileBtn = $(`
+        <button
+          type="button"
+          data-panel-key="${item.key}"
+          class="js-mobile-panel-nav-btn px-3 py-2.5 rounded-xl text-right text-[13px] font-medium transition-colors cursor-pointer ${
+            isInitialActive
+              ? 'bg-[#3b2a1e] text-[#faf6ec] font-semibold'
+              : 'bg-[#f7f2e6] text-[#3b2a1e] hover:bg-[#e8decb] border border-[#ded2bc]'
+          }"
+        >${item.label}</button>
+      `);
+
+      $panelMobileBtn.on('click', (e) => {
+        e.preventDefault();
+        $mobileDrawer
+          .find('.js-mobile-panel-nav-btn')
+          .removeClass('bg-[#3b2a1e] text-[#faf6ec] font-semibold')
+          .addClass('bg-[#f7f2e6] text-[#3b2a1e] border border-[#ded2bc]');
+        $panelMobileBtn
+          .removeClass('bg-[#f7f2e6] text-[#3b2a1e] border border-[#ded2bc]')
+          .addClass('bg-[#3b2a1e] text-[#faf6ec] font-semibold');
+        closeMobileDrawer();
+        if (props.onPanelMenuSelect) {
+          props.onPanelMenuSelect(item.key);
+        }
+      });
+
+      $mobileDrawer.append($panelMobileBtn);
+    });
+  }
 
   // Add subtle border & shadow when scrolling down so the floating navbar stands out cleanly
   function syncNavbarScrollState(): void {

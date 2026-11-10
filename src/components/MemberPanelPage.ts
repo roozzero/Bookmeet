@@ -749,11 +749,11 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     return `
       <div class="space-y-6">
         <!-- Slim Welcome Banner -->
-        <div class="px-5 py-3.5 rounded-2xl bg-gradient-to-l from-[#EFE3D1] via-[#F5ECDE] to-[#FAF5EC] border border-[#E2D3BF] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="px-5 py-3.5 rounded-2xl bg-gradient-to-l from-[#EFE3D1] via-[#F5ECDE] to-[#FAF5EC] border border-[#E2D3BF] flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right">
           <h2 class="font-display text-[18px] sm:text-[20px] font-bold text-[#231912]">
             ${state.member.first_name} ${state.member.last_name} عزیز، خوش آمدید
           </h2>
-          <div class="inline-flex items-center gap-3 bg-[#FAF5EC] px-3.5 py-1.5 rounded-xl border border-[#DFCEB9] text-[12px] shrink-0 self-start sm:self-auto">
+          <div class="inline-flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 bg-[#FAF5EC] px-3.5 py-1.5 rounded-xl border border-[#DFCEB9] text-[12px] shrink-0 self-center sm:self-auto text-center">
             <span class="text-[#7A6352]">کد عضویت: <strong class="font-bold text-[#231912]">${toPersianDigits(state.member.membership_code || 'BM-۱۴۰۵-۱۰۸')}</strong></span>
             <span class="text-[#D5C3AE]">|</span>
             <span class="text-[#6E5644]">عضویت از ${toPersianDigits(state.member.joined_date || 'مهر ۱۴۰۴')}</span>
@@ -1012,28 +1012,37 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     return `
       <div class="space-y-6">
         <!-- Top Header -->
-        <div class="p-5 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div class="flex items-start gap-4">
+        <div class="p-4 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex items-start gap-4 w-full">
             <img
               src="${params.parentCoverUrl}"
               alt="${params.parentTitle}"
               class="w-16 h-20 rounded-xl object-cover border border-[#D8C5AC] shrink-0 hidden sm:block"
             />
-            <div>
+            <div class="w-full min-w-0">
               <button
                 type="button"
-                class="${params.backButtonClass} inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#7A4B2A] hover:text-[#231912] mb-1.5 cursor-pointer"
+                class="${params.backButtonClass} inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#7A4B2A] hover:text-[#231912] mb-2 cursor-pointer"
               >
                 <span>→</span>
                 <span>${params.backButtonLabel}</span>
               </button>
-              <h2 class="font-display text-[19px] sm:text-[22px] font-bold text-[#231912]">
+              <h2 class="font-display text-[18px] sm:text-[22px] font-bold text-[#231912] leading-[1.6]">
                 ${toPersianDigits(params.parentTitle)}
               </h2>
-              <div class="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-[12.5px] text-[#5B4739]">
-                <span>اثر: <strong class="text-[#231912]">${toPersianDigits(params.bookTitle)}</strong></span>
-                <span>${params.mentorLabel}: <strong class="text-[#231912]">${toPersianDigits(params.mentorName)}</strong></span>
-                <span>برنامه: <strong class="text-[#231912]">${formatPersianDateDisplay(params.scheduleText)}</strong></span>
+              <div class="mt-3 sm:mt-2 grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2 sm:gap-x-5 sm:gap-y-1.5 p-3 sm:p-0 rounded-xl bg-[#F4E9DA]/60 sm:bg-transparent border border-[#E5D7C5] sm:border-0 text-[12.5px] text-[#5B4739]">
+                <div class="flex items-center justify-between sm:justify-start gap-2">
+                  <span class="text-[#7A6352]">اثر:</span>
+                  <strong class="text-[#231912] truncate">${toPersianDigits(params.bookTitle)}</strong>
+                </div>
+                <div class="flex items-center justify-between sm:justify-start gap-2 border-t border-[#E6D8C5]/70 pt-1.5 sm:border-0 sm:pt-0">
+                  <span class="text-[#7A6352]">${params.mentorLabel}:</span>
+                  <strong class="text-[#231912] truncate">${toPersianDigits(params.mentorName)}</strong>
+                </div>
+                <div class="flex items-center justify-between sm:justify-start gap-2 border-t border-[#E6D8C5]/70 pt-1.5 sm:border-0 sm:pt-0">
+                  <span class="text-[#7A6352]">برنامه:</span>
+                  <strong class="text-[#231912] truncate">${formatPersianDateDisplay(params.scheduleText)}</strong>
+                </div>
               </div>
             </div>
           </div>
@@ -1049,7 +1058,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               class="js-subsession-search-input w-full px-4 py-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
             />
           </div>
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="grid grid-cols-3 sm:flex items-center gap-2 shrink-0">
             ${(
               [
                 { key: 'all', label: 'همه جلسات' },
@@ -1062,7 +1071,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               <button
                 type="button"
                 data-subfilter="${tab.key}"
-                class="js-subsession-filter-btn px-3.5 py-2 rounded-xl text-[12px] font-semibold transition-colors cursor-pointer ${
+                class="js-subsession-filter-btn px-2.5 sm:px-3.5 py-2 rounded-xl text-[11.5px] sm:text-[12px] font-semibold text-center transition-colors cursor-pointer ${
                   subSessionFilter === tab.key
                     ? 'bg-[#5A3A22] text-[#FAF5EC]'
                     : 'bg-[#F3E7D6] text-[#4E3B2D] hover:bg-[#E6D5BE]'
@@ -1377,7 +1386,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               class="js-sessions-main-search-input w-full px-4 py-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
             />
           </div>
-          <div class="flex flex-wrap items-center gap-2 shrink-0">
+          <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 shrink-0">
             ${(
               [
                 { key: 'all', label: 'همه جلسات' },
@@ -1391,7 +1400,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               <button
                 type="button"
                 data-sessions-filter="${f.key}"
-                class="js-sessions-main-filter-btn px-3.5 py-2 rounded-xl text-[12px] font-semibold transition-colors cursor-pointer ${
+                class="js-sessions-main-filter-btn px-3.5 py-2 rounded-xl text-[12px] font-semibold text-center transition-colors cursor-pointer ${
                   sessionsListFilter === f.key
                     ? 'bg-[#5A3A22] text-[#FAF5EC]'
                     : 'bg-[#F3E7D6] text-[#4E3B2D] hover:bg-[#E6D5BE]'
@@ -1536,7 +1545,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               class="js-classes-main-search-input w-full px-4 py-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
             />
           </div>
-          <div class="flex flex-wrap items-center gap-2 shrink-0">
+          <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 shrink-0">
             ${(
               [
                 { key: 'all', label: 'همه کلاس‌ها' },
@@ -1550,7 +1559,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               <button
                 type="button"
                 data-classes-filter="${f.key}"
-                class="js-classes-main-filter-btn px-3.5 py-2 rounded-xl text-[12px] font-semibold transition-colors cursor-pointer ${
+                class="js-classes-main-filter-btn px-3.5 py-2 rounded-xl text-[12px] font-semibold text-center transition-colors cursor-pointer ${
                   classesListFilter === f.key
                     ? 'bg-[#5A3A22] text-[#FAF5EC]'
                     : 'bg-[#F3E7D6] text-[#4E3B2D] hover:bg-[#E6D5BE]'
@@ -1694,7 +1703,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
           </div>
           <button
             type="button"
-            class="js-toggle-add-book-form px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+            class="js-toggle-add-book-form w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold text-center justify-center transition-colors cursor-pointer shrink-0"
           >
             ${isAddBookFormOpen ? '✕ بستن فرم افزودن کتاب' : '+ افزودن کتاب جدید'}
           </button>
@@ -1798,7 +1807,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               class="js-library-search-input w-full px-4 py-2.5 rounded-xl bg-[#F4E9DA]/65 border border-[#DFCEB9] text-[13px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
             />
           </div>
-          <div class="flex flex-wrap items-center gap-2 shrink-0">
+          <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 shrink-0">
             ${(
               [
                 { key: 'all', label: 'همه کتاب‌ها' },
@@ -1812,7 +1821,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               <button
                 type="button"
                 data-libfilter="${f.key}"
-                class="js-library-filter-btn px-3.5 py-2 rounded-xl text-[12px] font-semibold transition-colors cursor-pointer ${
+                class="js-library-filter-btn px-3.5 py-2 rounded-xl text-[12px] font-semibold text-center transition-colors cursor-pointer ${
                   libraryFilter === f.key
                     ? 'bg-[#5A3A22] text-[#FAF5EC]'
                     : 'bg-[#F3E7D6] text-[#4E3B2D] hover:bg-[#E6D5BE]'
@@ -1965,8 +1974,8 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     const unreadCount = state.announcements.filter((a) => a.is_read === 0).length;
 
     return `
-      <div class="space-y-6">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="space-y-5 mt-0 pt-0">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 class="font-display text-[20px] sm:text-[23px] font-bold text-[#231912]">
               اطلاعیه‌های باشگاه کتابخوانی کتابوشکا
@@ -1980,7 +1989,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               ? `
             <button
               type="button"
-              class="js-mark-all-announcements-read px-4 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+              class="js-mark-all-announcements-read w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold text-center justify-center transition-colors cursor-pointer shrink-0"
             >
               ✓ ثبت همه اطلاعیه‌ها به عنوان خوانده‌شده (${toPersianDigits(unreadCount)})
             </button>
@@ -2212,8 +2221,8 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                     class="w-full px-3.5 py-2.5 rounded-xl bg-[#F4E9DA]/60 border border-[#DFCEB9] text-[13px] text-[#231912] leading-[1.85] focus:outline-none focus:border-[#8B5A36]"
                   ></textarea>
                 </div>
-                <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
-                  <div class="flex items-center gap-3 flex-wrap">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                  <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
                     <input
                       type="file"
                       multiple
@@ -2222,18 +2231,18 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                     />
                     <button
                       type="button"
-                      class="js-trigger-reply-ticket-file px-4 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#3F2E21] inline-flex items-center gap-2 transition-colors cursor-pointer"
+                      class="js-trigger-reply-ticket-file w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12px] font-semibold text-[#3F2E21] inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
                     >
                       <span>📎</span>
                       <span>افزودن فایل یا تصویر پیوست</span>
                     </button>
-                    <span class="js-reply-ticket-file-label text-[12px] text-[#6B5444]">
+                    <span class="js-reply-ticket-file-label text-[12px] text-[#6B5444] text-center sm:text-right">
                       ${selectedReplyFileNames ? `فایل انتخاب‌شده: ${toPersianDigits(selectedReplyFileNames)}` : 'فایلی انتخاب نشده است'}
                     </span>
                   </div>
                   <button
                     type="submit"
-                    class="px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer"
+                    class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold text-center justify-center transition-colors cursor-pointer"
                   >
                     ارسال پاسخ
                   </button>
@@ -2310,8 +2319,8 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
             </div>
 
             <!-- File Attachment Button & Submit -->
-            <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
-              <div class="flex items-center gap-3 flex-wrap">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+              <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
                 <input
                   type="file"
                   multiple
@@ -2320,19 +2329,19 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                 />
                 <button
                   type="button"
-                  class="js-trigger-ticket-file px-4 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12.5px] font-semibold text-[#3F2E21] inline-flex items-center gap-2 transition-colors cursor-pointer"
+                  class="js-trigger-ticket-file w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12.5px] font-semibold text-[#3F2E21] inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <span>📎</span>
                   <span>افزودن فایل پیوست</span>
                 </button>
-                <span class="js-ticket-file-label text-[12px] text-[#6B5444]">
+                <span class="js-ticket-file-label text-[12px] text-[#6B5444] text-center sm:text-right">
                   ${selectedTicketFileName ? `فایل انتخاب‌شده: ${toPersianDigits(selectedTicketFileName)}` : 'فایلی انتخاب نشده است (حداکثر ۵ مگابایت)'}
                 </span>
               </div>
 
               <button
                 type="submit"
-                class="px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold transition-colors cursor-pointer"
+                class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13px] font-semibold text-center justify-center transition-colors cursor-pointer"
               >
                 ثبت و ارسال تیکت
               </button>
@@ -2462,7 +2471,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               </div>
             </div>
 
-            <div class="flex items-center gap-2.5">
+            <div class="flex items-center gap-2.5 self-end sm:self-auto">
               <input
                 type="file"
                 accept="image/*"
@@ -2470,18 +2479,28 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               />
               <button
                 type="button"
-                class="js-trigger-avatar-upload px-4 py-2 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[12.5px] font-semibold text-[#3F2E21] transition-colors cursor-pointer"
+                title="انتخاب تصویر جدید"
+                aria-label="انتخاب تصویر جدید"
+                class="js-trigger-avatar-upload w-10 h-10 rounded-xl bg-[#F3E7D6] hover:bg-[#E5D4BC] border border-[#D8C4AA] text-[#3F2E21] inline-flex items-center justify-center transition-colors cursor-pointer"
               >
-                انتخاب تصویر جدید
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                  <circle cx="12" cy="13" r="4"></circle>
+                </svg>
               </button>
               ${
                 displayAvatar
                   ? `
                 <button
                   type="button"
-                  class="js-remove-avatar-btn px-3 py-2 rounded-xl border border-[#E6B8B3] text-[12px] font-semibold text-[#9E3329] hover:bg-[#FBEAE8] transition-colors cursor-pointer"
+                  title="حذف عکس"
+                  aria-label="حذف عکس"
+                  class="js-remove-avatar-btn w-10 h-10 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] inline-flex items-center justify-center transition-colors cursor-pointer"
                 >
-                  حذف عکس
+                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
                 </button>
               `
                   : ''
@@ -2570,7 +2589,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
           <div class="flex justify-end pt-2">
             <button
               type="button"
-              class="js-save-profile-btn px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13.5px] font-semibold transition-colors cursor-pointer"
+              class="js-save-profile-btn w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[13.5px] font-semibold text-center justify-center transition-colors cursor-pointer"
             >
               ${isSavingProfile ? 'در حال ذخیره تغییرات...' : 'ذخیره تغییرات پروفایل'}
             </button>
@@ -2875,6 +2894,11 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
               aria-label="باز و بسته کردن منوی پنل کاربری"
               class="js-toggle-member-mobile-nav lg:hidden inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#EFE3D2] hover:bg-[#E4D3BC] text-[#3F2E21] text-[12.5px] font-semibold transition-colors cursor-pointer shrink-0"
             >
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <line x1="4" y1="7" x2="20" y2="7"></line>
+                <line x1="4" y1="12" x2="20" y2="12"></line>
+                <line x1="4" y1="17" x2="20" y2="17"></line>
+              </svg>
               <span>${activeNavItem.label}</span>
               <svg class="w-4 h-4 transition-transform ${isMobileSidebarOpen ? 'rotate-180' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="6 9 12 15 18 9"></polyline>
@@ -2916,7 +2940,7 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
             <div class="pt-4 mt-4 border-t border-[#E6D8C5] space-y-2">
               <button
                 type="button"
-                class="js-back-to-home w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#5B4636] hover:bg-[#EFE3D2] text-right transition-colors cursor-pointer"
+                class="js-back-to-home hidden lg:block w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#5B4636] hover:bg-[#EFE3D2] text-right transition-colors cursor-pointer"
               >
                 ← بازگشت به صفحه اصلی سایت
               </button>

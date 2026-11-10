@@ -373,13 +373,35 @@ function mountApplication(
     $app.empty();
 
     const $shell = $(
-      '<div dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
+      '<div dir="rtl" class="min-h-screen flex flex-col justify-start relative"></div>'
     );
+
+    const adminNavItems = [
+      { key: 'dashboard', label: 'داشبورد' },
+      { key: 'sessions', label: 'مدیریت نشستها' },
+      { key: 'classes', label: 'مدیریت کلاس ها' },
+      { key: 'library', label: 'کتابخانه' },
+      { key: 'users', label: 'مدیریت کاربران' },
+      { key: 'blog', label: 'وبلاگ' },
+      { key: 'comments', label: 'نظرات کاربران' },
+      { key: 'gallery', label: 'گالری تصاویر' },
+      { key: 'announcements', label: 'اطلاعیه ها' },
+      { key: 'tickets', label: 'تیکت ها' },
+      { key: 'contact_messages', label: 'پیامهای دریافتی' },
+      { key: 'profile', label: 'پروفایل' },
+      { key: 'home_settings', label: 'تنظیمات صفحه اصلی' },
+    ];
 
     const $navbar = createNavbarComponent({
       navigationLinks: payload.navigationLinks,
       ctaText: getNavbarCtaLabel(),
       isStationaryCta: true,
+      panelMode: 'admin',
+      panelMenuItems: adminNavItems,
+      activePanelKey: initialTab,
+      onPanelMenuSelect: (key) => {
+        $shell.find(`.js-admin-tab-btn[data-admin-tab="${key}"]`).trigger('click');
+      },
       onNavigate: (href) => {
         ApiService.fetchBootstrapData()
           .then((fresh) => {
@@ -525,13 +547,30 @@ function mountApplication(
     $app.empty();
 
     const $shell = $(
-      '<div dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
+      '<div dir="rtl" class="min-h-screen flex flex-col justify-start relative"></div>'
     );
+
+    const memberNavItems = [
+      { key: 'dashboard', label: 'داشبورد' },
+      { key: 'sessions', label: 'نشست های من' },
+      { key: 'classes', label: 'کلاس های من' },
+      { key: 'library', label: 'کتابخانه من' },
+      { key: 'announcements', label: 'اطلاعیه' },
+      { key: 'tickets', label: 'تیکت' },
+      { key: 'profile', label: 'پروفایل' },
+      { key: 'calendar', label: 'تقویم رویدادها' },
+    ];
 
     const $navbar = createNavbarComponent({
       navigationLinks: payload.navigationLinks,
       ctaText: getNavbarCtaLabel(),
       isStationaryCta: true,
+      panelMode: 'member',
+      panelMenuItems: memberNavItems,
+      activePanelKey: initialTab,
+      onPanelMenuSelect: (key) => {
+        $shell.find(`.js-panel-tab-btn[data-tab="${key}"]`).trigger('click');
+      },
       onNavigate: (href) => {
         renderMainHomeView(href);
       },
@@ -719,7 +758,7 @@ function mountApplication(
     $app.empty();
 
     const $shell = $(
-      '<div dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
+      '<div dir="rtl" class="min-h-screen flex flex-col justify-start relative"></div>'
     );
 
     const $loginModal = createClubAuthModalComponent({
@@ -776,7 +815,7 @@ function mountApplication(
     $app.empty();
 
     const $shell = $(
-      '<div dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
+      '<div dir="rtl" class="min-h-screen flex flex-col justify-start relative"></div>'
     );
 
     const $loginModal = createClubAuthModalComponent({
@@ -845,7 +884,7 @@ function mountApplication(
     $app.empty();
 
     const $shell = $(
-      '<div dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
+      '<div dir="rtl" class="min-h-screen flex flex-col justify-start relative"></div>'
     );
 
     const $loginModal = createClubAuthModalComponent({
@@ -911,7 +950,7 @@ function mountApplication(
     $app.empty();
 
     const $shell = $(
-      '<div dir="rtl" class="min-h-screen flex flex-col justify-between relative"></div>'
+      '<div dir="rtl" class="min-h-screen flex flex-col justify-start relative"></div>'
     );
 
     const $loginModal = createClubAuthModalComponent({
