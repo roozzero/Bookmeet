@@ -4,10 +4,11 @@ import type { NavigationLink } from '../types/models.ts';
 export interface NavbarPanelMenuItem {
   key: string;
   label: string;
+  badge?: string;
 }
 
 export interface NavbarProps {
-  navigationLinks: NavigationLink[];
+  navigationLinks?: NavigationLink[];
   ctaText: string;
   activeHref?: string;
   isStationaryCta?: boolean;
@@ -69,11 +70,17 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
           </button>
         </div>
 
-        <!-- Zone 2 (Center on Desktop): Persian Navigation Links -->
-        <nav
-          class="js-desktop-nav hidden lg:flex items-center gap-5 xl:gap-8 text-[14px] font-medium text-[#4a392b] overflow-x-auto"
-          aria-label="منوی اصلی"
-        ></nav>
+        ${
+          !isPanelMode
+            ? `
+          <!-- Zone 2 (Center on Desktop - Public Website Only): Persian Navigation Links -->
+          <nav
+            class="js-desktop-nav hidden lg:flex items-center gap-5 xl:gap-8 text-[14px] font-medium text-[#4a392b] overflow-x-auto"
+            aria-label="منوی اصلی"
+          ></nav>
+        `
+            : ''
+        }
 
         <!-- Zone 3 (Left in RTL): Primary Action Button -->
         <div class="flex items-center shrink-0">
@@ -88,7 +95,7 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
 
       <!-- Collapsible Mobile Navigation Drawer -->
       <nav
-        class="js-mobile-nav-drawer hidden lg:hidden mt-3 pt-3 border-t border-[#d8ccb6] grid grid-cols-2 sm:grid-cols-4 gap-2"
+        class="js-mobile-nav-drawer hidden lg:hidden mt-3 pt-3 border-t border-[#d8ccb6] flex-col space-y-1.5 max-h-[75vh] overflow-y-auto"
         aria-label="${
           mode === 'admin'
             ? 'منوی موبایل پنل مدیریت'
@@ -104,55 +111,59 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
   const $mobileDrawer = $header.find('.js-mobile-nav-drawer');
 
   function closeMobileDrawer(): void {
-    $mobileDrawer.addClass('hidden');
+    $mobileDrawer.removeClass('flex').addClass('hidden');
     $header.find('.js-mobile-nav-toggle').attr('aria-expanded', 'false');
     $header.find('.js-mobile-nav-icon-open').removeClass('hidden');
     $header.find('.js-mobile-nav-icon-close').addClass('hidden');
+  }
+
+  function openMobileDrawer(): void {
+    $mobileDrawer.removeClass('hidden').addClass('flex');
+    $header.find('.js-mobile-nav-toggle').attr('aria-expanded', 'true');
+    $header.find('.js-mobile-nav-icon-open').addClass('hidden');
+    $header.find('.js-mobile-nav-icon-close').removeClass('hidden');
   }
 
   $header.find('.js-mobile-nav-toggle').on('click', (e) => {
     e.preventDefault();
     const isHidden = $mobileDrawer.hasClass('hidden');
     if (isHidden) {
-      $mobileDrawer.removeClass('hidden');
-      $header.find('.js-mobile-nav-toggle').attr('aria-expanded', 'true');
-      $header.find('.js-mobile-nav-icon-open').addClass('hidden');
-      $header.find('.js-mobile-nav-icon-close').removeClass('hidden');
+      openMobileDrawer();
     } else {
       closeMobileDrawer();
     }
   });
 
-  props.navigationLinks.forEach((link, idx) => {
-    const isInitialActive = props.activeHref
-      ? props.activeHref === link.href
-      : idx === 0;
+  if (!isPanelMode && Array.isArray(props.navigationLinks)) {
+    props.navigationLinks.forEach((link, idx) => {
+      const isInitialActive = props.activeHref
+        ? props.activeHref === link.href
+        : idx === 0;
 
-    const $link = $(`
-      <button
-        type="button"
-        data-href="${link.href}"
-        data-label="${link.label}"
-        class="js-nav-link bg-transparent whitespace-nowrap shrink-0 transition-colors py-1 border-b-2 cursor-pointer ${
-          isInitialActive
-            ? 'text-[#23180f] font-semibold border-[#3b2a1e]'
-            : 'text-[#4a392b] hover:text-[#23180f] border-transparent'
-        }"
-      >${link.label}</button>
-    `);
+      const $link = $(`
+        <button
+          type="button"
+          data-href="${link.href}"
+          data-label="${link.label}"
+          class="js-nav-link bg-transparent whitespace-nowrap shrink-0 transition-colors py-1 border-b-2 cursor-pointer ${
+            isInitialActive
+              ? 'text-[#23180f] font-semibold border-[#3b2a1e]'
+              : 'text-[#4a392b] hover:text-[#23180f] border-transparent'
+          }"
+        >${link.label}</button>
+      `);
 
-    const handleDesktopNavClick = (e: JQuery.ClickEvent) => {
-      e.preventDefault();
-      $desktopNav
-        .find('.js-nav-link')
-        .removeClass('text-[#23180f] font-semibold border-[#3b2a1e]')
-        .addClass('text-[#4a392b] border-transparent');
-      $desktopNav
-        .find(`.js-nav-link[data-href="${link.href}"]`)
-        .removeClass('text-[#4a392b] border-transparent')
-        .addClass('text-[#23180f] font-semibold border-[#3b2a1e]');
+      const handlePublicNavClick = (e: JQuery.ClickEvent) => {
+        e.preventDefault();
+        $desktopNav
+          .find('.js-nav-link')
+          .removeClass('text-[#23180f] font-semibold border-[#3b2a1e]')
+          .addClass('text-[#4a392b] border-transparent');
+        $desktopNav
+          .find(`.js-nav-link[data-href="${link.href}"]`)
+          .removeClass('text-[#4a392b] border-transparent')
+          .addClass('text-[#23180f] font-semibold border-[#3b2a1e]');
 
-      if (!isPanelMode) {
         $mobileDrawer
           .find('.js-mobile-nav-link')
           .removeClass('bg-[#3b2a1e] text-[#faf6ec] font-semibold')
@@ -161,35 +172,55 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
           .find(`.js-mobile-nav-link[data-href="${link.href}"]`)
           .removeClass('bg-[#f7f2e6] text-[#3b2a1e] border border-[#ded2bc]')
           .addClass('bg-[#3b2a1e] text-[#faf6ec] font-semibold');
-      }
 
-      closeMobileDrawer();
+        closeMobileDrawer();
 
-      if (props.onNavigate) {
-        props.onNavigate(link.href, link.label);
-      }
-    };
+        if (props.onNavigate) {
+          props.onNavigate(link.href, link.label);
+        }
+      };
 
-    $link.on('click', handleDesktopNavClick);
-    $desktopNav.append($link);
+      $link.on('click', handlePublicNavClick);
+      $desktopNav.append($link);
 
-    if (!isPanelMode) {
       const $mobileLink = $(`
         <button
           type="button"
           data-href="${link.href}"
           data-label="${link.label}"
-          class="js-mobile-nav-link px-3 py-2.5 rounded-xl text-right text-[13px] font-medium transition-colors cursor-pointer ${
+          class="js-mobile-nav-link w-full px-4 py-2.5 rounded-xl text-right text-[13px] font-medium flex items-center justify-between transition-colors cursor-pointer ${
             isInitialActive
               ? 'bg-[#3b2a1e] text-[#faf6ec] font-semibold'
               : 'bg-[#f7f2e6] text-[#3b2a1e] hover:bg-[#e8decb] border border-[#ded2bc]'
           }"
-        >${link.label}</button>
+        ><span>${link.label}</span></button>
       `);
-      $mobileLink.on('click', handleDesktopNavClick);
+      $mobileLink.on('click', handlePublicNavClick);
       $mobileDrawer.append($mobileLink);
-    }
-  });
+    });
+  }
+
+  function highlightActivePanelItem(activeKey: string): void {
+    $mobileDrawer.find('.js-mobile-panel-nav-btn').each(function () {
+      const btnKey = String($(this).data('panel-key') || '');
+      const $badge = $(this).find('.js-mobile-panel-badge');
+      if (btnKey === activeKey) {
+        $(this)
+          .removeClass('bg-[#f7f2e6] text-[#3b2a1e] border border-[#ded2bc]')
+          .addClass('bg-[#5A3A22] text-[#FAF5EC] font-semibold shadow-xs');
+        $badge
+          .removeClass('bg-[#E8DAC7] text-[#5C4432]')
+          .addClass('bg-[#FAF5EC]/20 text-[#FAF5EC]');
+      } else {
+        $(this)
+          .removeClass('bg-[#5A3A22] text-[#FAF5EC] font-semibold shadow-xs')
+          .addClass('bg-[#f7f2e6] text-[#3b2a1e] border border-[#ded2bc]');
+        $badge
+          .removeClass('bg-[#FAF5EC]/20 text-[#FAF5EC]')
+          .addClass('bg-[#E8DAC7] text-[#5C4432]');
+      }
+    });
+  }
 
   if (isPanelMode && Array.isArray(props.panelMenuItems)) {
     props.panelMenuItems.forEach((item, idx) => {
@@ -200,23 +231,28 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
         <button
           type="button"
           data-panel-key="${item.key}"
-          class="js-mobile-panel-nav-btn px-3 py-2.5 rounded-xl text-right text-[13px] font-medium transition-colors cursor-pointer ${
+          class="js-mobile-panel-nav-btn w-full px-4 py-2.5 rounded-xl text-right text-[13px] flex items-center justify-between transition-colors cursor-pointer ${
             isInitialActive
-              ? 'bg-[#3b2a1e] text-[#faf6ec] font-semibold'
-              : 'bg-[#f7f2e6] text-[#3b2a1e] hover:bg-[#e8decb] border border-[#ded2bc]'
+              ? 'bg-[#5A3A22] text-[#FAF5EC] font-semibold shadow-xs'
+              : 'bg-[#f7f2e6] text-[#3b2a1e] hover:bg-[#e8decb] border border-[#ded2bc] font-medium'
           }"
-        >${item.label}</button>
+        >
+          <span>${item.label}</span>
+          ${
+            item.badge
+              ? `<span class="js-mobile-panel-badge text-[11px] px-2 py-0.5 rounded-md ${
+                  isInitialActive
+                    ? 'bg-[#FAF5EC]/20 text-[#FAF5EC]'
+                    : 'bg-[#E8DAC7] text-[#5C4432]'
+                }">${item.badge}</span>`
+              : ''
+          }
+        </button>
       `);
 
       $panelMobileBtn.on('click', (e) => {
         e.preventDefault();
-        $mobileDrawer
-          .find('.js-mobile-panel-nav-btn')
-          .removeClass('bg-[#3b2a1e] text-[#faf6ec] font-semibold')
-          .addClass('bg-[#f7f2e6] text-[#3b2a1e] border border-[#ded2bc]');
-        $panelMobileBtn
-          .removeClass('bg-[#f7f2e6] text-[#3b2a1e] border border-[#ded2bc]')
-          .addClass('bg-[#3b2a1e] text-[#faf6ec] font-semibold');
+        highlightActivePanelItem(item.key);
         closeMobileDrawer();
         if (props.onPanelMenuSelect) {
           props.onPanelMenuSelect(item.key);
@@ -226,6 +262,13 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
       $mobileDrawer.append($panelMobileBtn);
     });
   }
+
+  $header.on('navbar:set-active-key', (_e, key: string) => {
+    if (key) {
+      highlightActivePanelItem(key);
+    }
+    closeMobileDrawer();
+  });
 
   // Add subtle border & shadow when scrolling down so the floating navbar stands out cleanly
   function syncNavbarScrollState(): void {

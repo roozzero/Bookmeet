@@ -209,8 +209,8 @@ export function createLibrarySection(
       <div class="max-w-7xl mx-auto">
         <!-- Events & Current Reading Showcase (Connected to #events navigation) -->
         <div id="events" class="scroll-mt-24">
-          <div class="mb-10 sm:mb-12">
-            <h2 class="font-display text-[28px] sm:text-[36px] lg:text-[42px] font-bold leading-[1.3] text-[#1E150F] text-justify">
+          <div class="mb-8 sm:mb-12">
+            <h2 class="font-display text-[19px] sm:text-[32px] lg:text-[40px] font-bold leading-[1.45] sm:leading-[1.3] text-[#1E150F] text-right sm:text-justify">
               کتابِ در حال هم‌خوانی و نشست‌های پیشِ رو
             </h2>
           </div>

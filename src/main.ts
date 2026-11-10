@@ -393,7 +393,6 @@ function mountApplication(
     ];
 
     const $navbar = createNavbarComponent({
-      navigationLinks: payload.navigationLinks,
       ctaText: getNavbarCtaLabel(),
       isStationaryCta: true,
       panelMode: 'admin',
@@ -429,6 +428,10 @@ function mountApplication(
       initialSubPath,
       onRouteChange: (newPath) => {
         pushRoute(newPath);
+        const match = newPath.match(/^\/admin\/([^/?#]+)/);
+        if (match && match[1]) {
+          $navbar.trigger('navbar:set-active-key', [match[1]]);
+        }
       },
       onBackToSite: () => {
         ApiService.fetchBootstrapData()
@@ -562,7 +565,6 @@ function mountApplication(
     ];
 
     const $navbar = createNavbarComponent({
-      navigationLinks: payload.navigationLinks,
       ctaText: getNavbarCtaLabel(),
       isStationaryCta: true,
       panelMode: 'member',
@@ -586,6 +588,10 @@ function mountApplication(
       initialEnrollmentNotice,
       onRouteChange: (newPath) => {
         pushRoute(newPath);
+        const match = newPath.match(/^\/panel\/([^/?#]+)/);
+        if (match && match[1]) {
+          $navbar.trigger('navbar:set-active-key', [match[1]]);
+        }
       },
       onBackToSite: () => {
         pushRoute('/');

@@ -1615,31 +1615,31 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               </div>
             </div>
 
-            <div class="px-6 py-3.5 border-t border-[#E5D7C5] flex flex-wrap items-center justify-between gap-2.5">
-              <div class="flex flex-wrap items-center gap-2">
+            <div class="px-4 sm:px-6 py-3.5 border-t border-[#E5D7C5] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
                 <button
                   type="button"
                   data-contact-msg-id="${msg.id}"
                   data-next-read="${isRead ? '0' : '1'}"
-                  class="js-admin-toggle-contact-msg-read px-3.5 py-2 rounded-xl border text-[12px] font-semibold cursor-pointer transition-colors ${
+                  class="js-admin-toggle-contact-msg-read w-full sm:w-auto px-3 py-2 rounded-xl border text-[11.5px] sm:text-[12px] font-semibold text-center justify-center cursor-pointer transition-colors ${
                     isRead
                       ? 'bg-[#FFF6E0] border-[#E3C178] text-[#6E4B0C] hover:bg-[#F7E7C4]'
                       : 'bg-[#E4F2E7] border-[#BBD9C2] text-[#235332] hover:bg-[#D2E9D7]'
                   }"
                 >
-                  ${isRead ? 'علامت به عنوان خوانده‌نشده' : '✓ علامت به عنوان خوانده‌شده'}
+                  ${isRead ? 'علامت خوانده‌نشده' : '✓ علامت خوانده‌شده'}
                 </button>
                 <button
                   type="button"
                   data-delete-contact-msg="${msg.id}"
-                  class="js-admin-delete-contact-msg px-3.5 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold cursor-pointer transition-colors"
+                  class="js-admin-delete-contact-msg w-full sm:w-auto px-3 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[11.5px] sm:text-[12px] font-semibold text-center justify-center cursor-pointer transition-colors"
                 >
                   حذف پیام
                 </button>
               </div>
               <button
                 type="button"
-                class="js-admin-close-contact-msg-modal px-4 py-2 rounded-xl border border-[#C5B198] text-[#4E3B2D] hover:bg-[#EFE3D2] text-[12.5px] font-semibold cursor-pointer"
+                class="js-admin-close-contact-msg-modal w-full sm:w-auto px-4 py-2 rounded-xl border border-[#C5B198] text-[#4E3B2D] hover:bg-[#EFE3D2] text-[12.5px] font-semibold text-center justify-center cursor-pointer"
               >
                 بستن پنجره
               </button>
@@ -4904,7 +4904,12 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
 
   // ==================== 9. USER COMMENTS MANAGEMENT TAB ====================
   function renderCommentsTab(): string {
-    const filteredComments = state.comments.filter((c) => {
+    const allComments = state.comments || [];
+    const approvedCount = allComments.filter((c) => c.status === 'تایید شده').length;
+    const pendingCount = allComments.filter((c) => c.status === 'در انتظار تایید').length;
+    const rejectedCount = allComments.filter((c) => c.status === 'رد شده').length;
+
+    const filteredComments = allComments.filter((c) => {
       if (commentFilter === 'all') return true;
       return c.status === commentFilter;
     });
@@ -4918,13 +4923,26 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               بررسی، تایید، رد یا پاسخگویی به دیدگاه‌ها و نظرات ثبت‌شده اعضا درباره مقالات و نشست‌های باشگاه.
             </p>
           </div>
+          <div class="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-auto">
+            <span class="px-3.5 py-1.5 rounded-xl bg-[#FFF3CD] border border-[#E5C77B] text-[#7A5A10] text-[12px] font-bold">
+              ${toPersianDigits(pendingCount)} در انتظار تایید
+            </span>
+            <span class="px-3.5 py-1.5 rounded-xl bg-[#EFE3D2] text-[#4E3B2D] text-[12px] font-semibold">
+              کل نظرات: ${toPersianDigits(allComments.length)}
+            </span>
+          </div>
+        </div>
+
+        <!-- Status Filter Bar matching Tickets layout -->
+        <div class="p-4 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <span class="text-[12.5px] font-semibold text-[#5B4739]">فیلتر بر اساس وضعیت انتشار:</span>
           <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
             ${(
               [
-                { key: 'all', label: 'همه نظرات' },
-                { key: 'تایید شده', label: 'تایید شده' },
-                { key: 'در انتظار تایید', label: 'در انتظار تایید' },
-                { key: 'رد شده', label: 'رد شده' },
+                { key: 'all', label: 'همه نظرات', count: allComments.length },
+                { key: 'تایید شده', label: 'تایید شده', count: approvedCount },
+                { key: 'در انتظار تایید', label: 'در انتظار تایید', count: pendingCount },
+                { key: 'رد شده', label: 'رد شده', count: rejectedCount },
               ] as const
             )
               .map(
@@ -4932,13 +4950,18 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <button
                 type="button"
                 data-comment-filter="${f.key}"
-                class="js-admin-comment-filter w-full sm:w-auto px-3.5 py-2 rounded-xl text-[12px] font-semibold text-center justify-center cursor-pointer ${
+                class="js-admin-comment-filter w-full sm:w-auto justify-between sm:justify-center px-3 py-2 rounded-xl text-[11.5px] sm:text-[12px] font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                   commentFilter === f.key
-                    ? 'bg-[#5A3A22] text-[#FAF5EC]'
-                    : 'bg-[#FAF5EC] border border-[#E5D7C5] text-[#4E3B2D]'
+                    ? 'bg-[#5A3A22] text-[#FAF5EC] shadow-xs'
+                    : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#E6D5BE]'
                 }"
               >
-                ${f.label}
+                <span class="truncate">${f.label}</span>
+                <span class="px-1.5 py-0.5 rounded-md text-[10.5px] shrink-0 ${
+                  commentFilter === f.key
+                    ? 'bg-[#FAF5EC]/20 text-[#FAF5EC]'
+                    : 'bg-[#E5D7C5] text-[#4E3B2D]'
+                }">${toPersianDigits(f.count)}</span>
               </button>
             `
               )
@@ -4946,79 +4969,115 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           </div>
         </div>
 
-        <div class="space-y-4">
-          ${filteredComments
-            .map(
-              (comment) => `
-            <div data-admin-comment-card="${comment.id}" class="p-5 sm:p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] space-y-4">
-              <div class="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 class="font-bold text-[15.5px] text-[#231912]">
-                    ${toPersianDigits(comment.author_name)}
-                    <span class="text-[12px] font-normal text-[#6B5444] mr-2">(${toPersianDigits(comment.author_phone)})</span>
-                  </h3>
-                  <span class="text-[12px] text-[#7A4B2A] block mt-0.5">
-                    درباره: ${toPersianDigits(comment.target_title)}
-                  </span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="text-[12px] text-[#6B5444]">${toPersianDigits(comment.created_date)}</span>
-                  <span class="px-2.5 py-0.5 rounded-md text-[11.5px] font-semibold ${
-                    comment.status === 'تایید شده'
-                      ? 'bg-[#E4F2E7] text-[#235332]'
-                      : comment.status === 'در انتظار تایید'
-                      ? 'bg-[#FFF3CD] text-[#7A5A10]'
-                      : 'bg-[#FBEAE8] text-[#9E3329]'
-                  }">
-                    ${toPersianDigits(comment.status)}
-                  </span>
-                </div>
-              </div>
+        ${
+          filteredComments.length === 0
+            ? `
+          <div class="p-8 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] text-center text-[13.5px] text-[#6B5444]">
+            نظری در این وضعیت یافت نشد.
+          </div>
+        `
+            : `
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            ${filteredComments
+              .map((comment) => {
+                const statusBadgeClass =
+                  comment.status === 'تایید شده'
+                    ? 'bg-[#E4F2E7] text-[#235332] border-[#BBD9C2]'
+                    : comment.status === 'در انتظار تایید'
+                    ? 'bg-[#FFF3CD] text-[#7A5A10] border-[#E5C77B]'
+                    : 'bg-[#FBEAE8] text-[#9E3329] border-[#E6B8B3]';
 
-              <p class="text-[13.5px] text-[#3D2E22] leading-[1.85] text-justify bg-[#F4E9DA]/50 p-3.5 rounded-xl border border-[#E8DAC6]">
-                ${toPersianDigits(comment.comment_text)}
-              </p>
+                return `
+                  <article
+                    data-admin-comment-card="${comment.id}"
+                    class="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] hover:border-[#8B5A36] transition-all flex flex-col justify-between gap-4 shadow-[0_6px_20px_rgba(61,46,34,0.04)]"
+                  >
+                    <div class="space-y-3">
+                      <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <span class="font-mono text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-[#EFE3D2] text-[#4E3B2D]">
+                          #${toPersianDigits(comment.id)}
+                        </span>
+                        <span class="px-2.5 py-0.5 rounded-md border text-[11.5px] font-semibold ${statusBadgeClass}">
+                          ${toPersianDigits(comment.status)}
+                        </span>
+                      </div>
 
-              <div class="pt-3 border-t border-[#E6D8C5] space-y-3">
-                <div>
-                  <label class="block text-[12px] font-semibold text-[#4E3B2D] mb-1">پاسخ مدیر به این نظر:</label>
-                  <textarea
-                    rows="2"
-                    class="js-admin-comment-reply-input w-full px-3.5 py-2 rounded-xl bg-[#FDFBF7] border border-[#DFCEB9] text-[13px] text-[#231912]"
-                  >${toPersianDigits(comment.admin_reply || '')}</textarea>
-                </div>
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div class="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
-                    <label class="text-[12px] font-semibold text-[#4E3B2D] shrink-0">وضعیت انتشار:</label>
-                    <select class="js-admin-comment-status-select w-full sm:w-auto px-3 py-2 rounded-xl bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[12.5px] text-[#231912]">
-                      <option value="تایید شده" ${comment.status === 'تایید شده' ? 'selected' : ''}>تایید شده</option>
-                      <option value="در انتظار تایید" ${comment.status === 'در انتظار تایید' ? 'selected' : ''}>در انتظار تایید</option>
-                      <option value="رد شده" ${comment.status === 'رد شده' ? 'selected' : ''}>رد شده</option>
-                    </select>
-                  </div>
-                  <div class="grid grid-cols-2 gap-2.5 w-full sm:w-auto">
-                    <button
-                      type="button"
-                      data-delete-comment="${comment.id}"
-                      class="js-admin-delete-comment w-full px-4 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold text-center justify-center cursor-pointer"
-                    >
-                      حذف
-                    </button>
-                    <button
-                      type="button"
-                      data-save-comment="${comment.id}"
-                      class="js-admin-save-comment w-full px-5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold text-center justify-center cursor-pointer"
-                    >
-                      ذخیره
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          `
-            )
-            .join('')}
-        </div>
+                      <h3 class="font-display text-[16.5px] font-bold text-[#231912] leading-[1.6] truncate" title="${toPersianDigits(comment.target_title)}">
+                        ${toPersianDigits(comment.target_title)}
+                      </h3>
+
+                      <div class="pt-2.5 border-t border-[#E6D8C5] space-y-1.5 text-[12px] text-[#5B4739]">
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-[#7A6352] shrink-0">نویسنده نظر:</span>
+                          <strong class="text-[#231912] truncate">${toPersianDigits(comment.author_name)}</strong>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-[#7A6352] shrink-0">شماره تماس:</span>
+                          <strong class="text-[#231912] truncate">${toPersianDigits(comment.author_phone || '—')}</strong>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-[#7A6352] shrink-0">مربوط به:</span>
+                          <strong class="text-[#231912] truncate">${toPersianDigits(comment.target_title)}</strong>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-[#7A6352] shrink-0">تاریخ ثبت:</span>
+                          <strong class="text-[#231912]">${toPersianDigits(comment.created_date)}</strong>
+                        </div>
+                      </div>
+
+                      <div class="p-3.5 rounded-xl bg-[#F4E9DA]/55 border border-[#E6D8C5]">
+                        <span class="block text-[11px] font-semibold text-[#7A6352] mb-1">متن دیدگاه کاربر:</span>
+                        <p class="text-[13px] text-[#231912] leading-[1.85] text-justify whitespace-pre-line">
+                          ${toPersianDigits(comment.comment_text)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-[#E6D8C5] space-y-3">
+                      <div>
+                        <label class="block text-[11.5px] font-semibold text-[#4E3B2D] mb-1">پاسخ مدیر به این نظر:</label>
+                        <textarea
+                          rows="2"
+                          placeholder="پاسخ خود را برای نمایش در زیر این دیدگاه بنویسید..."
+                          class="js-admin-comment-reply-input w-full px-3.5 py-2 rounded-xl bg-[#FDFBF7] border border-[#DFCEB9] text-[12.5px] text-[#231912] focus:outline-none focus:border-[#8B5A36]"
+                        >${toPersianDigits(comment.admin_reply || '')}</textarea>
+                      </div>
+
+                      <div class="space-y-2.5">
+                        <div class="flex items-center justify-between gap-2">
+                          <label class="text-[12px] font-semibold text-[#4E3B2D] shrink-0">وضعیت انتشار:</label>
+                          <select class="js-admin-comment-status-select flex-1 px-3 py-2 rounded-xl bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[12px] font-semibold text-[#231912] focus:outline-none focus:border-[#8B5A36]">
+                            <option value="تایید شده" ${comment.status === 'تایید شده' ? 'selected' : ''}>تایید شده</option>
+                            <option value="در انتظار تایید" ${comment.status === 'در انتظار تایید' ? 'selected' : ''}>در انتظار تایید</option>
+                            <option value="رد شده" ${comment.status === 'رد شده' ? 'selected' : ''}>رد شده</option>
+                          </select>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2.5 w-full">
+                          <button
+                            type="button"
+                            data-delete-comment="${comment.id}"
+                            class="js-admin-delete-comment w-full px-3.5 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold text-center justify-center transition-colors cursor-pointer"
+                          >
+                            حذف نظر
+                          </button>
+                          <button
+                            type="button"
+                            data-save-comment="${comment.id}"
+                            class="js-admin-save-comment w-full px-4 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold text-center justify-center transition-colors cursor-pointer"
+                          >
+                            ذخیره تغییرات
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                `;
+              })
+              .join('')}
+          </div>
+        `
+        }
       </div>
     `;
   }
@@ -5418,7 +5477,7 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           </div>
         </div>
 
-        <!-- Search and Read/Unread Filter Bar -->
+        <!-- Search and Read/Unread Filter Bar matching Tickets layout -->
         <div class="p-4 rounded-2xl bg-[#FAF5EC] border border-[#E5D7C5] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <input
             type="text"
@@ -5429,9 +5488,9 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           <div class="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
             ${(
               [
-                { key: 'all', label: `همه (${toPersianDigits(allMessages.length)})` },
-                { key: 'unread', label: `خوانده‌نشده (${toPersianDigits(unreadCount)})` },
-                { key: 'read', label: `خوانده‌شده (${toPersianDigits(readCount)})` },
+                { key: 'all', label: 'همه', count: allMessages.length },
+                { key: 'unread', label: 'خوانده‌نشده', count: unreadCount },
+                { key: 'read', label: 'خوانده‌شده', count: readCount },
               ] as const
             )
               .map(
@@ -5439,13 +5498,18 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
               <button
                 type="button"
                 data-contact-msg-filter="${f.key}"
-                class="js-admin-contact-msg-filter w-full sm:w-auto px-2.5 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-[12px] font-semibold text-center justify-center truncate cursor-pointer transition-colors ${
+                class="js-admin-contact-msg-filter w-full sm:w-auto justify-between sm:justify-center px-2.5 sm:px-3.5 py-2 rounded-xl text-[11px] sm:text-[12px] font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                   contactMessageFilter === f.key
-                    ? 'bg-[#5A3A22] text-[#FAF5EC]'
-                    : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#EFE3D2]'
+                    ? 'bg-[#5A3A22] text-[#FAF5EC] shadow-xs'
+                    : 'bg-[#F4E9DA]/70 border border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#E6D5BE]'
                 }"
               >
-                ${f.label}
+                <span class="truncate">${f.label}</span>
+                <span class="px-1.5 py-0.5 rounded-md text-[10.5px] shrink-0 ${
+                  contactMessageFilter === f.key
+                    ? 'bg-[#FAF5EC]/20 text-[#FAF5EC]'
+                    : 'bg-[#E5D7C5] text-[#4E3B2D]'
+                }">${toPersianDigits(f.count)}</span>
               </button>
             `
               )
@@ -5453,52 +5517,76 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
           </div>
         </div>
 
-        <!-- Messages List -->
+        <!-- Messages Card Grid (Matching Ticket Card Layout) -->
         ${
           filteredMessages.length > 0
             ? `
-          <div class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
             ${filteredMessages
               .map((msg) => {
                 const isRead = Number(msg.is_read || 0) === 1;
+                const statusBadgeClass = isRead
+                  ? 'bg-[#E4F2E7] text-[#235332] border-[#BBD9C2]'
+                  : 'bg-[#FFF3CD] text-[#7A5A10] border-[#E5C77B]';
+
                 return `
-                  <article class="p-4 sm:p-6 rounded-2xl border transition-all ${
+                  <article class="p-5 rounded-2xl border transition-all flex flex-col justify-between gap-4 shadow-[0_6px_20px_rgba(61,46,34,0.04)] ${
                     isRead
-                      ? 'bg-[#FAF5EC] border-[#E5D7C5]'
-                      : 'bg-[#FDF9F1] border-2 border-[#8B5A36] shadow-[0_10px_26px_rgba(122,75,42,0.08)]'
-                  } space-y-4">
-                    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                      <div class="space-y-1 min-w-0">
-                        <div class="flex flex-wrap items-center gap-2">
-                          <span class="px-2.5 py-0.5 rounded-md text-[11px] font-bold ${
-                            isRead
-                              ? 'bg-[#E4F2E7] text-[#235332]'
-                              : 'bg-[#FFF3CD] text-[#7A5A10]'
-                          }">
-                            ${isRead ? '✓ خوانده‌شده' : '● پیام جدید (خوانده‌نشده)'}
-                          </span>
-                          <span class="text-[12px] text-[#6B5444]">
-                            تاریخ ارسال: <strong class="text-[#231912]">${toPersianDigits(msg.created_at || '—')}</strong>
-                          </span>
-                        </div>
-                        <h3 class="font-display text-[17px] sm:text-[18px] font-bold text-[#231912] pt-1">
-                          ${toPersianDigits(msg.subject || 'بدون موضوع')}
-                        </h3>
+                      ? 'bg-[#FAF5EC] border-[#E5D7C5] hover:border-[#8B5A36]'
+                      : 'bg-[#FDF9F1] border-2 border-[#8B5A36]'
+                  }">
+                    <div class="space-y-3">
+                      <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <span class="font-mono text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-[#EFE3D2] text-[#4E3B2D]">
+                          #${toPersianDigits(msg.id)}
+                        </span>
+                        <span class="px-2.5 py-0.5 rounded-md border text-[11.5px] font-semibold ${statusBadgeClass}">
+                          ${isRead ? '✓ خوانده‌شده' : '● پیام جدید (خوانده‌نشده)'}
+                        </span>
                       </div>
 
-                      <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
-                        <button
-                          type="button"
-                          data-open-contact-msg="${msg.id}"
-                          class="js-admin-open-contact-msg flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12px] font-semibold text-center justify-center cursor-pointer transition-colors"
-                        >
-                          مشاهده کامل پیام
-                        </button>
+                      <h3 class="font-display text-[16.5px] font-bold text-[#231912] leading-[1.6] truncate" title="${toPersianDigits(msg.subject || 'بدون موضوع')}">
+                        ${toPersianDigits(msg.subject || 'بدون موضوع')}
+                      </h3>
+
+                      <div class="pt-2.5 border-t border-[#E6D8C5] space-y-1.5 text-[12px] text-[#5B4739]">
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-[#7A6352] shrink-0">فرستنده پیام:</span>
+                          <strong class="text-[#231912] truncate">${toPersianDigits(msg.full_name || '—')}</strong>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-[#7A6352] shrink-0">ایمیل فرستنده:</span>
+                          <strong dir="ltr" class="text-[#231912] truncate">${msg.email || '—'}</strong>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-[#7A6352] shrink-0">تاریخ ارسال:</span>
+                          <strong class="text-[#231912]">${toPersianDigits(msg.created_at || '—')}</strong>
+                        </div>
+                      </div>
+
+                      <div class="p-3.5 rounded-xl bg-[#F4E9DA]/55 border border-[#E6D8C5]">
+                        <span class="block text-[11px] font-semibold text-[#7A6352] mb-1">خلاصه متن پیام:</span>
+                        <p class="text-[12.5px] text-[#3F2E21] leading-[1.85] line-clamp-2 text-justify">
+                          ${toPersianDigits(msg.message || '')}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-[#E6D8C5] space-y-2.5">
+                      <button
+                        type="button"
+                        data-open-contact-msg="${msg.id}"
+                        class="js-admin-open-contact-msg w-full px-4 py-2.5 rounded-xl bg-[#5A3A22] hover:bg-[#432A18] text-[#FAF5EC] text-[12.5px] font-semibold text-center justify-center transition-colors cursor-pointer"
+                      >
+                        مشاهده کامل پیام ←
+                      </button>
+
+                      <div class="grid grid-cols-2 gap-2 w-full">
                         <button
                           type="button"
                           data-contact-msg-id="${msg.id}"
                           data-next-read="${isRead ? '0' : '1'}"
-                          class="js-admin-toggle-contact-msg-read px-3 py-2 rounded-xl border text-[12px] font-semibold cursor-pointer transition-colors ${
+                          class="js-admin-toggle-contact-msg-read w-full px-2.5 py-2 rounded-xl border text-[11.5px] font-semibold text-center justify-center truncate cursor-pointer transition-colors ${
                             isRead
                               ? 'bg-[#F4E9DA]/80 border-[#DFCEB9] text-[#4E3B2D] hover:bg-[#EFE3D2]'
                               : 'bg-[#E4F2E7] border-[#BBD9C2] text-[#235332] hover:bg-[#D2E9D7]'
@@ -5509,28 +5597,11 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                         <button
                           type="button"
                           data-delete-contact-msg="${msg.id}"
-                          class="js-admin-delete-contact-msg px-3 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[12px] font-semibold cursor-pointer transition-colors"
+                          class="js-admin-delete-contact-msg w-full px-2.5 py-2 rounded-xl border border-[#E6B8B3] text-[#9E3329] hover:bg-[#FBEAE8] text-[11.5px] font-semibold text-center justify-center truncate cursor-pointer transition-colors"
                         >
-                          حذف
+                          حذف پیام
                         </button>
                       </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 px-4 py-3 rounded-xl bg-[#F4E9DA]/55 border border-[#E5D7C5] text-[12.5px]">
-                      <div class="flex items-center gap-2 min-w-0">
-                        <span class="text-[#7A6452] shrink-0">نام فرستنده:</span>
-                        <strong class="text-[#231912] font-bold truncate">${toPersianDigits(msg.full_name || '—')}</strong>
-                      </div>
-                      <div class="flex items-center gap-2 min-w-0">
-                        <span class="text-[#7A6452] shrink-0">ایمیل فرستنده:</span>
-                        <strong dir="ltr" class="text-[#231912] font-bold truncate">${msg.email || '—'}</strong>
-                      </div>
-                    </div>
-
-                    <div class="p-4 rounded-xl bg-[#FDFBF7] border border-[#E6D7C3]">
-                      <p class="text-[13.5px] text-[#3F2E21] leading-[1.95] whitespace-pre-line text-justify">
-                        ${toPersianDigits(msg.message || '')}
-                      </p>
                     </div>
                   </article>
                 `;
@@ -5699,51 +5770,52 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
             </button>
           </div>
 
-          <div class="${isAdminMobileSidebarOpen ? 'block pt-4 mt-4 border-t border-[#E6D8C5]' : 'hidden'} lg:block">
-            <nav class="space-y-1.5" aria-label="منوی پنل مدیریت">
-              ${navItems
-                .map((item) => {
-                  const isActive = activeTab === item.key;
-                  return `
-                    <button
-                      type="button"
-                      data-admin-tab="${item.key}"
-                      class="js-admin-tab-btn w-full px-4 py-2.5 rounded-xl text-right text-[13px] font-semibold flex items-center justify-between transition-all cursor-pointer ${
-                        isActive
-                          ? 'bg-[#5A3A22] text-[#FAF5EC] shadow-sm'
-                          : 'text-[#3F2E21] hover:bg-[#EFE3D2]'
-                      }"
-                    >
-                      <span>${item.label}</span>
-                      ${
-                        item.badge
-                          ? `<span class="text-[11px] px-2 py-0.5 rounded-md ${
-                              isActive
-                                ? 'bg-[#FAF5EC]/20 text-[#FAF5EC]'
-                                : 'bg-[#E8DAC7] text-[#5C4432]'
-                            }">${item.badge}</span>`
-                          : ''
-                      }
-                    </button>
-                  `;
-                })
-                .join('')}
-            </nav>
+          <nav
+            class="${isAdminMobileSidebarOpen ? 'block pt-4 mt-4 border-t border-[#E6D8C5]' : 'hidden'} lg:block space-y-1.5"
+            aria-label="منوی پنل مدیریت"
+          >
+            ${navItems
+              .map((item) => {
+                const isActive = activeTab === item.key;
+                return `
+                  <button
+                    type="button"
+                    data-admin-tab="${item.key}"
+                    class="js-admin-tab-btn w-full px-4 py-2.5 rounded-xl text-right text-[13px] font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-[#5A3A22] text-[#FAF5EC] shadow-sm'
+                        : 'text-[#3F2E21] hover:bg-[#EFE3D2]'
+                    }"
+                  >
+                    <span>${item.label}</span>
+                    ${
+                      item.badge
+                        ? `<span class="text-[11px] px-2 py-0.5 rounded-md ${
+                            isActive
+                              ? 'bg-[#FAF5EC]/20 text-[#FAF5EC]'
+                              : 'bg-[#E8DAC7] text-[#5C4432]'
+                          }">${item.badge}</span>`
+                        : ''
+                    }
+                  </button>
+                `;
+              })
+              .join('')}
+          </nav>
 
-            <div class="pt-4 mt-4 border-t border-[#E6D8C5] space-y-2">
-              <button
-                type="button"
-                class="js-admin-back-to-site hidden lg:block w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#5B4636] hover:bg-[#EFE3D2] text-right transition-colors cursor-pointer"
-              >
-                ← مشاهده صفحه اصلی سایت
-              </button>
-              <button
-                type="button"
-                class="js-admin-logout w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#9E3329] hover:bg-[#FBEAE8] text-right transition-colors cursor-pointer"
-              >
-                خروج از پنل مدیریت
-              </button>
-            </div>
+          <div class="pt-3 mt-3 lg:pt-4 lg:mt-4 border-t border-[#E6D8C5] flex items-center justify-between lg:block lg:space-y-2 gap-2">
+            <button
+              type="button"
+              class="js-admin-back-to-site px-3.5 lg:px-4 py-2 lg:py-2.5 rounded-xl text-[12px] lg:text-[12.5px] font-semibold text-[#5B4636] hover:bg-[#EFE3D2] text-right transition-colors cursor-pointer lg:w-full"
+            >
+              ← مشاهده صفحه اصلی سایت
+            </button>
+            <button
+              type="button"
+              class="js-admin-logout px-3.5 lg:px-4 py-2 lg:py-2.5 rounded-xl text-[12px] lg:text-[12.5px] font-semibold text-[#9E3329] hover:bg-[#FBEAE8] text-right transition-colors cursor-pointer lg:w-full"
+            >
+              خروج از پنل مدیریت
+            </button>
           </div>
         </aside>
 
