@@ -285,7 +285,6 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
   };
 
   let activeTab: PanelTabKey = props.initialTab || 'dashboard';
-  let isMobileSidebarOpen = false;
   let selectedSessionId: number | null = null;
   let selectedClassId: number | null = null;
   let selectedTicketId: number | null = null;
@@ -2863,7 +2862,6 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     ];
 
     const sidebarAvatar = state.member.avatar_url || '';
-    const activeNavItem = navItems.find((item) => item.key === activeTab) || navItems[0];
 
     $wrapper.html(`
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-7 items-start">
@@ -2887,27 +2885,10 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                 </span>
               </div>
             </div>
-
-            <button
-              type="button"
-              aria-expanded="${isMobileSidebarOpen ? 'true' : 'false'}"
-              aria-label="باز و بسته کردن منوی پنل کاربری"
-              class="js-toggle-member-mobile-nav lg:hidden inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#EFE3D2] hover:bg-[#E4D3BC] text-[#3F2E21] text-[12.5px] font-semibold transition-colors cursor-pointer shrink-0"
-            >
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <line x1="4" y1="7" x2="20" y2="7"></line>
-                <line x1="4" y1="12" x2="20" y2="12"></line>
-                <line x1="4" y1="17" x2="20" y2="17"></line>
-              </svg>
-              <span>${activeNavItem.label}</span>
-              <svg class="w-4 h-4 transition-transform ${isMobileSidebarOpen ? 'rotate-180' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </button>
           </div>
 
           <nav
-            class="${isMobileSidebarOpen ? 'block pt-4 mt-4 border-t border-[#E6D8C5]' : 'hidden'} lg:block space-y-1.5"
+            class="hidden lg:block space-y-1.5"
             aria-label="منوی پنل کاربری"
           >
             ${navItems
@@ -2986,16 +2967,10 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
   }
 
   // Event Delegations
-  $wrapper.on('click', '.js-toggle-member-mobile-nav', () => {
-    isMobileSidebarOpen = !isMobileSidebarOpen;
-    render();
-  });
-
   $wrapper.on('click', '.js-panel-tab-btn', function () {
     const nextTab = $(this).data('tab') as PanelTabKey;
     if (nextTab) {
       activeTab = nextTab;
-      isMobileSidebarOpen = false;
       selectedSessionId = null;
       selectedClassId = null;
       selectedTicketId = null;
@@ -3014,7 +2989,6 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
     const nextTab = $(this).data('switch-tab') as PanelTabKey;
     if (nextTab) {
       activeTab = nextTab;
-      isMobileSidebarOpen = false;
       selectedSessionId = null;
       selectedClassId = null;
       selectedTicketId = null;

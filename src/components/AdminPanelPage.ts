@@ -371,7 +371,6 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   };
 
   let activeTab: AdminTabKey = props.initialTab || 'dashboard';
-  let isAdminMobileSidebarOpen = false;
 
   // Gallery state
   let gallerySearch = '';
@@ -5729,8 +5728,6 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
       { key: 'home_settings', label: 'تنظیمات صفحه اصلی' },
     ];
 
-    const activeNavItem = navItems.find((item) => item.key === activeTab) || navItems[0];
-
     $wrapper.html(`
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-7 items-start">
         <!-- Sidebar Navigation -->
@@ -5751,27 +5748,10 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
                 <div class="text-[11.5px] text-[#235332] font-semibold truncate">مدیر ارشد باشگاه کتابوشکا</div>
               </div>
             </div>
-
-            <button
-              type="button"
-              aria-expanded="${isAdminMobileSidebarOpen ? 'true' : 'false'}"
-              aria-label="باز و بسته کردن منوی پنل مدیریت"
-              class="js-toggle-admin-mobile-nav lg:hidden inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#EFE3D2] hover:bg-[#E4D3BC] text-[#3F2E21] text-[12.5px] font-semibold transition-colors cursor-pointer shrink-0"
-            >
-              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <line x1="3" y1="6" x2="21" y2="6"></line>
-                <line x1="3" y1="12" x2="21" y2="12"></line>
-                <line x1="3" y1="18" x2="21" y2="18"></line>
-              </svg>
-              <span>${activeNavItem.label}</span>
-              <svg class="w-4 h-4 transition-transform ${isAdminMobileSidebarOpen ? 'rotate-180' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </button>
           </div>
 
           <nav
-            class="${isAdminMobileSidebarOpen ? 'block pt-4 mt-4 border-t border-[#E6D8C5]' : 'hidden'} lg:block space-y-1.5"
+            class="hidden lg:block space-y-1.5"
             aria-label="منوی پنل مدیریت"
           >
             ${navItems
@@ -5830,16 +5810,10 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
   }
 
   // ==================== EVENT HANDLERS ====================
-  $wrapper.on('click', '.js-toggle-admin-mobile-nav', () => {
-    isAdminMobileSidebarOpen = !isAdminMobileSidebarOpen;
-    render();
-  });
-
   $wrapper.on('click', '.js-admin-tab-btn', function () {
     const tab = $(this).data('admin-tab') as AdminTabKey;
     if (tab) {
       activeTab = tab;
-      isAdminMobileSidebarOpen = false;
       editingSession = null;
       managingSubSessionsForSessionId = null;
       editingSubSession = null;
@@ -5862,7 +5836,6 @@ export function createAdminPanelPageComponent(props: AdminPanelPageProps): JQuer
     const tab = $(this).data('admin-switch') as AdminTabKey;
     if (tab) {
       activeTab = tab;
-      isAdminMobileSidebarOpen = false;
       managingSubSessionsForSessionId = null;
       managingSubSessionsForClassId = null;
       selectedAdminTicketId = null;

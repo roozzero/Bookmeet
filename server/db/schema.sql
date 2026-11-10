@@ -1,5 +1,5 @@
 -- ============================================================================
--- Bookmeet MySQL Database Schema (XAMPP & cPanel Compatible, UTF-8 / Persian)
+-- Ketboshka MySQL Database Schema (XAMPP & cPanel Compatible, UTF-8 / Persian)
 -- ============================================================================
 -- Note: In XAMPP phpMyAdmin, you can either run this file directly or first
 -- select your database (e.g. `bookmeet_db`) and import this file.
@@ -184,7 +184,8 @@ CREATE TABLE IF NOT EXISTS `contact_messages` (
   `subject` VARCHAR(200) NOT NULL,
   `message` TEXT NOT NULL,
   `is_read` TINYINT(1) NOT NULL DEFAULT 0,
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_contact_messages_read` (`is_read`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 11. Club Members & Single Administrator Account
@@ -350,13 +351,15 @@ CREATE TABLE IF NOT EXISTS `member_tickets` (
 CREATE TABLE IF NOT EXISTS `ticket_attachments` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `ticket_id` INT NOT NULL,
-  `sender_role` ENUM('member', 'admin') NOT NULL DEFAULT 'member',
+  `message_index` INT NOT NULL DEFAULT 0,
+  `uploader_role` ENUM('member', 'admin') NOT NULL DEFAULT 'member',
   `file_name` VARCHAR(255) NOT NULL,
   `mime_type` VARCHAR(120) NOT NULL,
   `file_size` INT NOT NULL DEFAULT 0,
-  `file_data` LONGTEXT NOT NULL,
+  `data_url` LONGTEXT NOT NULL,
   `created_at` VARCHAR(80) NOT NULL,
   INDEX `idx_ticket_attachments_ticket` (`ticket_id`),
+  INDEX `idx_ticket_attachments_msg` (`ticket_id`, `message_index`),
   CONSTRAINT `fk_ticket_attachments_ticket`
     FOREIGN KEY (`ticket_id`) REFERENCES `member_tickets` (`id`)
     ON DELETE CASCADE
@@ -377,7 +380,8 @@ CREATE TABLE IF NOT EXISTS `club_calendar_events` (
   `description` TEXT NOT NULL,
   `is_reserved` TINYINT(1) NOT NULL DEFAULT 0,
   `reserved_by_phones_json` LONGTEXT,
-  `sort_order` INT NOT NULL DEFAULT 0
+  `sort_order` INT NOT NULL DEFAULT 0,
+  INDEX `idx_calendar_events_sort` (`sort_order`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 20. Club Announcements

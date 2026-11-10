@@ -576,7 +576,8 @@ class MySQLDatabaseManager {
         href VARCHAR(255) NOT NULL,
         sort_order INT NOT NULL DEFAULT 0,
         is_active TINYINT(1) NOT NULL DEFAULT 1,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_nav_sort (sort_order, is_active)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
       `CREATE TABLE IF NOT EXISTS hero_settings (
@@ -653,7 +654,8 @@ class MySQLDatabaseManager {
         tags TEXT NULL,
         notes LONGTEXT NULL,
         sort_order INT NOT NULL DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_library_books_sort (sort_order, is_current)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
       `CREATE TABLE IF NOT EXISTS library_categories (
@@ -676,7 +678,8 @@ class MySQLDatabaseManager {
         tags VARCHAR(255) NOT NULL DEFAULT '',
         status VARCHAR(40) NOT NULL DEFAULT 'منتشر شده',
         sort_order INT NOT NULL DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_blog_sort (sort_order, status)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
       `CREATE TABLE IF NOT EXISTS gallery_images (
@@ -702,12 +705,12 @@ class MySQLDatabaseManager {
 
       `CREATE TABLE IF NOT EXISTS footer_settings (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        title VARCHAR(200) NOT NULL DEFAULT 'باشگاه کتابخوانی کتابوشکا',
+        title VARCHAR(220) NOT NULL DEFAULT 'باشگاه کتابخوانی کتابوشکا',
         description TEXT NOT NULL,
         phone VARCHAR(80) NOT NULL DEFAULT '',
         email VARCHAR(150) NOT NULL DEFAULT '',
         address VARCHAR(255) NOT NULL DEFAULT '',
-        links_json LONGTEXT NOT NULL,
+        links_json LONGTEXT NULL,
         instagram_url VARCHAR(255) NOT NULL DEFAULT '',
         telegram_url VARCHAR(255) NOT NULL DEFAULT '',
         twitter_url VARCHAR(255) NOT NULL DEFAULT '',
@@ -725,7 +728,8 @@ class MySQLDatabaseManager {
         subject VARCHAR(200) NOT NULL,
         message TEXT NOT NULL,
         is_read TINYINT(1) NOT NULL DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_contact_messages_read (is_read, created_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
       `CREATE TABLE IF NOT EXISTS club_members (
@@ -743,7 +747,8 @@ class MySQLDatabaseManager {
         joined_date VARCHAR(60) NOT NULL DEFAULT '',
         password_hash VARCHAR(255) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY uk_club_members_phone (phone)
+        UNIQUE KEY uk_club_members_phone (phone),
+        INDEX idx_club_members_role (role)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
       `CREATE TABLE IF NOT EXISTS auth_tokens (
@@ -770,7 +775,8 @@ class MySQLDatabaseManager {
         admin_reply TEXT NOT NULL,
         status VARCHAR(40) NOT NULL DEFAULT 'در انتظار تایید',
         created_date VARCHAR(80) NOT NULL,
-        sort_order INT NOT NULL DEFAULT 0
+        sort_order INT NOT NULL DEFAULT 0,
+        INDEX idx_user_comments_status (status, sort_order)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
       `CREATE TABLE IF NOT EXISTS member_sessions (
@@ -780,7 +786,7 @@ class MySQLDatabaseManager {
         book_title VARCHAR(180) NOT NULL,
         book_author VARCHAR(150) NOT NULL DEFAULT '',
         translator VARCHAR(150) NOT NULL DEFAULT '',
-        category VARCHAR(100) NOT NULL DEFAULT '',
+        category VARCHAR(120) NOT NULL DEFAULT '',
         publication_year INT NOT NULL DEFAULT 1405,
         pages_count INT NOT NULL DEFAULT 0,
         publisher VARCHAR(150) NOT NULL DEFAULT '',
@@ -796,7 +802,8 @@ class MySQLDatabaseManager {
         member_note TEXT NOT NULL,
         sub_sessions_json LONGTEXT NOT NULL,
         sort_order INT NOT NULL DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_member_sessions_sort (sort_order, status)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
       `CREATE TABLE IF NOT EXISTS member_classes (
@@ -818,7 +825,8 @@ class MySQLDatabaseManager {
         description TEXT NOT NULL,
         sub_sessions_json LONGTEXT NOT NULL,
         sort_order INT NOT NULL DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_member_classes_sort (sort_order, status)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
       `CREATE TABLE IF NOT EXISTS session_enrollments (
@@ -835,7 +843,10 @@ class MySQLDatabaseManager {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE KEY uk_enrollment_target_member (target_type, target_id, member_phone),
         INDEX idx_enrollment_member_phone (member_phone),
-        INDEX idx_enrollment_target (target_type, target_id)
+        INDEX idx_enrollment_target (target_type, target_id),
+        CONSTRAINT fk_enrollment_member
+          FOREIGN KEY (member_id) REFERENCES club_members (id)
+          ON DELETE SET NULL
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
       `CREATE TABLE IF NOT EXISTS member_library (
@@ -883,6 +894,7 @@ class MySQLDatabaseManager {
         data_url LONGTEXT NOT NULL,
         created_at VARCHAR(80) NOT NULL,
         INDEX idx_ticket_attachments_ticket (ticket_id),
+        INDEX idx_ticket_attachments_msg (ticket_id, message_index),
         CONSTRAINT fk_ticket_attachments_ticket
           FOREIGN KEY (ticket_id) REFERENCES member_tickets (id)
           ON DELETE CASCADE
@@ -902,7 +914,8 @@ class MySQLDatabaseManager {
         description TEXT NOT NULL,
         is_reserved TINYINT(1) NOT NULL DEFAULT 0,
         reserved_by_phones_json LONGTEXT,
-        sort_order INT NOT NULL DEFAULT 0
+        sort_order INT NOT NULL DEFAULT 0,
+        INDEX idx_calendar_events_sort (sort_order)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
       `CREATE TABLE IF NOT EXISTS club_announcements (
@@ -917,7 +930,8 @@ class MySQLDatabaseManager {
         read_by_phones_json LONGTEXT,
         target_user_phone VARCHAR(60) DEFAULT NULL,
         target_user_name VARCHAR(150) DEFAULT NULL,
-        sort_order INT NOT NULL DEFAULT 0
+        sort_order INT NOT NULL DEFAULT 0,
+        INDEX idx_announcements_target (target_user_phone, sort_order)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
     ];
 
@@ -930,134 +944,371 @@ class MySQLDatabaseManager {
     this.initialized = true;
   }
 
+  private async hasColumn(
+    dbName: string,
+    tableName: string,
+    columnName: string
+  ): Promise<boolean> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+      [dbName, tableName, columnName]
+    );
+    return rows.length > 0;
+  }
+
+  private async ensureColumnsExist(
+    dbName: string,
+    tableName: string,
+    columns: Array<{ name: string; definition: string }>
+  ): Promise<void> {
+    for (const col of columns) {
+      const exists = await this.hasColumn(dbName, tableName, col.name);
+      if (!exists) {
+        await this.pool.execute(
+          `ALTER TABLE \`${tableName}\` ADD COLUMN \`${col.name}\` ${col.definition}`
+        );
+      }
+    }
+  }
+
+  private async ensureIndexExists(
+    dbName: string,
+    tableName: string,
+    indexName: string,
+    indexDefinitionSql: string
+  ): Promise<void> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+      [dbName, tableName, indexName]
+    );
+    if (rows.length === 0) {
+      await this.pool.execute(
+        `ALTER TABLE \`${tableName}\` ADD ${indexDefinitionSql}`
+      );
+    }
+  }
+
   private async ensureSchemaMigrations(): Promise<void> {
     const dbName = process.env.MYSQL_DATABASE || 'bookmeet_db';
 
     // 1. Safely drop legacy city and favorite_genre columns from club_members if present
     for (const legacyCol of ['city', 'favorite_genre']) {
-      const [colRows] = await this.pool.execute<RowDataPacket[]>(
-        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'club_members' AND COLUMN_NAME = ?`,
-        [dbName, legacyCol]
-      );
-      if (colRows.length > 0) {
+      if (await this.hasColumn(dbName, 'club_members', legacyCol)) {
         await this.pool.execute(
           `ALTER TABLE club_members DROP COLUMN \`${legacyCol}\``
         );
       }
     }
 
-    // 2. Safely add new session columns to member_sessions if missing
-    const sessionColumnsToEnsure: Array<{ name: string; definition: string }> = [
+    // 1b. Ensure all required club_members columns and indexes exist
+    await this.ensureColumnsExist(dbName, 'club_members', [
+      { name: 'role', definition: "ENUM('member', 'admin') NOT NULL DEFAULT 'member'" },
+      { name: 'status', definition: "VARCHAR(40) NOT NULL DEFAULT 'فعال'" },
+      { name: 'education', definition: "VARCHAR(120) NOT NULL DEFAULT ''" },
+      { name: 'email', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
+      { name: 'avatar_url', definition: 'LONGTEXT NULL' },
+      { name: 'bio', definition: 'TEXT NULL' },
+      { name: 'membership_code', definition: "VARCHAR(60) NOT NULL DEFAULT ''" },
+      { name: 'joined_date', definition: "VARCHAR(60) NOT NULL DEFAULT ''" },
+      { name: 'password_hash', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
+    ]);
+    await this.ensureIndexExists(
+      dbName,
+      'club_members',
+      'uk_club_members_phone',
+      'UNIQUE KEY `uk_club_members_phone` (`phone`)'
+    );
+    await this.ensureIndexExists(
+      dbName,
+      'club_members',
+      'idx_club_members_role',
+      'INDEX `idx_club_members_role` (`role`)'
+    );
+
+    // 2. Safely add all required columns to member_sessions if missing
+    await this.ensureColumnsExist(dbName, 'member_sessions', [
+      { name: 'member_phone', definition: "VARCHAR(60) NOT NULL DEFAULT 'all'" },
+      { name: 'book_author', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
       { name: 'translator', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
-      { name: 'category', definition: "VARCHAR(100) NOT NULL DEFAULT ''" },
+      { name: 'category', definition: "VARCHAR(120) NOT NULL DEFAULT ''" },
       { name: 'publication_year', definition: 'INT NOT NULL DEFAULT 1405' },
+      { name: 'pages_count', definition: 'INT NOT NULL DEFAULT 0' },
+      { name: 'publisher', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
+      { name: 'mentor_name', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
+      { name: 'session_date', definition: "VARCHAR(100) NOT NULL DEFAULT ''" },
+      { name: 'session_time', definition: "VARCHAR(100) NOT NULL DEFAULT ''" },
+      { name: 'cover_url', definition: 'LONGTEXT NULL' },
       { name: 'short_description', definition: 'TEXT NULL' },
       { name: 'full_description', definition: 'LONGTEXT NULL' },
-    ];
+      { name: 'location_type', definition: "VARCHAR(80) NOT NULL DEFAULT 'حضوری و آنلاین'" },
+      { name: 'meeting_link_or_room', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
+      { name: 'status', definition: "VARCHAR(60) NOT NULL DEFAULT 'فعال'" },
+      { name: 'member_note', definition: 'TEXT NULL' },
+      { name: 'sub_sessions_json', definition: 'LONGTEXT NULL' },
+      { name: 'sort_order', definition: 'INT NOT NULL DEFAULT 0' },
+    ]);
+    await this.ensureIndexExists(
+      dbName,
+      'member_sessions',
+      'idx_member_sessions_sort',
+      'INDEX `idx_member_sessions_sort` (`sort_order`, `status`)'
+    );
 
-    for (const col of sessionColumnsToEnsure) {
-      const [colRows] = await this.pool.execute<RowDataPacket[]>(
-        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'member_sessions' AND COLUMN_NAME = ?`,
-        [dbName, col.name]
-      );
-      if (colRows.length === 0) {
-        await this.pool.execute(
-          `ALTER TABLE member_sessions ADD COLUMN \`${col.name}\` ${col.definition}`
-        );
-      }
-    }
-
-    // 3. Safely add new course metadata and syllabus columns to member_classes if missing
-    const classColumnsToEnsure: Array<{ name: string; definition: string }> = [
+    // 3. Safely add course metadata and syllabus columns to member_classes if missing
+    await this.ensureColumnsExist(dbName, 'member_classes', [
+      { name: 'member_phone', definition: "VARCHAR(60) NOT NULL DEFAULT 'all'" },
+      { name: 'book_title', definition: "VARCHAR(180) NOT NULL DEFAULT ''" },
+      { name: 'instructor_name', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
+      { name: 'schedule_summary', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
+      { name: 'level_label', definition: "VARCHAR(80) NOT NULL DEFAULT 'مبتدی'" },
       { name: 'start_date', definition: "VARCHAR(100) NOT NULL DEFAULT ''" },
       { name: 'end_date', definition: "VARCHAR(100) NOT NULL DEFAULT ''" },
       { name: 'duration_label', definition: "VARCHAR(100) NOT NULL DEFAULT ''" },
       { name: 'sessions_count', definition: "VARCHAR(100) NOT NULL DEFAULT ''" },
       { name: 'capacity_label', definition: "VARCHAR(100) NOT NULL DEFAULT ''" },
       { name: 'syllabus_json', definition: 'LONGTEXT NULL' },
-    ];
-
-    for (const col of classColumnsToEnsure) {
-      const [colRows] = await this.pool.execute<RowDataPacket[]>(
-        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'member_classes' AND COLUMN_NAME = ?`,
-        [dbName, col.name]
-      );
-      if (colRows.length === 0) {
-        await this.pool.execute(
-          `ALTER TABLE member_classes ADD COLUMN \`${col.name}\` ${col.definition}`
-        );
-      }
-    }
-
-    // 4. Safely add messages_json and updated_at to member_tickets if missing
-    const ticketColumnsToEnsure: Array<{ name: string; definition: string }> = [
-      { name: 'messages_json', definition: 'LONGTEXT NULL' },
-      { name: 'updated_at', definition: "VARCHAR(80) NOT NULL DEFAULT ''" },
-    ];
-
-    for (const col of ticketColumnsToEnsure) {
-      const [colRows] = await this.pool.execute<RowDataPacket[]>(
-        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'member_tickets' AND COLUMN_NAME = ?`,
-        [dbName, col.name]
-      );
-      if (colRows.length === 0) {
-        await this.pool.execute(
-          `ALTER TABLE member_tickets ADD COLUMN \`${col.name}\` ${col.definition}`
-        );
-      }
-    }
-
-    // 5. Safely add read_by_phones_json to club_announcements if missing
-    const [annColRows] = await this.pool.execute<RowDataPacket[]>(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'club_announcements' AND COLUMN_NAME = 'read_by_phones_json'`,
-      [dbName]
+      { name: 'cover_url', definition: 'LONGTEXT NULL' },
+      { name: 'status', definition: "VARCHAR(60) NOT NULL DEFAULT 'فعال'" },
+      { name: 'description', definition: 'TEXT NULL' },
+      { name: 'sub_sessions_json', definition: 'LONGTEXT NULL' },
+      { name: 'sort_order', definition: 'INT NOT NULL DEFAULT 0' },
+    ]);
+    await this.ensureIndexExists(
+      dbName,
+      'member_classes',
+      'idx_member_classes_sort',
+      'INDEX `idx_member_classes_sort` (`sort_order`, `status`)'
     );
-    if (annColRows.length === 0) {
-      await this.pool.execute(
-        'ALTER TABLE club_announcements ADD COLUMN `read_by_phones_json` LONGTEXT NULL'
-      );
-    }
 
-    // 6. Safely add extended book metadata columns to library_books if missing
-    const libraryBookColumnsToEnsure: Array<{ name: string; definition: string }> = [
+    // 3b. Ensure session_enrollments columns and indexes exist
+    await this.ensureColumnsExist(dbName, 'session_enrollments', [
+      { name: 'target_type', definition: "ENUM('session', 'class') NOT NULL DEFAULT 'session'" },
+      { name: 'target_id', definition: 'INT NOT NULL DEFAULT 0' },
+      { name: 'member_id', definition: 'INT DEFAULT NULL' },
+      { name: 'member_phone', definition: "VARCHAR(60) NOT NULL DEFAULT ''" },
+      { name: 'member_name', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
+      { name: 'status', definition: "VARCHAR(40) NOT NULL DEFAULT 'غیرفعال'" },
+      { name: 'attendance_status', definition: "VARCHAR(40) NOT NULL DEFAULT 'ثبت‌نام‌شده'" },
+      { name: 'member_note', definition: 'TEXT NULL' },
+      { name: 'registered_at', definition: "VARCHAR(80) NOT NULL DEFAULT ''" },
+    ]);
+    await this.ensureIndexExists(
+      dbName,
+      'session_enrollments',
+      'uk_enrollment_target_member',
+      'UNIQUE KEY `uk_enrollment_target_member` (`target_type`, `target_id`, `member_phone`)'
+    );
+    await this.ensureIndexExists(
+      dbName,
+      'session_enrollments',
+      'idx_enrollment_member_phone',
+      'INDEX `idx_enrollment_member_phone` (`member_phone`)'
+    );
+    await this.ensureIndexExists(
+      dbName,
+      'session_enrollments',
+      'idx_enrollment_target',
+      'INDEX `idx_enrollment_target` (`target_type`, `target_id`)'
+    );
+
+    // 4. Safely add all required columns to member_tickets if missing
+    await this.ensureColumnsExist(dbName, 'member_tickets', [
+      { name: 'priority', definition: "VARCHAR(40) NOT NULL DEFAULT 'عادی'" },
+      { name: 'status', definition: "VARCHAR(60) NOT NULL DEFAULT 'در انتظار بررسی'" },
+      { name: 'attachment_name', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
+      { name: 'admin_reply', definition: 'TEXT NULL' },
+      { name: 'admin_replies_json', definition: 'LONGTEXT NULL' },
+      { name: 'messages_json', definition: 'LONGTEXT NULL' },
+      { name: 'created_at', definition: "VARCHAR(80) NOT NULL DEFAULT ''" },
+      { name: 'updated_at', definition: "VARCHAR(80) NOT NULL DEFAULT ''" },
+    ]);
+    await this.ensureIndexExists(
+      dbName,
+      'member_tickets',
+      'idx_member_tickets_phone',
+      'INDEX `idx_member_tickets_phone` (`member_phone`, `status`)'
+    );
+
+    // 4b. Reconcile ticket_attachments schema (migrate legacy sender_role/file_data if created from older schema.sql)
+    await this.ensureColumnsExist(dbName, 'ticket_attachments', [
+      { name: 'message_index', definition: 'INT NOT NULL DEFAULT 0 AFTER `ticket_id`' },
+      { name: 'uploader_role', definition: "ENUM('member', 'admin') NOT NULL DEFAULT 'member'" },
+      { name: 'file_name', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
+      { name: 'mime_type', definition: "VARCHAR(120) NOT NULL DEFAULT 'application/octet-stream'" },
+      { name: 'file_size', definition: 'INT NOT NULL DEFAULT 0' },
+      { name: 'data_url', definition: 'LONGTEXT NULL' },
+      { name: 'created_at', definition: "VARCHAR(80) NOT NULL DEFAULT ''" },
+    ]);
+    if (await this.hasColumn(dbName, 'ticket_attachments', 'sender_role')) {
+      await this.pool.execute(
+        'UPDATE ticket_attachments SET uploader_role = sender_role WHERE sender_role IS NOT NULL'
+      );
+      await this.pool.execute('ALTER TABLE ticket_attachments DROP COLUMN `sender_role`');
+    }
+    if (await this.hasColumn(dbName, 'ticket_attachments', 'file_data')) {
+      await this.pool.execute(
+        "UPDATE ticket_attachments SET data_url = file_data WHERE (data_url IS NULL OR data_url = '') AND file_data IS NOT NULL"
+      );
+      await this.pool.execute('ALTER TABLE ticket_attachments DROP COLUMN `file_data`');
+    }
+    await this.ensureIndexExists(
+      dbName,
+      'ticket_attachments',
+      'idx_ticket_attachments_ticket',
+      'INDEX `idx_ticket_attachments_ticket` (`ticket_id`)'
+    );
+    await this.ensureIndexExists(
+      dbName,
+      'ticket_attachments',
+      'idx_ticket_attachments_msg',
+      'INDEX `idx_ticket_attachments_msg` (`ticket_id`, `message_index`)'
+    );
+
+    // 5. Ensure all columns & indexes on club_announcements and club_calendar_events
+    await this.ensureColumnsExist(dbName, 'club_announcements', [
+      { name: 'is_important', definition: 'TINYINT(1) NOT NULL DEFAULT 0' },
+      { name: 'is_read', definition: 'TINYINT(1) NOT NULL DEFAULT 0' },
+      { name: 'read_by_phones_json', definition: 'LONGTEXT NULL' },
+      { name: 'target_user_phone', definition: 'VARCHAR(60) DEFAULT NULL' },
+      { name: 'target_user_name', definition: 'VARCHAR(150) DEFAULT NULL' },
+      { name: 'sort_order', definition: 'INT NOT NULL DEFAULT 0' },
+    ]);
+    await this.ensureIndexExists(
+      dbName,
+      'club_announcements',
+      'idx_announcements_target',
+      'INDEX `idx_announcements_target` (`target_user_phone`, `sort_order`)'
+    );
+
+    await this.ensureColumnsExist(dbName, 'club_calendar_events', [
+      { name: 'is_reserved', definition: 'TINYINT(1) NOT NULL DEFAULT 0' },
+      { name: 'reserved_by_phones_json', definition: 'LONGTEXT NULL' },
+      { name: 'sort_order', definition: 'INT NOT NULL DEFAULT 0' },
+    ]);
+    await this.ensureIndexExists(
+      dbName,
+      'club_calendar_events',
+      'idx_calendar_events_sort',
+      'INDEX `idx_calendar_events_sort` (`sort_order`)'
+    );
+
+    // 6. Safely add extended book metadata columns to library_books and member_library if missing
+    await this.ensureColumnsExist(dbName, 'library_books', [
+      { name: 'is_current', definition: 'TINYINT(1) NOT NULL DEFAULT 0' },
+      { name: 'original_title', definition: "VARCHAR(180) NOT NULL DEFAULT ''" },
+      { name: 'author', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
+      { name: 'translator', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
+      { name: 'category', definition: "VARCHAR(80) NOT NULL DEFAULT ''" },
+      { name: 'publication_year', definition: 'INT NOT NULL DEFAULT 0' },
       { name: 'edition_number', definition: "VARCHAR(80) NOT NULL DEFAULT ''" },
+      { name: 'pages_count', definition: 'INT NOT NULL DEFAULT 0' },
       { name: 'publisher', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
+      { name: 'reading_progress_percent', definition: 'INT NOT NULL DEFAULT 0' },
+      { name: 'session_schedule', definition: "VARCHAR(180) NOT NULL DEFAULT ''" },
+      { name: 'cover_url', definition: 'LONGTEXT NULL' },
+      { name: 'short_description', definition: 'TEXT NULL' },
       { name: 'description', definition: 'LONGTEXT NULL' },
       { name: 'memorable_quote', definition: 'TEXT NULL' },
       { name: 'recommended_for', definition: 'TEXT NULL' },
       { name: 'tags', definition: 'TEXT NULL' },
       { name: 'notes', definition: 'LONGTEXT NULL' },
-    ];
-
-    for (const col of libraryBookColumnsToEnsure) {
-      const [colRows] = await this.pool.execute<RowDataPacket[]>(
-        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'library_books' AND COLUMN_NAME = ?`,
-        [dbName, col.name]
-      );
-      if (colRows.length === 0) {
-        await this.pool.execute(
-          `ALTER TABLE library_books ADD COLUMN \`${col.name}\` ${col.definition}`
-        );
-      }
-    }
-
-    // 6b. Ensure contact_messages has is_read column
-    const [contactReadCol] = await this.pool.execute<RowDataPacket[]>(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'contact_messages' AND COLUMN_NAME = 'is_read'`,
-      [dbName]
+      { name: 'sort_order', definition: 'INT NOT NULL DEFAULT 0' },
+    ]);
+    await this.ensureIndexExists(
+      dbName,
+      'library_books',
+      'idx_library_books_sort',
+      'INDEX `idx_library_books_sort` (`sort_order`, `is_current`)'
     );
-    if (contactReadCol.length === 0) {
-      await this.pool.execute(
-        'ALTER TABLE contact_messages ADD COLUMN is_read TINYINT(1) NOT NULL DEFAULT 0 AFTER message'
-      );
-    }
+
+    await this.ensureColumnsExist(dbName, 'member_library', [
+      { name: 'translator', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
+      { name: 'reading_status', definition: "VARCHAR(60) NOT NULL DEFAULT 'در حال مطالعه'" },
+      { name: 'progress_percent', definition: 'INT NOT NULL DEFAULT 0' },
+      { name: 'pages_read', definition: 'INT NOT NULL DEFAULT 0' },
+      { name: 'pages_count', definition: 'INT NOT NULL DEFAULT 300' },
+      { name: 'personal_note', definition: 'TEXT NULL' },
+      { name: 'updated_at', definition: "VARCHAR(80) NOT NULL DEFAULT ''" },
+    ]);
+    await this.ensureIndexExists(
+      dbName,
+      'member_library',
+      'idx_member_library_phone',
+      'INDEX `idx_member_library_phone` (`member_phone`)'
+    );
+
+    // 6b. Ensure blog_posts, user_comments, footer_settings, contact_messages, and navigation_links columns & indexes
+    await this.ensureColumnsExist(dbName, 'blog_posts', [
+      { name: 'slug', definition: "VARCHAR(220) NOT NULL DEFAULT ''" },
+      { name: 'category', definition: "VARCHAR(100) NOT NULL DEFAULT 'یادداشت ادبی'" },
+      { name: 'author', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
+      { name: 'published_date', definition: "VARCHAR(80) NOT NULL DEFAULT ''" },
+      { name: 'reading_time', definition: "VARCHAR(60) NOT NULL DEFAULT '۵ دقیقه مطالعه'" },
+      { name: 'cover_url', definition: 'LONGTEXT NULL' },
+      { name: 'excerpt', definition: 'TEXT NULL' },
+      { name: 'full_content', definition: 'LONGTEXT NULL' },
+      { name: 'tags', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
+      { name: 'status', definition: "VARCHAR(40) NOT NULL DEFAULT 'منتشر شده'" },
+      { name: 'sort_order', definition: 'INT NOT NULL DEFAULT 0' },
+    ]);
+    await this.ensureIndexExists(
+      dbName,
+      'blog_posts',
+      'idx_blog_sort',
+      'INDEX `idx_blog_sort` (`sort_order`, `status`)'
+    );
+
+    await this.ensureColumnsExist(dbName, 'user_comments', [
+      { name: 'author_phone', definition: "VARCHAR(60) NOT NULL DEFAULT ''" },
+      { name: 'target_type', definition: "VARCHAR(60) NOT NULL DEFAULT 'مقاله وبلاگ'" },
+      { name: 'rating', definition: 'INT NOT NULL DEFAULT 5' },
+      { name: 'comment_text', definition: 'TEXT NULL' },
+      { name: 'admin_reply', definition: 'TEXT NULL' },
+      { name: 'status', definition: "VARCHAR(40) NOT NULL DEFAULT 'در انتظار تایید'" },
+      { name: 'created_date', definition: "VARCHAR(80) NOT NULL DEFAULT ''" },
+      { name: 'sort_order', definition: 'INT NOT NULL DEFAULT 0' },
+    ]);
+    await this.ensureIndexExists(
+      dbName,
+      'user_comments',
+      'idx_user_comments_status',
+      'INDEX `idx_user_comments_status` (`status`, `sort_order`)'
+    );
+
+    await this.ensureColumnsExist(dbName, 'footer_settings', [
+      { name: 'title', definition: "VARCHAR(220) NOT NULL DEFAULT 'باشگاه کتابخوانی کتابوشکا'" },
+      { name: 'description', definition: 'TEXT NULL' },
+      { name: 'phone', definition: "VARCHAR(80) NOT NULL DEFAULT ''" },
+      { name: 'email', definition: "VARCHAR(150) NOT NULL DEFAULT ''" },
+      { name: 'address', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
+      { name: 'links_json', definition: 'LONGTEXT NULL' },
+      { name: 'instagram_url', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
+      { name: 'telegram_url', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
+      { name: 'twitter_url', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
+      { name: 'youtube_url', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
+      { name: 'linkedin_url', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
+      { name: 'copyright_text', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
+      { name: 'tagline_text', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
+    ]);
+
+    await this.ensureColumnsExist(dbName, 'contact_messages', [
+      { name: 'is_read', definition: 'TINYINT(1) NOT NULL DEFAULT 0 AFTER `message`' },
+    ]);
+    await this.ensureIndexExists(
+      dbName,
+      'contact_messages',
+      'idx_contact_messages_read',
+      'INDEX `idx_contact_messages_read` (`is_read`, `created_at`)'
+    );
+
+    await this.ensureIndexExists(
+      dbName,
+      'navigation_links',
+      'idx_nav_sort',
+      'INDEX `idx_nav_sort` (`sort_order`, `is_active`)'
+    );
 
     // 7. Backfill exact Jalali joined_date from created_at on club_members where placeholder was stored
     const [membersToBackfill] = await this.pool.execute<RowDataPacket[]>(
