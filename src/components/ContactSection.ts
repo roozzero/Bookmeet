@@ -171,7 +171,7 @@ export function createContactSectionComponent(
               <div class="space-y-1.5 max-w-lg">
                 <div class="inline-flex items-center gap-3">
                   <img
-                    src="/assets/Bookmate%20Persian%20Logo%20with%20Colorful%20Books.png"
+                    src="/assets/aistudio/Playful_Persian-English_Storybook_Logo_c1743733.png"
                     alt="لوگوی باشگاه کتابخوانی کتابوشکا"
                     class="h-10 w-auto object-contain select-none shrink-0"
                   />

@@ -23,7 +23,7 @@ export interface NavbarProps {
 }
 
 export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
-  const logoSrc = '/assets/Bookmate%20Persian%20Logo%20with%20Colorful%20Books.png';
+  const logoSrc = '/assets/aistudio/Playful_Persian-English_Storybook_Logo_c1743733.png';
   const ctaMotionClass = props.isStationaryCta ? '' : 'club-login-btn--rocking';
   const mode = props.panelMode || 'public';
   const isPanelMode = mode === 'admin' || mode === 'member';

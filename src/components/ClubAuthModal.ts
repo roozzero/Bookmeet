@@ -19,7 +19,7 @@ export function createClubAuthModalComponent(
         <div class="flex items-center justify-between border-b border-[#e5dccb] pb-2.5">
           <div class="flex items-center gap-2">
             <img
-              src="/assets/Bookmate Persian Logo with Colorful Books.png"
+              src="/assets/aistudio/Playful_Persian-English_Storybook_Logo_c1743733.png"
               alt="لوگوی باشگاه کتابخوانی کتابوشکا"
               class="h-7 w-auto object-contain select-none"
             />
