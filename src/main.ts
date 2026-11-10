@@ -392,7 +392,35 @@ function mountApplication(
       { key: 'home_settings', label: 'تنظیمات صفحه اصلی' },
     ];
 
+    const handleAdminBackToSite = (): void => {
+      ApiService.fetchBootstrapData()
+        .then((fresh) => {
+          payload.libraryBooks = fresh.libraryBooks || [];
+          payload.libraryCategories = fresh.libraryCategories || [];
+          payload.publicSessions = fresh.publicSessions || [];
+          payload.publicClasses = fresh.publicClasses || [];
+          payload.approvedComments = fresh.approvedComments || [];
+          payload.blogPosts = fresh.blogPosts || [];
+          if (fresh.footerSettings) payload.footerSettings = fresh.footerSettings;
+          allPosts = payload.blogPosts;
+        })
+        .finally(() => {
+          pushRoute('/');
+          renderMainHomeView();
+        });
+    };
+
+    const handleAdminLogout = (): void => {
+      ApiService.logoutClubMember().finally(() => {
+        currentMember = null;
+        clearSavedActiveRoute();
+        pushRoute('/');
+        renderMainHomeView();
+      });
+    };
+
     const $navbar = createNavbarComponent({
+      navigationLinks: payload.navigationLinks,
       ctaText: getNavbarCtaLabel(),
       isStationaryCta: true,
       panelMode: 'admin',
@@ -401,6 +429,8 @@ function mountApplication(
       onPanelMenuSelect: (key) => {
         $shell.find(`.js-admin-tab-btn[data-admin-tab="${key}"]`).trigger('click');
       },
+      onPanelBackToSite: handleAdminBackToSite,
+      onPanelLogout: handleAdminLogout,
       onNavigate: (href) => {
         ApiService.fetchBootstrapData()
           .then((fresh) => {
@@ -433,31 +463,8 @@ function mountApplication(
           $navbar.trigger('navbar:set-active-key', [match[1]]);
         }
       },
-      onBackToSite: () => {
-        ApiService.fetchBootstrapData()
-          .then((fresh) => {
-            payload.libraryBooks = fresh.libraryBooks || [];
-            payload.libraryCategories = fresh.libraryCategories || [];
-            payload.publicSessions = fresh.publicSessions || [];
-            payload.publicClasses = fresh.publicClasses || [];
-            payload.approvedComments = fresh.approvedComments || [];
-            payload.blogPosts = fresh.blogPosts || [];
-            if (fresh.footerSettings) payload.footerSettings = fresh.footerSettings;
-            allPosts = payload.blogPosts;
-          })
-          .finally(() => {
-            pushRoute('/');
-            renderMainHomeView();
-          });
-      },
-      onLogout: () => {
-        ApiService.logoutClubMember().finally(() => {
-          currentMember = null;
-          clearSavedActiveRoute();
-          pushRoute('/');
-          renderMainHomeView();
-        });
-      },
+      onBackToSite: handleAdminBackToSite,
+      onLogout: handleAdminLogout,
       onAdminUpdated: (updatedAdmin) => {
         currentMember = updatedAdmin;
         $('.js-club-login-btn').text(getNavbarCtaLabel());
@@ -564,7 +571,22 @@ function mountApplication(
       { key: 'calendar', label: 'تقویم رویدادها' },
     ];
 
+    const handleMemberBackToSite = (): void => {
+      pushRoute('/');
+      renderMainHomeView();
+    };
+
+    const handleMemberLogout = (): void => {
+      ApiService.logoutClubMember().finally(() => {
+        currentMember = null;
+        clearSavedActiveRoute();
+        pushRoute('/');
+        renderMainHomeView();
+      });
+    };
+
     const $navbar = createNavbarComponent({
+      navigationLinks: payload.navigationLinks,
       ctaText: getNavbarCtaLabel(),
       isStationaryCta: true,
       panelMode: 'member',
@@ -573,6 +595,8 @@ function mountApplication(
       onPanelMenuSelect: (key) => {
         $shell.find(`.js-panel-tab-btn[data-tab="${key}"]`).trigger('click');
       },
+      onPanelBackToSite: handleMemberBackToSite,
+      onPanelLogout: handleMemberLogout,
       onNavigate: (href) => {
         renderMainHomeView(href);
       },
@@ -593,18 +617,8 @@ function mountApplication(
           $navbar.trigger('navbar:set-active-key', [match[1]]);
         }
       },
-      onBackToSite: () => {
-        pushRoute('/');
-        renderMainHomeView();
-      },
-      onLogout: () => {
-        ApiService.logoutClubMember().finally(() => {
-          currentMember = null;
-          clearSavedActiveRoute();
-          pushRoute('/');
-          renderMainHomeView();
-        });
-      },
+      onBackToSite: handleMemberBackToSite,
+      onLogout: handleMemberLogout,
       onMemberUpdated: (updatedMember) => {
         currentMember = updatedMember;
         $('.js-club-login-btn').text(getNavbarCtaLabel());

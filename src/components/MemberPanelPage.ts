@@ -2937,22 +2937,23 @@ export function createMemberPanelPageComponent(props: MemberPanelPageProps): JQu
                 `;
               })
               .join('')}
-          </nav>
 
-          <div class="pt-3 mt-3 lg:pt-4 lg:mt-4 border-t border-[#E6D8C5] flex items-center justify-between lg:block lg:space-y-2 gap-2">
-            <button
-              type="button"
-              class="js-back-to-home px-3.5 lg:px-4 py-2 lg:py-2.5 rounded-xl text-[12px] lg:text-[12.5px] font-semibold text-[#5B4636] hover:bg-[#EFE3D2] text-right transition-colors cursor-pointer lg:w-full"
-            >
-              ← بازگشت به صفحه اصلی سایت
-            </button>
-            <button
-              type="button"
-              class="js-logout-panel px-3.5 lg:px-4 py-2 lg:py-2.5 rounded-xl text-[12px] lg:text-[12.5px] font-semibold text-[#9E3329] hover:bg-[#FBEAE8] text-right transition-colors cursor-pointer lg:w-full"
-            >
-              خروج از حساب کاربری
-            </button>
-          </div>
+            <div class="pt-3 mt-3 border-t border-[#E6D8C5] space-y-1.5">
+              <button
+                type="button"
+                class="js-back-to-home w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#5B4636] hover:bg-[#EFE3D2] text-right flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <span>بازگشت به سایت</span>
+                <span class="text-[12px] text-[#7A6352]">←</span>
+              </button>
+              <button
+                type="button"
+                class="js-logout-panel w-full px-4 py-2.5 rounded-xl text-[12.5px] font-semibold text-[#9E3329] hover:bg-[#FBEAE8] text-right flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <span>خروج</span>
+              </button>
+            </div>
+          </nav>
         </aside>
 
         <!-- Main Content Area -->

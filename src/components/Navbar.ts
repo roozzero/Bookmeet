@@ -16,6 +16,8 @@ export interface NavbarProps {
   panelMenuItems?: NavbarPanelMenuItem[];
   activePanelKey?: string;
   onPanelMenuSelect?: (key: string) => void;
+  onPanelBackToSite?: () => void;
+  onPanelLogout?: () => void;
   onNavigate?: (href: string, label: string) => void;
   onLoginClick?: () => void;
 }
@@ -33,10 +35,10 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
     >
       <div class="flex items-center justify-between gap-3 sm:gap-6">
         <!-- Zone 1 (Right in RTL): Ketboshka Logo + Mobile Menu Toggle -->
-        <div class="flex items-center gap-2.5 shrink-0">
+        <div class="${isPanelMode ? 'w-full lg:w-auto justify-between lg:justify-start' : ''} flex items-center gap-2.5 shrink-0">
           <button
             type="button"
-            class="js-mobile-nav-toggle lg:hidden w-10 h-10 rounded-xl bg-[#f7f2e6] border border-[#d6c8b2] text-[#3b2a1e] flex items-center justify-center cursor-pointer hover:bg-[#ebe1cd] transition-colors"
+            class="js-mobile-nav-toggle lg:hidden w-10 h-10 rounded-xl bg-[#f7f2e6] border border-[#d6c8b2] text-[#3b2a1e] flex items-center justify-center cursor-pointer hover:bg-[#ebe1cd] transition-colors shrink-0"
             aria-label="${
               mode === 'admin'
                 ? 'باز کردن منوی پنل مدیریت'
@@ -70,20 +72,14 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
           </button>
         </div>
 
-        ${
-          !isPanelMode
-            ? `
-          <!-- Zone 2 (Center on Desktop - Public Website Only): Persian Navigation Links -->
-          <nav
-            class="js-desktop-nav hidden lg:flex items-center gap-5 xl:gap-8 text-[14px] font-medium text-[#4a392b] overflow-x-auto"
-            aria-label="منوی اصلی"
-          ></nav>
-        `
-            : ''
-        }
+        <!-- Zone 2 (Center on Desktop Only): Persian Navigation Links -->
+        <nav
+          class="js-desktop-nav hidden lg:flex items-center gap-5 xl:gap-8 text-[14px] font-medium text-[#4a392b] overflow-x-auto"
+          aria-label="منوی اصلی"
+        ></nav>
 
-        <!-- Zone 3 (Left in RTL): Primary Action Button -->
-        <div class="flex items-center shrink-0">
+        <!-- Zone 3 (Left in RTL): Primary Action Button (Hidden on mobile inside Admin/User Panels so only Hamburger Menu is visible as navigation control) -->
+        <div class="${isPanelMode ? 'hidden lg:flex' : 'flex'} items-center shrink-0">
           <button
             type="button"
             class="js-club-login-btn club-login-btn ${ctaMotionClass} px-3.5 sm:px-4 py-2 text-[12.5px] sm:text-[13px] font-medium whitespace-nowrap shrink-0 cursor-pointer"
@@ -95,7 +91,7 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
 
       <!-- Collapsible Mobile Navigation Drawer -->
       <nav
-        class="js-mobile-nav-drawer hidden lg:hidden mt-3 pt-3 border-t border-[#d8ccb6] flex-col space-y-1.5 max-h-[75vh] overflow-y-auto"
+        class="js-mobile-nav-drawer hidden lg:hidden mt-3 pt-3 border-t border-[#d8ccb6] flex-col space-y-1.5 max-h-[78vh] overflow-y-auto"
         aria-label="${
           mode === 'admin'
             ? 'منوی موبایل پنل مدیریت'
@@ -134,7 +130,7 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
     }
   });
 
-  if (!isPanelMode && Array.isArray(props.navigationLinks)) {
+  if (Array.isArray(props.navigationLinks)) {
     props.navigationLinks.forEach((link, idx) => {
       const isInitialActive = props.activeHref
         ? props.activeHref === link.href
@@ -183,20 +179,23 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
       $link.on('click', handlePublicNavClick);
       $desktopNav.append($link);
 
-      const $mobileLink = $(`
-        <button
-          type="button"
-          data-href="${link.href}"
-          data-label="${link.label}"
-          class="js-mobile-nav-link w-full px-4 py-2.5 rounded-xl text-right text-[13px] font-medium flex items-center justify-between transition-colors cursor-pointer ${
-            isInitialActive
-              ? 'bg-[#3b2a1e] text-[#faf6ec] font-semibold'
-              : 'bg-[#f7f2e6] text-[#3b2a1e] hover:bg-[#e8decb] border border-[#ded2bc]'
-          }"
-        ><span>${link.label}</span></button>
-      `);
-      $mobileLink.on('click', handlePublicNavClick);
-      $mobileDrawer.append($mobileLink);
+      // Only add public website links to the mobile hamburger menu when in public mode
+      if (!isPanelMode) {
+        const $mobileLink = $(`
+          <button
+            type="button"
+            data-href="${link.href}"
+            data-label="${link.label}"
+            class="js-mobile-nav-link w-full px-4 py-2.5 rounded-xl text-right text-[13px] font-medium flex items-center justify-between transition-colors cursor-pointer ${
+              isInitialActive
+                ? 'bg-[#3b2a1e] text-[#faf6ec] font-semibold'
+                : 'bg-[#f7f2e6] text-[#3b2a1e] hover:bg-[#e8decb] border border-[#ded2bc]'
+            }"
+          ><span>${link.label}</span></button>
+        `);
+        $mobileLink.on('click', handlePublicNavClick);
+        $mobileDrawer.append($mobileLink);
+      }
     });
   }
 
@@ -261,6 +260,45 @@ export function createNavbarComponent(props: NavbarProps): JQuery<HTMLElement> {
 
       $mobileDrawer.append($panelMobileBtn);
     });
+
+    // Visually separated "بازگشت به سایت" and "خروج" options at the end of the panel hamburger menu
+    const $panelActionsWrapper = $(`
+      <div class="pt-2.5 mt-2 border-t border-[#d8ccb6] space-y-1.5">
+        <button
+          type="button"
+          class="js-mobile-panel-back-to-site w-full px-4 py-2.5 rounded-xl text-right text-[13px] font-semibold text-[#4E3B2D] bg-[#f7f2e6] hover:bg-[#ebe1cd] border border-[#ded2bc] flex items-center justify-between transition-colors cursor-pointer"
+        >
+          <span>بازگشت به سایت</span>
+          <span class="text-[12px] text-[#7A6352]">←</span>
+        </button>
+        <button
+          type="button"
+          class="js-mobile-panel-logout w-full px-4 py-2.5 rounded-xl text-right text-[13px] font-semibold text-[#9E3329] bg-[#FBEAE8]/85 hover:bg-[#F5D5D1] border border-[#E6B8B3] flex items-center justify-between transition-colors cursor-pointer"
+        >
+          <span>خروج</span>
+        </button>
+      </div>
+    `);
+
+    $panelActionsWrapper.find('.js-mobile-panel-back-to-site').on('click', (e) => {
+      e.preventDefault();
+      closeMobileDrawer();
+      if (props.onPanelBackToSite) {
+        props.onPanelBackToSite();
+      } else if (props.onNavigate) {
+        props.onNavigate('#home', 'صفحه اصلی');
+      }
+    });
+
+    $panelActionsWrapper.find('.js-mobile-panel-logout').on('click', (e) => {
+      e.preventDefault();
+      closeMobileDrawer();
+      if (props.onPanelLogout) {
+        props.onPanelLogout();
+      }
+    });
+
+    $mobileDrawer.append($panelActionsWrapper);
   }
 
   $header.on('navbar:set-active-key', (_e, key: string) => {
